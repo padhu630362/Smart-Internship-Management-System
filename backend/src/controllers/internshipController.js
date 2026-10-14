@@ -1,3 +1,5 @@
+import path from 'path';
+import fs from 'fs';
 import { Internship, WORK_MODES, INTERNSHIP_STATUSES } from '../models/Internship.js';
 import { ROLES, User } from '../models/User.js';
 import {
@@ -5,6 +7,8 @@ import {
   NOTIFICATION_TYPES,
 } from '../services/notificationService.js';
 import { escapeRegex } from '../middlewares/sanitize.js';
+import { extractResumeText, analyzeResumeWithGemini } from '../services/aiService.js';
+import { UPLOAD_DIR } from '../utils/fileUpload.js';
 
 /**
  * Public & Student directory of published internship opportunities.
@@ -486,3 +490,66 @@ export const deleteInternship = async (req, res, next) => {
     next(err);
   }
 };
+
+/**
+ * Calculates live AI / deterministic match score between current user and an internship.
+ */
+export const getInternshipMatchScore = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const internship = await Internship.findById(id);
+    if (!internship) {
+      const error = new Error('Internship not found.');
+      error.statusCode = 404;
+      error.code = 'NOT_FOUND';
+      return next(error);
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      const error = new Error('User not found.');
+      error.statusCode = 404;
+      error.code = 'USER_NOT_FOUND';
+      return next(error);
+    }
+
+    const studentSnapshot = {
+      name: user.name,
+      department: user.profile?.studentDetails?.department || '',
+      cgpa: user.profile?.studentDetails?.cgpa || null,
+      skills: user.profile?.studentDetails?.skills || [],
+      bio: user.profile?.bio || '',
+    };
+
+    let resumeText = '';
+    const resumeFilename = user.profile?.studentDetails?.resumeUrl?.split('/').pop();
+    if (resumeFilename) {
+      const filePath = path.join(UPLOAD_DIR, resumeFilename);
+      if (fs.existsSync(filePath)) {
+        resumeText = await extractResumeText(filePath);
+      }
+    }
+
+    const matchResult = await analyzeResumeWithGemini({
+      resumeText,
+      studentProfile: studentSnapshot,
+      internship,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        matchScore: matchResult.matchScore,
+        matchedSkills: matchResult.matchedSkills,
+        missingSkills: matchResult.missingSkills,
+        strengths: matchResult.strengths,
+        improvements: matchResult.improvements,
+        overallAssessment: matchResult.overallAssessment,
+        engine: matchResult.engine,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+

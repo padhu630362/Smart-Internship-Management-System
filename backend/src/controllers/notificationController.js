@@ -166,6 +166,36 @@ export const deleteNotification = async (req, res, next) => {
 };
 
 /**
+ * Clear notifications for current user (optionally only read ones)
+ */
+export const clearAllNotifications = async (req, res, next) => {
+  try {
+    const filter = { recipient: req.user.id };
+    if (req.query.onlyRead === 'true') {
+      filter.isRead = true;
+    }
+
+    const result = await Notification.deleteMany(filter);
+
+    const unreadCount = await Notification.countDocuments({
+      recipient: req.user.id,
+      isRead: false,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Notifications cleared successfully.',
+      data: {
+        deletedCount: result.deletedCount,
+        unreadCount,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * Mentors, Coordinators, and Admins can broadcast announcements
  */
 export const createAnnouncement = async (req, res, next) => {

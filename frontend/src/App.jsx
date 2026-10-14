@@ -23,6 +23,10 @@ import ManageTasksPage from './pages/ManageTasksPage';
 import ChatPage from './pages/ChatPage';
 import ReportsPage from './pages/ReportsPage';
 import EvaluationsPage from './pages/EvaluationsPage';
+import CertificatesPage from './pages/CertificatesPage';
+import VerifyCertificatePage from './pages/VerifyCertificatePage';
+import ExternalJobsPage from './pages/ExternalJobsPage';
+import NotificationsPage from './pages/NotificationsPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import healthService from './services/healthService';
 
@@ -50,8 +54,11 @@ export const App = () => {
             <Route path="/" element={<HomePage />} />
             <Route path="/roadmap" element={<RoadmapPage />} />
             <Route path="/internships" element={<InternshipsDirectoryPage />} />
+            <Route path="/external-jobs" element={<ExternalJobsPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/verify-certificate" element={<VerifyCertificatePage />} />
+            <Route path="/verify-certificate/:code" element={<VerifyCertificatePage />} />
 
             {/* Protected authenticated routes */}
             <Route
@@ -59,6 +66,14 @@ export const App = () => {
               element={
                 <ProtectedRoute>
                   <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/notifications"
+              element={
+                <ProtectedRoute>
+                  <NotificationsPage />
                 </ProtectedRoute>
               }
             />
@@ -101,6 +116,22 @@ export const App = () => {
               element={
                 <ProtectedRoute allowedRoles={['student']}>
                   <StudentTasksPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-certificates"
+              element={
+                <ProtectedRoute allowedRoles={['student']}>
+                  <CertificatesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/certificates"
+              element={
+                <ProtectedRoute allowedRoles={['student']}>
+                  <CertificatesPage />
                 </ProtectedRoute>
               }
             />

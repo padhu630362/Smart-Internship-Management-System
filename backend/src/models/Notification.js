@@ -11,6 +11,8 @@ export const NOTIFICATION_TYPES = {
   ATTENDANCE_REVIEWED: 'attendance_reviewed',
   MENTOR_ANNOUNCEMENT: 'mentor_announcement',
   SYSTEM_ANNOUNCEMENT: 'system_announcement',
+  CERTIFICATE_ISSUED: 'certificate_issued',
+  JOB_ALERT: 'job_alert',
 };
 
 const notificationSchema = new mongoose.Schema(

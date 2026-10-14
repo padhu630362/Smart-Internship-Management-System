@@ -11,6 +11,8 @@ export const NOTIFICATION_TYPES = {
   ATTENDANCE_REVIEWED: 'attendance_reviewed',
   MENTOR_ANNOUNCEMENT: 'mentor_announcement',
   SYSTEM_ANNOUNCEMENT: 'system_announcement',
+  CERTIFICATE_ISSUED: 'certificate_issued',
+  JOB_ALERT: 'job_alert',
 };
 
 export const notificationService = {
@@ -51,6 +53,14 @@ export const notificationService = {
    */
   async deleteNotification(id) {
     const response = await apiClient.delete(`/api/notifications/${id}`);
+    return response.data;
+  },
+
+  /**
+   * Clear notifications (all or only read)
+   */
+  async clearAllNotifications(params = {}) {
+    const response = await apiClient.delete('/api/notifications', { params });
     return response.data;
   },
 

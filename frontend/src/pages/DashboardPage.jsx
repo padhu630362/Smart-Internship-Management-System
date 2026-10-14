@@ -673,6 +673,30 @@ export const DashboardPage = () => {
                     )}
                   </CardContent>
                 </Card>
+
+                {/* Completion Certificates Access Banner */}
+                <div className="lg:col-span-2">
+                  <div className="surface-card rounded-2xl p-4 border border-brand-200/80 dark:border-brand-900/60 bg-linear-to-r from-brand-50/50 to-transparent flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-brand-500 text-white shadow-2xs">
+                        <Award className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                          Verified Completion Credentials & Certificates
+                        </h4>
+                        <p className="text-xs text-slate-500">
+                          Accredited, verifiable completion credentials awarded upon successful final mentor evaluations.
+                        </p>
+                      </div>
+                    </div>
+                    <Link to="/my-certificates">
+                      <Button size="sm" variant="primary" icon={ChevronRight} className="text-xs shrink-0">
+                        View Credentials
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
               </div>
             </div>
           )}

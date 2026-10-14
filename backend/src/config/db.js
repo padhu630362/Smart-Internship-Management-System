@@ -33,7 +33,8 @@ export const connectDB = async () => {
     });
 
     const conn = await mongoose.connect(env.MONGO_URI, {
-      serverSelectionTimeoutMS: 10000,
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 5000,
     });
 
     isConnected = true;
@@ -61,4 +62,51 @@ export const getDbStatus = () => {
   };
 };
 
-export default { connectDB, disconnectDB, getDbStatus };
+/**
+ * Actively pings the connected MongoDB instance with an explicit timeout.
+ * Prevents hanging requests if the connection is wedged or stalling.
+ */
+export const pingDb = async (timeoutMs = 2000) => {
+  const readyState = mongoose.connection.readyState;
+  if (readyState !== 1 || !mongoose.connection.db) {
+    return {
+      connected: false,
+      stateCode: readyState,
+      status: stateMap[readyState] || 'disconnected',
+      error: 'Database is not currently connected'
+    };
+  }
+
+  const start = Date.now();
+  try {
+    const pingPromise = mongoose.connection.db.admin().ping();
+    const timeoutPromise = new Promise((_, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(`Database ping timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+      if (timer.unref) timer.unref();
+    });
+
+    await Promise.race([pingPromise, timeoutPromise]);
+    const latencyMs = Date.now() - start;
+
+    return {
+      connected: true,
+      stateCode: 1,
+      status: 'connected',
+      latencyMs,
+      host: mongoose.connection.host || null,
+      name: mongoose.connection.name || null
+    };
+  } catch (error) {
+    return {
+      connected: false,
+      stateCode: mongoose.connection.readyState,
+      status: stateMap[mongoose.connection.readyState] || 'disconnected',
+      latencyMs: Date.now() - start,
+      error: error.message
+    };
+  }
+};
+
+export default { connectDB, disconnectDB, getDbStatus, pingDb };

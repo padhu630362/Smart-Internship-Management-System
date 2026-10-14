@@ -29,7 +29,7 @@ import StatusBadge from '../components/common/StatusBadge';
 import LoadingState from '../components/common/LoadingState';
 
 export const ProfilePage = () => {
-  const { user: authUser, updateUserState } = useAuth();
+  const { user: authUser, updateUserState, token } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -605,7 +605,7 @@ export const ProfilePage = () => {
 
                   <div className="flex items-center gap-2 w-full sm:w-auto">
                     <a
-                      href={profile.studentDetails.resumeUrl}
+                      href={`${profile.studentDetails.resumeUrl}${profile.studentDetails.resumeUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(token || localStorage.getItem('sims_auth_token') || '')}&download=true`}
                       download
                       target="_blank"
                       rel="noopener noreferrer"

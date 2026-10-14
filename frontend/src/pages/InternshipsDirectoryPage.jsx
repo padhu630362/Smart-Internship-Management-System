@@ -53,6 +53,9 @@ export const InternshipsDirectoryPage = () => {
   // Selected Opportunity Detail Modal
   const [selectedOpportunity, setSelectedOpportunity] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [aiFitScore, setAiFitScore] = useState(null);
+  const [isLoadingAiFit, setIsLoadingAiFit] = useState(false);
+  const [aiFitError, setAiFitError] = useState('');
 
   // Application Submission Modal & Flow
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
@@ -137,7 +140,24 @@ export const InternshipsDirectoryPage = () => {
 
   const handleOpenDetail = (opportunity) => {
     setSelectedOpportunity(opportunity);
+    setAiFitScore(null);
+    setAiFitError('');
     setIsDetailOpen(true);
+  };
+
+  const handleCheckAiFit = async (internshipId) => {
+    try {
+      setIsLoadingAiFit(true);
+      setAiFitError('');
+      const res = await internshipService.getMatchScore(internshipId);
+      if (res?.data) {
+        setAiFitScore(res.data);
+      }
+    } catch (err) {
+      setAiFitError(err.response?.data?.message || 'Failed to calculate AI skill match.');
+    } finally {
+      setIsLoadingAiFit(false);
+    }
   };
 
   // Helper to format deadline days remaining
@@ -632,6 +652,74 @@ export const InternshipsDirectoryPage = () => {
                         )}
                       </span>
                     </div>
+                  </div>
+
+                  {/* AI Fit Compatibility Evaluation */}
+                  <div className="pt-2.5 border-t border-brand-200/60 dark:border-brand-800/60">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600 dark:text-slate-400 font-medium">
+                        Smart AI Skill Fit Analysis:
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleCheckAiFit(selectedOpportunity._id)}
+                        disabled={isLoadingAiFit}
+                        className="text-[11px] py-1 px-2.5 h-auto border-brand-300 dark:border-brand-700 text-brand-700 dark:text-brand-300"
+                      >
+                        <Sparkles className={`w-3 h-3 mr-1 text-brand-600 ${isLoadingAiFit ? 'animate-spin' : ''}`} />
+                        {isLoadingAiFit ? 'Analyzing Fit...' : aiFitScore ? 'Re-Evaluate Fit' : 'Check My AI Fit'}
+                      </Button>
+                    </div>
+
+                    {aiFitError && (
+                      <p className="text-rose-600 dark:text-rose-400 text-[11px] mt-1.5">{aiFitError}</p>
+                    )}
+
+                    {aiFitScore && (
+                      <div className="mt-2.5 p-3 rounded-xl bg-white dark:bg-slate-900 border border-brand-200 dark:border-brand-800 space-y-2 shadow-2xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                            <span className={`inline-block w-2.5 h-2.5 rounded-full ${
+                              aiFitScore.matchScore >= 75 ? 'bg-emerald-500' : aiFitScore.matchScore >= 50 ? 'bg-amber-500' : 'bg-rose-500'
+                            }`} />
+                            Match Score: {aiFitScore.matchScore}%
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {aiFitScore.engine}
+                          </span>
+                        </div>
+
+                        {aiFitScore.matchedSkills?.length > 0 && (
+                          <div className="text-[11px]">
+                            <span className="font-semibold text-emerald-700 dark:text-emerald-400">
+                              Matched Skills:
+                            </span>{' '}
+                            <span className="text-slate-600 dark:text-slate-300">
+                              {aiFitScore.matchedSkills.join(', ')}
+                            </span>
+                          </div>
+                        )}
+
+                        {aiFitScore.missingSkills?.length > 0 && (
+                          <div className="text-[11px]">
+                            <span className="font-semibold text-amber-700 dark:text-amber-400">
+                              Recommended to Learn:
+                            </span>{' '}
+                            <span className="text-slate-600 dark:text-slate-300">
+                              {aiFitScore.missingSkills.join(', ')}
+                            </span>
+                          </div>
+                        )}
+
+                        {aiFitScore.strengths?.length > 0 && (
+                          <div className="text-[11px] text-slate-500 italic pt-1 border-t border-slate-100 dark:border-slate-800">
+                            💡 {aiFitScore.strengths[0]}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

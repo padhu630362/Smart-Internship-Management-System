@@ -13,6 +13,8 @@ import evaluationRoutes from './evaluationRoutes.js';
 import analyticsRoutes from './analyticsRoutes.js';
 import reportRoutes from './reportRoutes.js';
 import auditLogRoutes from './auditLogRoutes.js';
+import certificateRoutes from './certificateRoutes.js';
+import externalJobRoutes from './externalJobRoutes.js';
 
 const router = Router();
 
@@ -24,6 +26,7 @@ router.get('/', (req, res) => {
     documentation: '/docs',
     endpoints: {
       health: '/api/health',
+      databaseHealth: '/api/health/db',
       auth: '/api/auth',
       users: '/api/users',
       internships: '/api/internships',
@@ -37,6 +40,8 @@ router.get('/', (req, res) => {
       analytics: '/api/analytics',
       reports: '/api/reports',
       auditLogs: '/api/audit-logs',
+      certificates: '/api/certificates',
+      externalJobs: '/api/external-jobs',
     },
   });
 });
@@ -56,5 +61,7 @@ router.use('/evaluations', evaluationRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/reports', reportRoutes);
 router.use('/audit-logs', auditLogRoutes);
+router.use('/certificates', certificateRoutes);
+router.use('/external-jobs', externalJobRoutes);
 
 export default router;

@@ -14,6 +14,7 @@ import {
   updateInternship,
   updateInternshipStatus,
   deleteInternship,
+  getInternshipMatchScore,
 } from '../controllers/internshipController.js';
 
 const router = Router();
@@ -24,6 +25,7 @@ const router = Router();
 router.get('/', optionalAuth, getPublicInternships);
 router.get('/manage', authenticateToken, requireRoles(ROLES.COMPANY, ROLES.MENTOR, ROLES.COORDINATOR, ROLES.ADMIN), getCompanyInternships);
 router.get('/:id', optionalAuth, getInternshipById);
+router.get('/:id/match-score', authenticateToken, getInternshipMatchScore);
 
 // ==========================================
 // Company, Coordinator & Admin Management

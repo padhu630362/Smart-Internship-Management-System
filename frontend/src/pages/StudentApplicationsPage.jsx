@@ -27,8 +27,17 @@ import Modal from '../components/common/Modal';
 import LoadingState from '../components/common/LoadingState';
 import EmptyState from '../components/common/EmptyState';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/common/Card';
+import { useAuth } from '../context/AuthContext';
 
 export const StudentApplicationsPage = () => {
+  const { token } = useAuth();
+
+  const getResumeUrl = (rawUrl) => {
+    if (!rawUrl) return '#';
+    const authToken = token || localStorage.getItem('sims_auth_token') || '';
+    return `${rawUrl}${rawUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(authToken)}`;
+  };
+
   const [applications, setApplications] = useState([]);
   const [stats, setStats] = useState({
     totalApplied: 0,
@@ -454,7 +463,7 @@ export const StudentApplicationsPage = () => {
                     Official Resume:
                   </span>
                   <a
-                    href={selectedApp.resumeUrl || '/api/users/profile/resume'}
+                    href={getResumeUrl(selectedApp.resumeUrl)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-semibold text-brand-600 hover:underline flex items-center gap-1"

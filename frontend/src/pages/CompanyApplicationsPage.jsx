@@ -33,7 +33,13 @@ import EmptyState from '../components/common/EmptyState';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/common/Card';
 
 export const CompanyApplicationsPage = () => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
+
+  const getResumeUrl = (rawUrl) => {
+    if (!rawUrl) return '#';
+    const authToken = token || localStorage.getItem('sims_auth_token') || '';
+    return `${rawUrl}${rawUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(authToken)}`;
+  };
 
   const [applications, setApplications] = useState([]);
   const [opportunities, setOpportunities] = useState([]);
@@ -76,6 +82,30 @@ export const CompanyApplicationsPage = () => {
     instructions: '',
   });
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  const handleTriggerAiAnalysis = async (appId) => {
+    try {
+      setIsAnalyzing(true);
+      setErrorMessage('');
+      const res = await applicationService.analyzeResume(appId);
+      if (res?.data?.aiAnalysis) {
+        const updatedAnalysis = res.data.aiAnalysis;
+        setSelectedApp((prev) => (prev ? { ...prev, aiAnalysis: updatedAnalysis } : null));
+        setApplications((prev) =>
+          prev.map((a) => (a._id === appId ? { ...a, aiAnalysis: updatedAnalysis } : a))
+        );
+        setSuccessMessage('AI Resume analysis completed successfully.');
+        setTimeout(() => setSuccessMessage(''), 4000);
+      }
+    } catch (err) {
+      setErrorMessage(
+        err.response?.data?.message || err.response?.data?.error?.message || 'Failed to perform AI analysis.'
+      );
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   useEffect(() => {
     fetchOpportunities();
@@ -465,6 +495,49 @@ export const CompanyApplicationsPage = () => {
                     )}
                   </div>
 
+                  {/* AI Match Score Badge & Skills Preview */}
+                  {app.aiAnalysis?.matchScore !== undefined && app.aiAnalysis?.matchScore !== null ? (
+                    <div className="flex flex-wrap items-center gap-2 pt-1.5">
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                          app.aiAnalysis.matchScore >= 75
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                            : app.aiAnalysis.matchScore >= 50
+                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
+                            : 'bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-300 dark:border-rose-800'
+                        }`}
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        {app.aiAnalysis.matchScore}% Match
+                      </span>
+                      {app.aiAnalysis.matchedSkills?.length > 0 && (
+                        <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                          ✓ {app.aiAnalysis.matchedSkills.slice(0, 3).join(', ')}
+                        </span>
+                      )}
+                      {app.aiAnalysis.missingSkills?.length > 0 && (
+                        <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                          • Missing: {app.aiAnalysis.missingSkills.slice(0, 2).join(', ')}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="pt-1">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleTriggerAiAnalysis(app._id);
+                        }}
+                        disabled={isAnalyzing}
+                        className="inline-flex items-center gap-1 text-[11px] font-medium text-brand-600 hover:text-brand-700 underline"
+                      >
+                        <Sparkles className="w-3 h-3 text-brand-500" />
+                        {isAnalyzing ? 'Analyzing...' : 'Run AI Resume Match'}
+                      </button>
+                    </div>
+                  )}
+
                   {/* Rejection reason or interview preview */}
                   {app.status === 'rejected' && app.decisionReason && (
                     <p className="text-xs text-rose-600 dark:text-rose-400 italic">
@@ -482,7 +555,7 @@ export const CompanyApplicationsPage = () => {
                 {/* Right Action: Review button */}
                 <div className="flex items-center gap-2 shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100 dark:border-slate-800">
                   <a
-                    href={app.resumeUrl || '/api/users/profile/resume'}
+                    href={getResumeUrl(app.resumeUrl)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
@@ -562,7 +635,7 @@ export const CompanyApplicationsPage = () => {
                 </div>
 
                 <a
-                  href={selectedApp.resumeUrl || '/api/users/profile/resume'}
+                  href={getResumeUrl(selectedApp.resumeUrl)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-brand-600 hover:text-brand-700 shadow-2xs"
@@ -629,6 +702,160 @@ export const CompanyApplicationsPage = () => {
                   <p className="p-3 rounded-lg bg-white dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-sans">
                     {selectedApp.coverLetter}
                   </p>
+                </div>
+              )}
+            </div>
+
+            {/* AI Resume Analysis & Screening Intelligence */}
+            <div className="p-4 rounded-xl border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/40 dark:bg-indigo-950/20 space-y-4 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-indigo-600 text-white shadow-2xs">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                      AI Resume & Skills Compatibility Insights
+                    </h5>
+                    <p className="text-[11px] text-slate-500">
+                      Engine: {selectedApp.aiAnalysis?.engine || 'Deterministic Semantic Matcher'}
+                    </p>
+                  </div>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleTriggerAiAnalysis(selectedApp._id)}
+                  disabled={isAnalyzing}
+                  className="text-xs font-medium border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300"
+                >
+                  <Sparkles className={`w-3.5 h-3.5 mr-1 text-indigo-500 ${isAnalyzing ? 'animate-spin' : ''}`} />
+                  {isAnalyzing ? 'Analyzing...' : 'Re-Run AI Analysis'}
+                </Button>
+              </div>
+
+              {selectedApp.aiAnalysis?.matchScore !== undefined && selectedApp.aiAnalysis?.matchScore !== null ? (
+                <div className="space-y-3">
+                  {/* Score & Progress */}
+                  <div className="p-3 rounded-lg bg-white dark:bg-slate-900 border border-indigo-100 dark:border-indigo-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-lg text-white shadow-2xs ${
+                        selectedApp.aiAnalysis.matchScore >= 75
+                          ? 'bg-emerald-600'
+                          : selectedApp.aiAnalysis.matchScore >= 50
+                          ? 'bg-amber-600'
+                          : 'bg-rose-600'
+                      }`}>
+                        {selectedApp.aiAnalysis.matchScore}%
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-900 dark:text-white">
+                          Candidate Alignment Score
+                        </div>
+                        <div className="text-[11px] text-slate-500">
+                          {selectedApp.aiAnalysis.matchScore >= 75
+                            ? 'Strong candidate fit across required technical domains'
+                            : selectedApp.aiAnalysis.matchScore >= 50
+                            ? 'Moderate alignment; some prerequisite skill gaps present'
+                            : 'Foundational gaps identified against mandatory requirements'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Matched vs Missing Skills */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div className="p-3 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-800/60">
+                      <span className="font-bold text-emerald-800 dark:text-emerald-300 block mb-1.5 text-[11px] uppercase tracking-wide">
+                        ✓ Verified Matched Skills ({selectedApp.aiAnalysis.matchedSkills?.length || 0})
+                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {selectedApp.aiAnalysis.matchedSkills?.length > 0 ? (
+                          selectedApp.aiAnalysis.matchedSkills.map((s, i) => (
+                            <span key={i} className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200 text-[10px] font-semibold">
+                              {s}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-slate-400 italic text-[11px]">No exact required skills detected</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-lg bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60">
+                      <span className="font-bold text-amber-800 dark:text-amber-300 block mb-1.5 text-[11px] uppercase tracking-wide">
+                        ⚠ Missing Prerequisite Skills ({selectedApp.aiAnalysis.missingSkills?.length || 0})
+                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {selectedApp.aiAnalysis.missingSkills?.length > 0 ? (
+                          selectedApp.aiAnalysis.missingSkills.map((s, i) => (
+                            <span key={i} className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 text-[10px] font-semibold">
+                              {s}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-emerald-600 font-semibold text-[11px]">All required skills satisfied!</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Overall Assessment */}
+                  {selectedApp.aiAnalysis.overallAssessment && (
+                    <div className="text-xs p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 leading-relaxed">
+                      <span className="font-bold block text-slate-900 dark:text-white mb-1">
+                        AI Executive Summary:
+                      </span>
+                      {selectedApp.aiAnalysis.overallAssessment}
+                    </div>
+                  )}
+
+                  {/* Strengths */}
+                  {selectedApp.aiAnalysis.strengths?.length > 0 && (
+                    <div className="text-xs space-y-1">
+                      <span className="font-bold text-slate-800 dark:text-slate-200 block text-[11px]">
+                        Identified Candidate Strengths:
+                      </span>
+                      <ul className="list-disc pl-4 space-y-0.5 text-slate-600 dark:text-slate-400 text-[11px]">
+                        {selectedApp.aiAnalysis.strengths.map((str, i) => (
+                          <li key={i}>{str}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Suggested Improvements */}
+                  {selectedApp.aiAnalysis.improvements?.length > 0 && (
+                    <div className="text-xs space-y-1">
+                      <span className="font-bold text-slate-800 dark:text-slate-200 block text-[11px]">
+                        Recommended Improvement Areas:
+                      </span>
+                      <ul className="list-disc pl-4 space-y-0.5 text-slate-600 dark:text-slate-400 text-[11px]">
+                        {selectedApp.aiAnalysis.improvements.map((imp, i) => (
+                          <li key={i}>{imp}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-4 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+                  <p className="text-xs text-slate-500 mb-2">
+                    AI analysis has not been executed yet for this applicant's resume.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    onClick={() => handleTriggerAiAnalysis(selectedApp._id)}
+                    disabled={isAnalyzing}
+                    className="text-xs"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 mr-1" />
+                    {isAnalyzing ? 'Analyzing Resume...' : 'Analyze Resume Now'}
+                  </Button>
                 </div>
               )}
             </div>

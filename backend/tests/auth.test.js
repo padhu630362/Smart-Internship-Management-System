@@ -251,4 +251,52 @@ describe('Phase 2: Authentication and RBAC Integration Tests', () => {
     assert.equal(newLoginRes.status, 200);
     assert.ok(newLoginRes.body.data.token);
   });
+
+  it('TC-AUTH-16: Google Sign-In - Should auto-register a new student via Google credential', async () => {
+    const googleEmail = `google_student_${timestamp}@example.com`;
+    const res = await request(app)
+      .post('/api/auth/google')
+      .send({
+        credential: `test_google_token_${timestamp}`,
+        email: googleEmail,
+        name: 'Jordan Google Intern',
+        role: ROLES.STUDENT,
+      });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.ok(res.body.data.token);
+    assert.equal(res.body.data.user.email, googleEmail);
+    assert.equal(res.body.data.user.role, ROLES.STUDENT);
+    assert.equal(res.body.data.user.authProvider, 'google');
+
+    // Clean up created google user
+    await User.deleteOne({ email: googleEmail });
+  });
+
+  it('TC-AUTH-17: Google Sign-In - Should authenticate existing user and preserve role', async () => {
+    const res = await request(app)
+      .post('/api/auth/google')
+      .send({
+        credential: `test_google_token_existing_${timestamp}`,
+        email: testStudentEmail,
+        name: 'Alex Student',
+        role: ROLES.STUDENT,
+      });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.ok(res.body.data.token);
+    assert.equal(res.body.data.user.email, testStudentEmail);
+  });
+
+  it('TC-AUTH-18: Security - Should reject Google Sign-In without credential token (400)', async () => {
+    const res = await request(app)
+      .post('/api/auth/google')
+      .send({});
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.success, false);
+    assert.equal(res.body.error.code, 'MISSING_CREDENTIAL');
+  });
 });

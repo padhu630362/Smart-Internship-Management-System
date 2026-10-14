@@ -210,7 +210,22 @@ export const downloadResume = async (req, res, next) => {
     }
 
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.download(filePath, safeFilename);
+    const ext = path.extname(safeFilename).toLowerCase();
+    const mimeMap = {
+      '.pdf': 'application/pdf',
+      '.doc': 'application/msword',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    };
+    const mimeType = mimeMap[ext] || 'application/octet-stream';
+    res.setHeader('Content-Type', mimeType);
+
+    if (req.query.download === 'true' || req.query.dl === '1') {
+      res.download(filePath, safeFilename);
+    } else {
+      res.setHeader('Content-Disposition', `inline; filename="${safeFilename}"`);
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.pipe(res);
+    }
   } catch (err) {
     next(err);
   }
@@ -306,6 +321,7 @@ export const getUsers = async (req, res, next) => {
             activeUsers: { $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] } },
             students: { $sum: { $cond: [{ $eq: ['$role', 'student'] }, 1, 0] } },
             companies: { $sum: { $cond: [{ $eq: ['$role', 'company'] }, 1, 0] } },
+            mentors: { $sum: { $cond: [{ $eq: ['$role', 'mentor'] }, 1, 0] } },
             coordinators: { $sum: { $cond: [{ $eq: ['$role', 'coordinator'] }, 1, 0] } },
             admins: { $sum: { $cond: [{ $eq: ['$role', 'admin'] }, 1, 0] } },
           },
@@ -318,6 +334,7 @@ export const getUsers = async (req, res, next) => {
       activeUsers: 0,
       students: 0,
       companies: 0,
+      mentors: 0,
       coordinators: 0,
       admins: 0,
     };

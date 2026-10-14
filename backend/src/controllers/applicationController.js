@@ -1,3 +1,6 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { Application, APPLICATION_STATUSES } from '../models/Application.js';
 import { Internship } from '../models/Internship.js';
 import { ROLES } from '../models/User.js';
@@ -7,6 +10,12 @@ import {
 } from '../services/notificationService.js';
 import { recordAuditLog } from '../services/auditService.js';
 import { escapeRegex } from '../middlewares/sanitize.js';
+import { extractResumeText, analyzeResumeWithGemini } from '../services/aiService.js';
+import { UPLOAD_DIR } from '../utils/fileUpload.js';
+import { logger } from '../utils/logger.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Student submits application for an internship opportunity.
@@ -40,6 +49,28 @@ export const submitApplication = async (req, res, next) => {
       note: 'Initial application submitted by student.',
     };
 
+    // Extract resume text if document exists on disk
+    let resumeText = '';
+    const resumeFilename = req.effectiveResumeUrl ? req.effectiveResumeUrl.split('/').pop() : null;
+    if (resumeFilename) {
+      const filePath = path.join(UPLOAD_DIR, resumeFilename);
+      if (fs.existsSync(filePath)) {
+        resumeText = await extractResumeText(filePath);
+      }
+    }
+
+    // Perform AI Resume Analysis & Skill Matching
+    let aiAnalysis = null;
+    try {
+      aiAnalysis = await analyzeResumeWithGemini({
+        resumeText,
+        studentProfile: studentSnapshot,
+        internship,
+      });
+    } catch (aiErr) {
+      logger.warn(`AI Analysis failed on submit: ${aiErr.message}`);
+    }
+
     const newApplication = await Application.create({
       internship: internship._id,
       student: user.id,
@@ -52,6 +83,7 @@ export const submitApplication = async (req, res, next) => {
         user.profile?.studentDetails?.resumeFileName ||
         'Official_Student_Resume.pdf',
       studentSnapshot,
+      aiAnalysis: aiAnalysis || undefined,
       statusHistory: [initialHistoryEntry],
     });
 
@@ -414,3 +446,64 @@ export const updateApplicationStatus = async (req, res, next) => {
     next(err);
   }
 };
+
+/**
+ * Triggers or re-runs AI resume analysis for a specific application.
+ * Accessible by company, mentor, coordinator, admin, and applicant student.
+ */
+export const analyzeApplicationResume = async (req, res, next) => {
+  try {
+    const applicationId = req.params.id;
+    const application = await Application.findById(applicationId).populate('internship');
+
+    if (!application) {
+      const error = new Error('Application not found.');
+      error.statusCode = 404;
+      error.code = 'APPLICATION_NOT_FOUND';
+      return next(error);
+    }
+
+    // Role verification: student can only trigger for their own application
+    if (req.user.role === ROLES.STUDENT && application.student.toString() !== req.user.id) {
+      const error = new Error('You do not have permission to analyze this application.');
+      error.statusCode = 403;
+      error.code = 'FORBIDDEN';
+      return next(error);
+    }
+
+    // Company can only analyze applications submitted for their internships
+    if (req.user.role === ROLES.COMPANY && application.company.toString() !== req.user.id) {
+      const error = new Error('You do not have permission to analyze applications for other companies.');
+      error.statusCode = 403;
+      error.code = 'FORBIDDEN';
+      return next(error);
+    }
+
+    let resumeText = '';
+    const resumeFilename = application.resumeUrl ? application.resumeUrl.split('/').pop() : null;
+    if (resumeFilename) {
+      const filePath = path.join(UPLOAD_DIR, resumeFilename);
+      if (fs.existsSync(filePath)) {
+        resumeText = await extractResumeText(filePath);
+      }
+    }
+
+    const aiAnalysis = await analyzeResumeWithGemini({
+      resumeText,
+      studentProfile: application.studentSnapshot,
+      internship: application.internship,
+    });
+
+    application.aiAnalysis = aiAnalysis;
+    await application.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'AI resume analysis completed successfully.',
+      data: { aiAnalysis },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+

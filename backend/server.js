@@ -4,6 +4,7 @@ import { env } from './src/config/env.js';
 import { connectDB, disconnectDB } from './src/config/db.js';
 import { logger } from './src/utils/logger.js';
 import { initSocket } from './src/socket.js';
+import { startJobScheduler, stopJobScheduler } from './src/services/jobScheduler.js';
 
 const server = http.createServer(app);
 initSocket(server);
@@ -13,10 +14,14 @@ const startServer = async () => {
     // Attempt database connection
     await connectDB();
 
-    server.listen(env.PORT, () => {
+    server.listen(env.PORT, '0.0.0.0', () => {
       logger.info(`Smart Internship Management System backend running in ${env.NODE_ENV} mode on port ${env.PORT}`);
       logger.info(`Health check available at: http://localhost:${env.PORT}/api/health`);
+      logger.info(`Database health check at: http://localhost:${env.PORT}/api/health/db`);
     });
+
+    // Start background job aggregator and notification daemon
+    startJobScheduler({ intervalMinutes: 60, initialDelayMs: 6000 });
   } catch (error) {
     logger.error('Failed to initialize server:', error);
     process.exit(1);
@@ -26,6 +31,7 @@ const startServer = async () => {
 // Graceful shutdown handling
 const shutdown = async (signal) => {
   logger.info(`Received ${signal}. Starting graceful shutdown...`);
+  stopJobScheduler();
   server.close(async () => {
     logger.info('HTTP server closed.');
     await disconnectDB();

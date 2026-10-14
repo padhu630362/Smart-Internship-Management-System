@@ -56,6 +56,14 @@ export const internshipService = {
     const response = await apiClient.delete(`/api/internships/${id}`);
     return response.data;
   },
+
+  /**
+   * Get student match score and skills compatibility breakdown
+   */
+  async getMatchScore(id) {
+    const response = await apiClient.get(`/api/internships/${id}/match-score`);
+    return response.data;
+  },
 };
 
 export default internshipService;

@@ -9,46 +9,96 @@
   }
 
   body {
-    @apply bg-slate-50 text-slate-900 transition-colors duration-200 antialiased selection:bg-brand-500 selection:text-white dark:bg-[#070b14] dark:text-slate-100;
+    @apply bg-[#fcfaf7] text-stone-900 transition-colors duration-200 antialiased selection:bg-brand-600 selection:text-white dark:bg-[#12090d] dark:text-stone-100;
     min-height: 100vh;
   }
 }
 
 @layer components {
-  /* Surface styles */
+  /* Surface styles with luxury Burgundy + Champagne tinting */
   .surface-card {
-    @apply bg-white border border-slate-200/80 shadow-sm rounded-xl transition-all duration-200 dark:bg-[#0d1424] dark:border-slate-800/80;
+    @apply bg-white/95 backdrop-blur-sm border border-champagne-200/80 shadow-soft rounded-2xl transition-all duration-200 dark:bg-[#1a1114]/90 dark:border-burgundy-900/50 dark:shadow-none;
   }
 
   .surface-panel {
-    @apply bg-white/90 backdrop-blur-md border border-slate-200/90 dark:bg-[#0a0f1d]/90 dark:border-slate-800/80;
+    @apply bg-white/90 backdrop-blur-md border border-champagne-200/90 dark:bg-[#170d11]/90 dark:border-burgundy-900/50;
   }
 
   .surface-hover {
-    @apply hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-card;
+    @apply hover:border-champagne-400 dark:hover:border-burgundy-700/60 hover:shadow-card transition-all;
   }
 
   .surface-sidebar {
-    @apply bg-white border-r border-slate-200 text-slate-700 dark:bg-[#070c18] dark:border-slate-800/90 dark:text-slate-300;
+    @apply bg-white/95 border-r border-champagne-200/80 text-stone-700 dark:bg-[#150d10] dark:border-warmdark-800 dark:text-stone-300;
   }
 
   .text-secondary {
-    @apply text-slate-500 dark:text-slate-400;
+    @apply text-stone-500 dark:text-stone-400;
   }
 
   .text-primary {
-    @apply text-slate-900 dark:text-slate-100;
+    @apply text-stone-900 dark:text-stone-100;
+  }
+
+  /* Burgundy & Champagne Badges */
+  .badge-burgundy {
+    @apply bg-burgundy-50 text-burgundy-800 border border-burgundy-200 dark:bg-burgundy-950/50 dark:text-burgundy-200 dark:border-burgundy-800/40;
+  }
+
+  .badge-champagne {
+    @apply bg-champagne-50 text-champagne-800 border border-champagne-200 dark:bg-champagne-950/50 dark:text-champagne-200 dark:border-champagne-800/40;
+  }
+
+  /* Backward compatible badge classes */
+  .badge-peach {
+    @apply bg-champagne-50 text-champagne-800 border border-champagne-200 dark:bg-champagne-950/50 dark:text-champagne-200 dark:border-champagne-800/40;
+  }
+
+  .badge-blush {
+    @apply bg-burgundy-50 text-burgundy-800 border border-burgundy-200 dark:bg-burgundy-950/50 dark:text-burgundy-200 dark:border-burgundy-800/40;
   }
 }
 
 @layer utilities {
+  /* Signature Burgundy into Shimmering Champagne Gold Gradient */
   .gradient-brand {
-    background: linear-gradient(135deg, #4f46e5 0%, #2563eb 50%, #0284c7 100%);
+    background: linear-gradient(135deg, #8a2c42 0%, #742236 45%, #be934c 100%);
+  }
+
+  .gradient-burgundy {
+    background: linear-gradient(135deg, #a0334c 0%, #742236 50%, #4d1a27 100%);
+  }
+
+  .gradient-champagne {
+    background: linear-gradient(135deg, #dfc798 0%, #be934c 50%, #a6783d 100%);
   }
 
   .gradient-brand-text {
-    background: linear-gradient(135deg, #4f46e5 0%, #2563eb 100%);
+    background: linear-gradient(135deg, #8a2c42 0%, #be934c 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
+  }
+
+  .gradient-subtle-champagne {
+    background: linear-gradient(180deg, rgba(252, 250, 244, 0.7) 0%, rgba(251, 245, 246, 0.4) 100%);
+  }
+
+  /* Custom Burgundy-Champagne Scrollbars */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(138, 44, 66, 0.3);
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(190, 147, 76, 0.6);
   }
 }

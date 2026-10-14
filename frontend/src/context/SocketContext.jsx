@@ -14,7 +14,25 @@ export const SocketProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState(new Set());
   const [totalChatUnread, setTotalChatUnread] = useState(0);
+  const [pushPermission, setPushPermission] = useState(
+    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported'
+  );
   const socketRef = useRef(null);
+
+  // Request browser desktop push permission
+  const requestPushPermission = useCallback(async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      return 'unsupported';
+    }
+    try {
+      const permission = await Notification.requestPermission();
+      setPushPermission(permission);
+      return permission;
+    } catch (err) {
+      console.warn('Failed to request push notification permission:', err);
+      return 'denied';
+    }
+  }, []);
 
   // Fetch unread count & initial recent notifications
   const refreshNotifications = useCallback(async () => {
@@ -23,7 +41,7 @@ export const SocketProvider = ({ children }) => {
       setIsLoading(true);
       const [countRes, listRes] = await Promise.all([
         notificationService.getUnreadCount(),
-        notificationService.getNotifications({ page: 1, limit: 20 }),
+        notificationService.getNotifications({ page: 1, limit: 30 }),
       ]);
       setUnreadCount(countRes?.data?.unreadCount || 0);
       setNotifications(listRes?.data?.notifications || []);
@@ -52,7 +70,7 @@ export const SocketProvider = ({ children }) => {
     refreshNotifications();
 
     // Determine backend socket URL
-    const socketUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5001';
+    const socketUrl = import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_BACKEND_URL || 'http://localhost:5001';
 
     const newSocket = io(socketUrl, {
       auth: { token },
@@ -99,7 +117,7 @@ export const SocketProvider = ({ children }) => {
       });
     });
 
-    // Handle incoming real-time notifications with deduplication
+    // Handle incoming real-time notifications with deduplication and desktop push
     newSocket.on('notification:new', (notification) => {
       if (!notification || !notification._id) return;
 
@@ -110,6 +128,21 @@ export const SocketProvider = ({ children }) => {
       });
 
       setUnreadCount((prev) => prev + 1);
+
+      // Trigger native browser notification if granted
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        try {
+          const title = notification.title || 'SIMS Job & Internship Alert';
+          const options = {
+            body: notification.message || 'A new update is available in your Smart Internship portal.',
+            icon: '/favicon.ico',
+            tag: notification._id,
+          };
+          new Notification(title, options);
+        } catch (e) {
+          console.debug('Browser notification error:', e);
+        }
+      }
     });
 
     setSocket(newSocket);
@@ -189,6 +222,20 @@ export const SocketProvider = ({ children }) => {
     }
   };
 
+  const clearAllNotifications = async (onlyRead = false) => {
+    try {
+      await notificationService.clearAllNotifications({ onlyRead: onlyRead ? 'true' : 'false' });
+      if (onlyRead) {
+        setNotifications((prev) => prev.filter((n) => !n.isRead));
+      } else {
+        setNotifications([]);
+        setUnreadCount(0);
+      }
+    } catch (err) {
+      console.error('Error clearing notifications:', err);
+    }
+  };
+
   return (
     <SocketContext.Provider
       value={{
@@ -199,6 +246,8 @@ export const SocketProvider = ({ children }) => {
         isLoading,
         onlineUsers,
         totalChatUnread,
+        pushPermission,
+        requestPushPermission,
         setTotalChatUnread,
         isUserOnline,
         joinConversation,
@@ -208,6 +257,7 @@ export const SocketProvider = ({ children }) => {
         markAsRead,
         markAllAsRead,
         deleteNotification,
+        clearAllNotifications,
       }}
     >
       {children}

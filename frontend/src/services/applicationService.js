@@ -67,6 +67,14 @@ export const applicationService = {
     });
     return response.data;
   },
+
+  /**
+   * Run or re-trigger AI Resume Analysis and Skill Matching
+   */
+  async analyzeResume(id) {
+    const response = await apiClient.post(`/api/applications/${id}/analyze-resume`);
+    return response.data;
+  },
 };
 
 export default applicationService;

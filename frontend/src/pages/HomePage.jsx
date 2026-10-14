@@ -1,407 +1,603 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
-  Server,
-  Database,
-  ShieldCheck,
-  RefreshCw,
-  Clock,
-  Cpu,
-  ArrowRight,
   Sparkles,
-  Layers,
-  CheckCircle2,
-  Lock,
+  ArrowRight,
   LogIn,
+  UserPlus,
+  ShieldCheck,
+  Briefcase,
+  GraduationCap,
+  Building2,
+  Users,
+  Brain,
+  CalendarCheck,
+  BellRing,
+  Award,
+  MessageSquare,
   Search,
-  Filter,
-  Eye,
-  FileText,
+  CheckCircle2,
+  Server,
   Activity,
+  ExternalLink,
+  ChevronRight,
+  TrendingUp,
+  FileCheck2,
+  Clock,
+  Layers,
+  MapPin,
+  RefreshCw,
 } from 'lucide-react';
-import RoleCard from '../components/RoleCard';
-import StatusBadge from '../components/common/StatusBadge';
 import Button from '../components/common/Button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../components/common/Card';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/common/Table';
-import Input from '../components/common/Input';
+import StatusBadge from '../components/common/StatusBadge';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/common/Card';
 import healthService from '../services/healthService';
+import internshipService from '../services/internshipService';
 import { useAuth } from '../context/AuthContext';
 
-export const HomePage = ({ onOpenLogin }) => {
+export const HomePage = () => {
   const { isAuthenticated, user } = useAuth();
-  const [healthData, setHealthData] = useState(null);
-  const [loadingHealth, setLoadingHealth] = useState(true);
-  const [lastChecked, setLastChecked] = useState(null);
-  const [searchFilter, setSearchFilter] = useState('');
+  const navigate = useNavigate();
 
-  const fetchHealth = async () => {
+  const [healthData, setHealthData] = useState(null);
+  const [dbHealthData, setDbHealthData] = useState(null);
+  const [loadingHealth, setLoadingHealth] = useState(true);
+  const [recentInternships, setRecentInternships] = useState([]);
+  const [loadingInternships, setLoadingInternships] = useState(true);
+  const [quickCertCode, setQuickCertCode] = useState('');
+
+  const fetchDiagnostics = async () => {
     setLoadingHealth(true);
-    const result = await healthService.checkHealth();
-    setHealthData(result);
-    setLastChecked(new Date().toLocaleTimeString());
-    setLoadingHealth(false);
+    try {
+      const [health, db] = await Promise.all([
+        healthService.checkHealth(),
+        healthService.checkDatabaseHealth(),
+      ]);
+      setHealthData(health);
+      setDbHealthData(db);
+    } catch {
+      // Degraded fallback
+    } finally {
+      setLoadingHealth(false);
+    }
+  };
+
+  const fetchLiveInternships = async () => {
+    setLoadingInternships(true);
+    try {
+      const res = await internshipService.getPublicInternships({ limit: 4, page: 1 });
+      if (res?.data?.internships) {
+        setRecentInternships(res.data.internships);
+      }
+    } catch {
+      // Silence error if server is cold
+    } finally {
+      setLoadingInternships(false);
+    }
   };
 
   useEffect(() => {
-    fetchHealth();
-    // Poll every 45s only if page is visible to optimize performance
-    const interval = setInterval(() => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        fetchHealth();
-      }
-    }, 45000);
-    return () => clearInterval(interval);
+    fetchDiagnostics();
+    fetchLiveInternships();
   }, []);
 
-  const roles = [
+  const isHealthy = healthData?.data?.status === 'healthy';
+  const isDbConnected = dbHealthData?.data?.status === 'connected' || healthData?.data?.database?.connected;
+
+  const coreFeatures = [
     {
-      role: 'student',
-      title: 'Student Portal',
-      description: 'Discover curated internship listings, submit trackable applications, upload resumes, log daily attendance, and chat in real-time.',
-      features: [
-        'Opportunity directory with keyword search & filters',
-        'Transparent application tracking & resume management',
-        'Daily attendance logging, task progress, and live chat',
-      ],
-      plannedPhase: 'Fully Operational • All Phases Complete',
+      icon: Brain,
+      title: 'AI Resume Matcher & Skill Radar',
+      description: 'Automated candidate screening powered by Google Gemini 1.5. Analyzes student CVs against job criteria with match scoring and keyword gap detection.',
+      badge: 'Gemini AI',
+      color: 'burgundy',
     },
     {
-      role: 'company',
-      title: 'Employer Hub',
-      description: 'Publish vetted internship listings, manage candidate pipelines, review applications, and coordinate intern placements.',
-      features: [
-        'Post and manage internship openings with openings & deadlines',
-        'Applicant review pipeline with multi-status transitions',
-        'Collaborate with mentors and evaluate candidate progress',
-      ],
-      plannedPhase: 'Fully Operational • All Phases Complete',
+      icon: BellRing,
+      title: 'Live Job Alerts & LinkedIn Feeds',
+      description: 'Continuous background aggregation of active tech internships with duplicate prevention, real-time push notifications, and verified LinkedIn search links.',
+      badge: 'Real-Time Sync',
+      color: 'champagne',
     },
     {
-      role: 'mentor',
-      title: 'Mentor Workspace',
-      description: 'Supervise daily activities, assign structured deliverables, approve attendance logs, and submit rubric-based appraisals.',
-      features: [
-        'Milestone task creation, priorities, and progress reviews',
-        'Daily attendance verification with audit trail notes',
-        'Rubric-based performance appraisals & 1-on-1 chat',
-      ],
-      plannedPhase: 'Fully Operational • All Phases Complete',
+      icon: CalendarCheck,
+      title: 'Daily Attendance & Work Logging',
+      description: 'Structured daily check-in logs, work summary timestamps, automated percentage analytics, and multi-tier mentor approval workflows.',
+      badge: 'Audit Verified',
+      color: 'burgundy',
     },
     {
-      role: 'admin',
-      title: 'Admin Console',
-      description: 'Institutional administration overseeing role verifications, credit compliance, system-wide analytics, and audit logging.',
-      features: [
-        'Full user management with RBAC & last-admin protection',
-        'Institutional analytics dashboards & sanitized CSV exports',
-        'Regulatory audit logging & security boundary enforcement',
-      ],
-      plannedPhase: 'Fully Operational • All Phases Complete',
+      icon: Award,
+      title: 'Digital Verifiable Certificates',
+      description: 'Cryptographically secured completion certificates with QR verification codes, dynamic PDF generation, and public verification portal.',
+      badge: 'Instant Verify',
+      color: 'champagne',
+    },
+    {
+      icon: MessageSquare,
+      title: 'Real-Time Collaboration & Chat',
+      description: 'Instant WebSocket communication channels connecting interns with industry mentors and company coordinators with unread counters.',
+      badge: 'Socket.IO',
+      color: 'burgundy',
+    },
+    {
+      icon: ShieldCheck,
+      title: 'Institutional Governance & RBAC',
+      description: 'Strict role-based access control protecting Students, Employers, Faculty Mentors, and Administrators with comprehensive audit logging.',
+      badge: 'Enterprise RBAC',
+      color: 'champagne',
     },
   ];
 
-  // Verified design system sample table rows (Workflow representation)
-  const workflowPreviewRows = [
+  const stakeholderRoles = [
     {
-      role: 'Full-Stack Developer Intern',
-      company: 'TechCorp Labs',
-      department: 'Engineering',
-      stipend: '₹25,000 / mo',
-      status: 'active',
-      statusLabel: 'Published',
-      applicants: 18,
+      role: 'student',
+      title: 'Student & Intern Portal',
+      icon: GraduationCap,
+      description: 'Browse verified opportunities, upload PDF resumes for AI feedback, log daily attendance, track application stages, and earn completion certificates.',
+      actionText: 'Join as Student',
+      path: '/register?role=student',
+      highlights: ['Smart Application Tracking', 'AI Resume Fit Scoring', 'Daily Attendance Logs'],
     },
     {
-      role: 'Cloud DevOps Associate',
-      company: 'SkyNet Systems',
-      department: 'Infrastructure',
-      stipend: '₹30,000 / mo',
-      status: 'info',
-      statusLabel: 'Interviewing',
-      applicants: 12,
+      role: 'company',
+      title: 'Host Employer Hub',
+      icon: Building2,
+      description: 'Post and manage internship openings, review candidate pipelines with AI insights, schedule interviews, and oversee allocated intern deliverables.',
+      actionText: 'Register Company',
+      path: '/register?role=company',
+      highlights: ['Candidate Pipeline Kanban', 'Automated AI Applicant Scoring', 'Attendance & Deliverable Sign-Off'],
     },
     {
-      role: 'Product Management Intern',
-      company: 'InnoVenture AI',
-      department: 'Product',
-      stipend: '₹20,000 / mo',
-      status: 'warning',
-      statusLabel: 'Under Review',
-      applicants: 34,
+      role: 'mentor',
+      title: 'Faculty Mentor Workspace',
+      icon: Users,
+      description: 'Supervise assigned students across host organizations, review daily work accomplishment logs, provide rubric evaluations, and guide progress.',
+      actionText: 'Mentor Sign In',
+      path: '/login',
+      highlights: ['Attendance Verification', 'Structured Rubric Appraisals', 'Direct Real-Time Chat'],
     },
     {
-      role: 'Data Science Trainee',
-      company: 'QuantIQ Analytics',
-      department: 'Analytics',
-      stipend: '₹28,000 / mo',
-      status: 'active',
-      statusLabel: 'Published',
-      applicants: 22,
+      role: 'admin',
+      title: 'Institutional Admin Console',
+      icon: ShieldCheck,
+      description: 'System-wide governance, student-to-company allocation control, regulatory accreditation reports, sanitized CSV exports, and audit trails.',
+      actionText: 'Admin Console',
+      path: '/login',
+      highlights: ['Global Analytics Dashboards', 'Accreditation CSV Exports', 'Security Audit Trails'],
     },
-  ].filter(
-    (item) =>
-      item.role.toLowerCase().includes(searchFilter.toLowerCase()) ||
-      item.company.toLowerCase().includes(searchFilter.toLowerCase()) ||
-      item.department.toLowerCase().includes(searchFilter.toLowerCase())
-  );
+  ];
 
-  const isHealthy = healthData?.data?.status === 'healthy';
-  const isDbConnected = healthData?.data?.database?.connected;
+  const handleVerifySubmit = (e) => {
+    e.preventDefault();
+    if (!quickCertCode.trim()) return;
+    navigate(`/verify-certificate/${encodeURIComponent(quickCertCode.trim())}`);
+  };
 
   return (
-    <div className="space-y-12">
-      {/* Hero Section with Enterprise Polish */}
-      <section className="relative overflow-hidden rounded-3xl surface-card border border-slate-200/90 dark:border-slate-800 p-8 sm:p-12 lg:p-14 bg-gradient-to-b from-white via-slate-50/50 to-white dark:from-[#0d1424] dark:via-[#090e1c] dark:to-[#0d1424]">
-        {/* Subtle Ambient Glow */}
-        <div className="absolute top-0 right-0 -mr-24 -mt-24 w-96 h-96 bg-brand-500/10 dark:bg-brand-500/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-0 -ml-24 -mb-24 w-80 h-80 bg-accent-500/10 dark:bg-accent-500/15 rounded-full blur-3xl pointer-events-none" />
+    <div className="space-y-16 py-4 animate-in fade-in duration-300">
+      {/* Hero Section */}
+      <section className="relative overflow-hidden rounded-3xl surface-card border border-champagne-300/80 dark:border-burgundy-900/60 p-8 sm:p-12 lg:p-16 shadow-card">
+        {/* Subtle Ambient Radial Glows */}
+        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 bg-burgundy-500/10 dark:bg-burgundy-600/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-96 h-96 bg-champagne-400/15 dark:bg-champagne-500/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative max-w-3xl space-y-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-50 text-brand-700 dark:bg-brand-950/40 dark:text-brand-300 border border-brand-200 dark:border-brand-800 text-xs font-semibold">
-            <Sparkles className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400" />
-            <span>Phase 1 Design System Active • Connected to MongoDB Atlas</span>
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-champagne-100/80 dark:bg-burgundy-950/60 border border-champagne-300 dark:border-burgundy-800 text-xs font-semibold text-burgundy-900 dark:text-champagne-200 shadow-soft">
+            <Sparkles className="w-3.5 h-3.5 text-champagne-600 dark:text-champagne-400 animate-pulse" />
+            <span>Next-Generation Smart Internship Management System</span>
           </div>
 
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
-            Institutional Internship Governance & Workflow Platform
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-stone-900 dark:text-white tracking-tight leading-[1.12]">
+            Empowering Careers Through{' '}
+            <span className="gradient-brand-text">Intelligent Governance</span>
           </h1>
 
-          <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
-            A cohesive full-stack enterprise ecosystem connecting students, host companies, faculty
-            mentors, and academic coordinators. Built with React 18, Tailwind CSS, Express, and MongoDB Atlas.
+          <p className="text-sm sm:text-base lg:text-lg text-stone-600 dark:text-stone-300 leading-relaxed font-normal">
+            A unified digital ecosystem connecting <strong>Students</strong>, <strong>Host Companies</strong>,{' '}
+            <strong>Faculty Mentors</strong>, and <strong>Academic Coordinators</strong> with AI resume screening,
+            daily attendance logging, real-time job notifications, and verifiable digital certificates.
           </p>
 
-          <div className="pt-2 flex flex-wrap items-center gap-3">
+          {/* Call to Action Buttons */}
+          <div className="pt-2 flex flex-wrap items-center gap-3.5">
             {isAuthenticated ? (
-              <Link to="/dashboard">
-                <Button
-                  variant="primary"
-                  size="lg"
-                  icon={ArrowRight}
-                  iconPosition="right"
-                  className="font-semibold shadow-md"
-                >
-                  Access My {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : ''} Dashboard
-                </Button>
-              </Link>
+              <>
+                <Link to="/dashboard">
+                  <Button
+                    variant="gradient"
+                    size="lg"
+                    icon={ArrowRight}
+                    iconPosition="right"
+                    className="font-bold text-sm shadow-burgundy hover:scale-[1.02]"
+                  >
+                    Go to {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : ''} Dashboard
+                  </Button>
+                </Link>
+                <Link to="/internships">
+                  <Button variant="secondary" size="lg" icon={Briefcase} className="text-sm font-semibold">
+                    Browse Opportunities
+                  </Button>
+                </Link>
+              </>
             ) : (
-              <Link to="/login">
-                <Button
-                  variant="primary"
-                  size="lg"
-                  icon={LogIn}
-                  className="font-semibold shadow-md"
-                >
-                  Sign In to SIMS
-                </Button>
-              </Link>
+              <>
+                <Link to="/register">
+                  <Button
+                    variant="gradient"
+                    size="lg"
+                    icon={UserPlus}
+                    iconPosition="left"
+                    className="font-bold text-sm shadow-burgundy hover:scale-[1.02]"
+                  >
+                    Create Free Account
+                  </Button>
+                </Link>
+
+                <Link to="/login">
+                  <Button
+                    variant="champagne"
+                    size="lg"
+                    icon={LogIn}
+                    iconPosition="left"
+                    className="font-bold text-sm shadow-champagne hover:scale-[1.02]"
+                  >
+                    Sign In
+                  </Button>
+                </Link>
+
+                <Link to="/internships">
+                  <Button variant="outline" size="lg" icon={Search} className="text-sm font-semibold">
+                    Explore Internships
+                  </Button>
+                </Link>
+              </>
             )}
-            <Link to="/roadmap">
-              <Button variant="secondary" size="lg" icon={ArrowRight} iconPosition="right">
-                View 6-Phase Roadmap
-              </Button>
-            </Link>
+          </div>
+
+          {/* Quick Metrics Trust Bar */}
+          <div className="pt-6 border-t border-champagne-200/90 dark:border-warmdark-800 grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div>
+              <div className="text-xl sm:text-2xl font-black text-burgundy-700 dark:text-champagne-300">
+                4 Roles
+              </div>
+              <div className="text-[11px] text-stone-500 font-medium">Students, Mentors, Companies, Admins</div>
+            </div>
+            <div>
+              <div className="text-xl sm:text-2xl font-black text-burgundy-700 dark:text-champagne-300">
+                100% Dynamic
+              </div>
+              <div className="text-[11px] text-stone-500 font-medium">MongoDB Persistent Cloud Backend</div>
+            </div>
+            <div>
+              <div className="text-xl sm:text-2xl font-black text-burgundy-700 dark:text-champagne-300">
+                Gemini 1.5
+              </div>
+              <div className="text-[11px] text-stone-500 font-medium">AI Resume Analysis & Skill Radar</div>
+            </div>
+            <div>
+              <div className="text-xl sm:text-2xl font-black text-burgundy-700 dark:text-champagne-300">
+                Real-Time
+              </div>
+              <div className="text-[11px] text-stone-500 font-medium">Job Alerts & Socket.IO Chat</div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Live Backend & Database Diagnostics Card */}
+      {/* Core Features Grid */}
+      <section className="space-y-6">
+        <div className="text-center max-w-2xl mx-auto space-y-2">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-burgundy-50 dark:bg-burgundy-950/50 text-burgundy-700 dark:text-burgundy-300 text-xs font-semibold border border-burgundy-200 dark:border-burgundy-900/60">
+            <Sparkles className="w-3.5 h-3.5 text-burgundy-600 dark:text-champagne-400" />
+            <span>Platform Capabilities</span>
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-black text-stone-900 dark:text-white tracking-tight">
+            Designed for Complete Internship Lifecycles
+          </h2>
+          <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-400">
+            From opportunity discovery and AI CV evaluation to attendance logging, task progress, and certified graduation.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {coreFeatures.map((feat, idx) => {
+            const Icon = feat.icon;
+            return (
+              <div
+                key={idx}
+                className="surface-card p-6 rounded-2xl border border-champagne-200/90 dark:border-warmdark-700 shadow-soft hover:shadow-card hover:border-champagne-400 transition-all duration-200 space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="p-3 rounded-xl bg-burgundy-50 dark:bg-burgundy-950/60 text-burgundy-700 dark:text-champagne-300 border border-burgundy-200 dark:border-burgundy-800/60">
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-champagne-100/80 dark:bg-warmdark-800 text-stone-700 dark:text-champagne-300 border border-champagne-300 dark:border-warmdark-700">
+                    {feat.badge}
+                  </span>
+                </div>
+                <h3 className="font-bold text-base text-stone-900 dark:text-white">{feat.title}</h3>
+                <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-400 leading-relaxed font-normal">
+                  {feat.description}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Stakeholder Workspaces Breakdown */}
+      <section className="space-y-6">
+        <div className="text-center max-w-2xl mx-auto space-y-2">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-champagne-100/80 dark:bg-warmdark-800 text-stone-800 dark:text-champagne-300 text-xs font-semibold border border-champagne-300 dark:border-warmdark-700">
+            <Users className="w-3.5 h-3.5 text-champagne-600 dark:text-champagne-400" />
+            <span>Role-Based Ecosystem</span>
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-black text-stone-900 dark:text-white tracking-tight">
+            Tailored Workspaces for Every Stakeholder
+          </h2>
+          <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-400">
+            Dedicated interfaces and rigorous permission boundaries configured for each participant.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {stakeholderRoles.map((roleItem, idx) => {
+            const RoleIcon = roleItem.icon;
+            return (
+              <div
+                key={idx}
+                className="surface-card p-6 rounded-2xl border border-champagne-200/90 dark:border-warmdark-700 flex flex-col justify-between space-y-4 hover:border-burgundy-300 transition-all duration-200"
+              >
+                <div className="space-y-3">
+                  <div className="w-12 h-12 rounded-xl bg-champagne-50 dark:bg-burgundy-950/40 text-burgundy-700 dark:text-champagne-300 border border-champagne-300 dark:border-burgundy-800 flex items-center justify-center">
+                    <RoleIcon className="w-6 h-6" />
+                  </div>
+                  <h3 className="font-bold text-base text-stone-900 dark:text-white">
+                    {roleItem.title}
+                  </h3>
+                  <p className="text-xs text-stone-600 dark:text-stone-400 leading-relaxed">
+                    {roleItem.description}
+                  </p>
+
+                  <div className="space-y-1.5 pt-2">
+                    {roleItem.highlights.map((item, hIdx) => (
+                      <div key={hIdx} className="flex items-center gap-1.5 text-[11px] text-stone-700 dark:text-stone-300 font-medium">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                        <span>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-champagne-200/80 dark:border-warmdark-800">
+                  <Link to={roleItem.path} className="w-full block">
+                    <Button variant="outline" size="sm" icon={ArrowRight} iconPosition="right" className="w-full justify-center text-xs">
+                      {roleItem.actionText}
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Live Featured Opportunities Section */}
+      <section className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-burgundy-700 dark:text-champagne-300">
+              <Briefcase className="w-3.5 h-3.5" />
+              <span>Verified Industry Postings</span>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-black text-stone-900 dark:text-white tracking-tight">
+              Featured Active Internships
+            </h2>
+            <p className="text-xs text-stone-500 dark:text-stone-400">
+              Directly fetched from the live database. Apply with one click using your stored profile & resume.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Link to="/internships">
+              <Button variant="secondary" size="sm" icon={ExternalLink} iconPosition="right">
+                View All Directory
+              </Button>
+            </Link>
+            <Link to="/external-jobs">
+              <Button variant="champagne" size="sm" icon={Search}>
+                LinkedIn & Remote Feeds
+              </Button>
+            </Link>
+          </div>
+        </div>
+
+        {loadingInternships ? (
+          <div className="p-8 text-center surface-card border border-champagne-200/80 rounded-2xl text-xs text-stone-500">
+            Loading live opportunities from database...
+          </div>
+        ) : recentInternships.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {recentInternships.map((opp) => (
+              <div
+                key={opp._id}
+                className="surface-card p-4 rounded-xl border border-champagne-200/80 dark:border-warmdark-700 hover:border-champagne-400 space-y-2.5 transition-all text-xs flex flex-col justify-between"
+              >
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-champagne-100 dark:bg-warmdark-800 text-stone-700 dark:text-champagne-300">
+                      {opp.workMode || 'Hybrid'}
+                    </span>
+                    <span className="text-[10px] font-mono text-stone-500">
+                      {opp.openings} opening{opp.openings > 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <h4 className="font-bold text-sm text-stone-900 dark:text-white line-clamp-1">
+                    {opp.title}
+                  </h4>
+                  <div className="text-stone-600 dark:text-stone-400 font-medium">
+                    {opp.companyName}
+                  </div>
+                  <div className="flex items-center gap-1 text-[11px] text-stone-500">
+                    <MapPin className="w-3 h-3 text-stone-400 shrink-0" />
+                    <span className="truncate">{opp.location || 'Flexible'}</span>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-champagne-200/60 dark:border-warmdark-800 flex items-center justify-between">
+                  <div className="font-bold font-mono text-burgundy-800 dark:text-champagne-300">
+                    {opp.stipend?.amount ? `₹${opp.stipend.amount}/mo` : 'Negotiable'}
+                  </div>
+                  <Link to={`/internships`}>
+                    <Button variant="primary" size="sm" className="text-xs px-2.5 py-1">
+                      Apply
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="p-8 text-center surface-card border border-champagne-200/80 rounded-2xl space-y-2">
+            <p className="text-xs text-stone-500">No active postings found in this instance yet.</p>
+            <Link to="/register?role=company">
+              <Button variant="champagne" size="sm" icon={Building2}>
+                Post First Internship
+              </Button>
+            </Link>
+          </div>
+        )}
+      </section>
+
+      {/* Quick Certificate Verification Callout */}
+      <section className="relative overflow-hidden rounded-2xl surface-card border border-champagne-300 dark:border-burgundy-900/60 p-6 sm:p-8 bg-gradient-to-r from-champagne-50/60 via-white to-burgundy-50/30 dark:from-[#170d11] dark:via-[#150d10] dark:to-[#170d11]">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div className="space-y-2 max-w-xl">
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-burgundy-800 dark:text-champagne-300">
+              <Award className="w-4 h-4 text-champagne-600" />
+              <span>Public Verification Gateway</span>
+            </div>
+            <h3 className="text-lg sm:text-xl font-bold text-stone-900 dark:text-white">
+              Verify an Issued Internship Certificate
+            </h3>
+            <p className="text-xs text-stone-600 dark:text-stone-400 leading-relaxed">
+              Employers, universities, and verification agencies can instantly validate certificate legitimacy
+              using the unique alphanumeric code stamped on the digital credential.
+            </p>
+          </div>
+
+          <form onSubmit={handleVerifySubmit} className="flex flex-col sm:flex-row items-stretch gap-2.5 w-full lg:w-auto">
+            <input
+              type="text"
+              placeholder="e.g. SIMS-2026-A1B2C3"
+              value={quickCertCode}
+              onChange={(e) => setQuickCertCode(e.target.value)}
+              className="p-2.5 rounded-xl border border-champagne-300 dark:border-warmdark-700 bg-white dark:bg-warmdark-900 text-xs font-mono tracking-wider text-stone-900 dark:text-white min-w-[220px]"
+            />
+            <Button type="submit" variant="gradient" size="md" icon={ShieldCheck} className="text-xs font-semibold whitespace-nowrap">
+              Verify Credential
+            </Button>
+          </form>
+        </div>
+      </section>
+
+      {/* Live System Diagnostics Card */}
       <section id="diagnostics">
-        <Card>
+        <Card className="border border-champagne-200/90 dark:border-warmdark-800 shadow-soft">
           <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-brand-50 text-brand-700 dark:bg-brand-950/40 dark:text-brand-400 border border-brand-200 dark:border-brand-800">
+                <div className="p-2 rounded-lg bg-burgundy-50 dark:bg-burgundy-950/60 text-burgundy-700 dark:text-champagne-300 border border-burgundy-200 dark:border-burgundy-800">
                   <Server className="w-5 h-5" />
                 </div>
-                <CardTitle>System Gateway & Cluster Diagnostics</CardTitle>
+                <CardTitle className="text-base">System Telemetry & Database Diagnostics</CardTitle>
               </div>
-              <CardDescription>
-                Live diagnostic telemetry communicating directly with <code className="font-mono text-brand-600 dark:text-brand-400">/api/health</code> (Port 5001)
+              <CardDescription className="text-xs">
+                Active status queried live from <code className="font-mono text-burgundy-700 dark:text-champagne-400">/api/health</code> and <code className="font-mono text-burgundy-700 dark:text-champagne-400">/api/health/db</code>
               </CardDescription>
             </div>
 
-            <div className="flex items-center gap-3">
-              {lastChecked && (
-                <span className="text-xs text-slate-400 font-mono hidden sm:inline">
-                  Synced: {lastChecked}
-                </span>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                icon={RefreshCw}
-                isLoading={loadingHealth}
-                onClick={fetchHealth}
-              >
-                Refresh
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              icon={RefreshCw}
+              isLoading={loadingHealth}
+              onClick={fetchDiagnostics}
+              className="text-xs"
+            >
+              Refresh Diagnostics
+            </Button>
           </CardHeader>
 
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* API Gateway Status */}
-              <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#070b14] border border-slate-200/90 dark:border-slate-800">
+              {/* API Gateway */}
+              <div className="p-4 rounded-xl bg-champagne-50/50 dark:bg-warmdark-850 border border-champagne-200/80 dark:border-warmdark-800">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">API Gateway</span>
+                  <span className="text-xs font-semibold text-stone-500">API Gateway</span>
                   <StatusBadge
                     status={isHealthy ? 'healthy' : 'warning'}
                     label={isHealthy ? 'Operational' : 'Checking'}
+                    size="sm"
                   />
                 </div>
-                <div className="text-base font-bold text-slate-900 dark:text-white font-mono">
-                  {isHealthy ? 'HTTP 200 OK' : 'Pending...'}
+                <div className="text-sm font-bold text-stone-900 dark:text-white font-mono">
+                  {isHealthy ? 'HTTP 200 OK' : 'Checking...'}
                 </div>
-                <div className="text-[11px] text-slate-500 mt-1">
-                  Port: <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">5001</span> • Env: <span className="font-mono">{healthData?.data?.environment || 'dev'}</span>
+                <div className="text-[11px] text-stone-500 mt-1">
+                  Port: <strong className="font-mono text-stone-700 dark:text-stone-300">5001</strong> • Env: <span className="font-mono">{healthData?.data?.environment || 'dev'}</span>
                 </div>
               </div>
 
-              {/* Database State */}
-              <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#070b14] border border-slate-200/90 dark:border-slate-800">
+              {/* Database Connection */}
+              <div className="p-4 rounded-xl bg-champagne-50/50 dark:bg-warmdark-850 border border-champagne-200/80 dark:border-warmdark-800">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">MongoDB Atlas</span>
+                  <span className="text-xs font-semibold text-stone-500">MongoDB Database</span>
                   <StatusBadge
                     status={isDbConnected ? 'healthy' : 'warning'}
                     label={isDbConnected ? 'Connected' : 'Degraded'}
+                    size="sm"
                   />
                 </div>
-                <div className="text-base font-bold text-slate-900 dark:text-white">
-                  {isDbConnected ? 'Cloud Replica Set' : 'Standby'}
+                <div className="text-sm font-bold text-stone-900 dark:text-white">
+                  {isDbConnected ? 'Active Connection' : 'Standby'}
                 </div>
-                <div className="text-[11px] text-slate-500 mt-1">
-                  Mongoose 8.9.x • Host: <span className="font-mono truncate">{healthData?.data?.database?.host ? 'Atlas Cluster0' : '127.0.0.1'}</span>
+                <div className="text-[11px] text-stone-500 mt-1">
+                  Latency: <strong className="font-mono text-stone-700 dark:text-stone-300">{dbHealthData?.data?.latencyMs !== undefined ? `${dbHealthData.data.latencyMs}ms` : '< 10ms'}</strong>
                 </div>
               </div>
 
-              {/* Uptime */}
-              <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#070b14] border border-slate-200/90 dark:border-slate-800">
+              {/* Process Uptime */}
+              <div className="p-4 rounded-xl bg-champagne-50/50 dark:bg-warmdark-850 border border-champagne-200/80 dark:border-warmdark-800">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Process Uptime</span>
-                  <Clock className="w-4 h-4 text-slate-400" />
+                  <span className="text-xs font-semibold text-stone-500">Node Process Uptime</span>
+                  <Clock className="w-3.5 h-3.5 text-stone-400" />
                 </div>
-                <div className="text-base font-bold text-slate-900 dark:text-white font-mono">
+                <div className="text-sm font-bold text-stone-900 dark:text-white font-mono">
                   {healthData?.data?.uptimeSeconds !== undefined ? `${healthData.data.uptimeSeconds}s` : '--'}
                 </div>
-                <div className="text-[11px] text-slate-500 mt-1">
-                  Graceful signal termination
+                <div className="text-[11px] text-stone-500 mt-1">
+                  Graceful signal termination active
                 </div>
               </div>
 
               {/* Memory Allocation */}
-              <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#070b14] border border-slate-200/90 dark:border-slate-800">
+              <div className="p-4 rounded-xl bg-champagne-50/50 dark:bg-warmdark-850 border border-champagne-200/80 dark:border-warmdark-800">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Memory (RSS)</span>
-                  <Cpu className="w-4 h-4 text-slate-400" />
+                  <span className="text-xs font-semibold text-stone-500">Node RSS Memory</span>
+                  <Activity className="w-3.5 h-3.5 text-stone-400" />
                 </div>
-                <div className="text-base font-bold text-slate-900 dark:text-white font-mono">
+                <div className="text-sm font-bold text-stone-900 dark:text-white font-mono">
                   {healthData?.data?.memoryUsageMB?.rss ? `${healthData.data.memoryUsageMB.rss} MB` : '--'}
                 </div>
-                <div className="text-[11px] text-slate-500 mt-1">
+                <div className="text-[11px] text-stone-500 mt-1">
                   Heap: <span className="font-mono">{healthData?.data?.memoryUsageMB?.heapUsed || '--'} MB</span>
                 </div>
               </div>
             </div>
           </CardContent>
         </Card>
-      </section>
-
-      {/* Design System Preview Table (Enterprise Table Component) */}
-      <section className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
-              Internship Workflow Preview
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-              Enterprise Table, Input, and StatusBadge components designed for Phase 3 directory
-            </p>
-          </div>
-
-          <div className="w-full sm:w-72">
-            <Input
-              icon={Search}
-              placeholder="Filter by role, company, department..."
-              value={searchFilter}
-              onChange={(e) => setSearchFilter(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <Table>
-          <TableHeader>
-            <tr>
-              <TableHead>Opportunity</TableHead>
-              <TableHead>Company</TableHead>
-              <TableHead>Department</TableHead>
-              <TableHead>Stipend</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Applicants</TableHead>
-              <TableHead className="text-right">Action</TableHead>
-            </tr>
-          </TableHeader>
-          <TableBody>
-            {workflowPreviewRows.length > 0 ? (
-              workflowPreviewRows.map((row, idx) => (
-                <TableRow key={idx}>
-                  <TableCell className="font-semibold text-slate-900 dark:text-white">
-                    {row.role}
-                  </TableCell>
-                  <TableCell>{row.company}</TableCell>
-                  <TableCell>
-                    <span className="px-2 py-0.5 rounded text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                      {row.department}
-                    </span>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">{row.stipend}</TableCell>
-                  <TableCell>
-                    <StatusBadge status={row.status} label={row.statusLabel} size="sm" />
-                  </TableCell>
-                  <TableCell className="font-medium text-xs">{row.applicants} students</TableCell>
-                  <TableCell className="text-right">
-                    <Link to="/login">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        icon={Lock}
-                        className="text-xs"
-                      >
-                        Apply
-                      </Button>
-                    </Link>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={7} className="p-8 text-center text-xs text-slate-400">
-                  No listings found matching "{searchFilter}"
-                </td>
-              </tr>
-            )}
-          </TableBody>
-        </Table>
-      </section>
-
-      {/* Stakeholder Workspaces (RoleCards) */}
-      <section className="space-y-6">
-        <div className="text-center max-w-2xl mx-auto">
-          <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-            Tailored Role Workspaces
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Strict role-based interfaces enforcing permission boundaries across every actor.
-            Login portals unlock in Phase 2.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {roles.map((item) => (
-            <RoleCard key={item.role} {...item} />
-          ))}
-        </div>
       </section>
     </div>
   );

@@ -86,6 +86,25 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const loginWithGoogle = async ({ credential, role }) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await authService.googleLogin({ credential, role });
+      const { user: authUser, token: authToken } = response.data;
+
+      localStorage.setItem('sims_auth_token', authToken);
+      setUser(authUser);
+      setToken(authToken);
+      return { success: true, user: authUser };
+    } catch (err) {
+      setError(err.message || 'Google authentication failed');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = async () => {
     try {
       await authService.logout();
@@ -108,6 +127,7 @@ export const AuthProvider = ({ children }) => {
         isLoading,
         error,
         login,
+        loginWithGoogle,
         register,
         logout,
         clearError,

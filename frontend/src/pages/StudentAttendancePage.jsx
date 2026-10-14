@@ -89,10 +89,26 @@ export const StudentAttendancePage = () => {
 
   const handleAttendanceSubmit = async (e) => {
     e.preventDefault();
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    if (!date) {
+      setErrorMessage('Please specify the attendance date.');
+      return;
+    }
+
+    if (date > todayISO) {
+      setErrorMessage('Attendance cannot be recorded for future dates.');
+      return;
+    }
+
+    if ((status === ATTENDANCE_STATUSES.PRESENT || status === ATTENDANCE_STATUSES.REMOTE) && !workSummary.trim()) {
+      setErrorMessage('Please provide a brief description of work completed or key deliverables today.');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
-      setErrorMessage('');
-      setSuccessMessage('');
 
       const res = await attendanceService.submitAttendance({
         date,
@@ -103,15 +119,14 @@ export const StudentAttendancePage = () => {
       });
 
       if (res?.success) {
-        setSuccessMessage('Daily attendance successfully recorded!');
+        setSuccessMessage('Daily attendance successfully recorded and saved to database!');
         setWorkSummary('');
-        fetchAttendanceData();
-        setTimeout(() => setSuccessMessage(''), 4000);
+        await fetchAttendanceData();
+        setTimeout(() => setSuccessMessage(''), 5000);
       }
     } catch (err) {
-      setErrorMessage(
-        err.response?.data?.error?.message || 'Failed to submit daily attendance.'
-      );
+      const msg = err.message || err.response?.data?.error?.message || 'Failed to submit daily attendance.';
+      setErrorMessage(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -168,14 +183,27 @@ export const StudentAttendancePage = () => {
       )}
 
       {errorMessage && (
-        <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-xs text-rose-800 dark:text-rose-200 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-600" />
-            <span>{errorMessage}</span>
+        <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-xs text-rose-800 dark:text-rose-200 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span className="font-semibold">{errorMessage}</span>
+            </div>
+            <button onClick={() => setErrorMessage('')} className="text-rose-500 font-bold px-1 hover:text-rose-700">
+              ×
+            </button>
           </div>
-          <button onClick={() => setErrorMessage('')} className="text-rose-500 font-bold">
-            ×
-          </button>
+          {(errorMessage.toLowerCase().includes('placement') || errorMessage.toLowerCase().includes('allocation')) && (
+            <div className="pt-1 text-[11px] text-rose-700 dark:text-rose-300">
+              <span>Looking for an internship placement? </span>
+              <a
+                href="/internships"
+                className="underline font-bold text-burgundy-700 dark:text-champagne-300 hover:text-burgundy-900"
+              >
+                Browse verified openings in the Directory &rarr;
+              </a>
+            </div>
+          )}
         </div>
       )}
 
@@ -323,8 +351,8 @@ export const StudentAttendancePage = () => {
                   variant="primary"
                   size="sm"
                   icon={Send}
-                  loading={isSubmitting}
-                  className="w-full justify-center font-semibold"
+                  isLoading={isSubmitting}
+                  className="w-full justify-center font-semibold shadow-sm"
                 >
                   Submit Daily Attendance
                 </Button>

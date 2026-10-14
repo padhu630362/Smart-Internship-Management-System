@@ -1,7 +1,7 @@
 # Smart Internship Management System (SIMS)
 
-[![Version](https://img.shields.io/badge/Release-v1.0.0%20(Phase%2012)-blue.svg)](https://github.com)
-[![Tests](https://img.shields.io/badge/Tests-143%2F143%20Passing%20(100%25)-brightgreen.svg)](docs/TEST_REPORT.md)
+[![Version](https://img.shields.io/badge/Release-v1.0.0%20(Production%20Ready)-blue.svg)](https://github.com)
+[![Tests](https://img.shields.io/badge/Tests-151%2F151%20Passing%20(100%25)-brightgreen.svg)](docs/TEST_REPORT.md)
 [![Node](https://img.shields.io/badge/Node-v20%2B%20LTS-brightgreen.svg)](https://nodejs.org)
 [![React](https://img.shields.io/badge/React-v18-cyan.svg)](https://react.dev)
 [![Vite](https://img.shields.io/badge/Vite-v6-purple.svg)](https://vitejs.dev)
@@ -9,7 +9,7 @@
 [![Socket.IO](https://img.shields.io/badge/Socket.IO-v4-black.svg)](https://socket.io)
 [![MongoDB](https://img.shields.io/badge/MongoDB-Atlas%20Replica%20Set-emerald.svg)](https://mongodb.com)
 
-The **Smart Internship Management System (SIMS)** is an enterprise-grade, multi-role web platform designed for universities, colleges, students, host employers, and industry mentors. It streamlines the full internship lifecycle: from opportunity discovery and applicant screening to official allocations, daily attendance audit trails, deliverable milestone tracking, real-time messaging, Socket.IO notifications, rubric performance appraisals, and institutional accreditation reporting.
+The **Smart Internship Management System (SIMS)** is an enterprise-grade, multi-role web platform designed for universities, colleges, students, host employers, and industry mentors. It streamlines the full internship lifecycle: from opportunity discovery and applicant screening to **AI-powered resume analysis & skill matching**, official allocations, daily attendance audit trails, deliverable milestone tracking, real-time messaging, Socket.IO notifications, rubric performance appraisals, **institutional completion certificates with public verification**, and regulatory accreditation reporting.
 
 ---
 
@@ -54,11 +54,11 @@ SIMS implements strict Role-Based Access Control (RBAC) across five system roles
 
 | Role | Key Capabilities & Workspaces |
 |---|---|
-| **Student / Intern** (`student`) | Browse opportunity directory with filters, upload PDF resume, 1-click application submission, application status timeline, daily attendance check-in, milestone task submissions, real-time 1-on-1 and group chat, Socket.IO notifications. |
-| **Employer / Company** (`company`) | Post and manage internship listings (openings, requirements, deadlines), candidate screening Kanban board, review student resumes, transition application states (`under_review`, `shortlisted`, `selected`, `rejected`), evaluate intern performance. |
-| **Industry Mentor** (`mentor`) | Supervise assigned interns, create prioritized deliverable tasks with due dates, review and approve daily attendance with audit notes, submit numerical rubric performance appraisals (technical, communication, overall), direct chat with interns. |
+| **Student / Intern** (`student`) | Browse opportunity directory with filters, live AI Skill Fit match calculator, upload PDF resume with authenticated inline viewer, 1-click application submission, application status timeline, daily attendance check-in, milestone task submissions, real-time 1-on-1 and group chat, Socket.IO notifications, earned completion certificates with PDF downloads and public verification. |
+| **Employer / Company** (`company`) | Post and manage internship listings (openings, requirements, deadlines), candidate screening Kanban board with AI Match Score (0-100%) and matched/missing skills badges, on-demand AI resume analysis, review student resumes, transition application states (`under_review`, `shortlisted`, `interview`, `selected`, `rejected`), evaluate intern performance. |
+| **Industry Mentor** (`mentor`) | Self-registration with company affiliation, supervise assigned interns, create prioritized deliverable tasks with due dates, review and approve daily attendance with audit notes, submit numerical rubric performance appraisals (technical, communication, overall), auto-issue accredited completion certificates upon passing final evaluation, direct chat with interns. |
 | **Internship Coordinator** (`coordinator`) | University academic supervisor console, publish institutional opportunities, verify employer credentials, create official allocations linking student-opportunity-mentor, review cross-department attendance, query analytical reports, export sanitized CSV. |
-| **System Administrator** (`admin`) | Institutional governance console, complete user management (search, paginate, toggle status, change roles), last-active administrator safety protection, inspect regulatory audit logs, system-wide placement metrics. |
+| **System Administrator** (`admin`) | Institutional governance console, complete user and mentor management (search, paginate, toggle status, change roles), last-active administrator safety protection, inspect immutable regulatory audit logs with actor and IP tracking, platform-wide placement metrics. |
 
 ---
 
@@ -167,6 +167,7 @@ CLIENT_URL=http://localhost:5173
 ALLOWED_ORIGINS=
 JWT_SECRET=development_jwt_secret_change_in_production_min_32_characters
 JWT_EXPIRES_IN=7d
+GEMINI_API_KEY=your_optional_google_gemini_api_key_here
 ```
 
 **Frontend Configuration:**

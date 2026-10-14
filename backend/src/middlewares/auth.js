@@ -7,18 +7,18 @@ import { AppError } from '../utils/AppError.js';
  */
 export const authenticateToken = async (req, res, next) => {
   try {
+    let token = null;
     const authHeader = req.headers.authorization || req.headers.Authorization;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return next(
-        new AppError('Authentication required. Missing Bearer token.', 401, 'UNAUTHORIZED')
-      );
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    } else if (req.query && req.query.token) {
+      token = req.query.token;
     }
 
-    const token = authHeader.split(' ')[1];
     if (!token) {
       return next(
-        new AppError('Authentication token not provided.', 401, 'TOKEN_MISSING')
+        new AppError('Authentication required. Missing Bearer token.', 401, 'UNAUTHORIZED')
       );
     }
 

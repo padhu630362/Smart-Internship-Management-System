@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, LogIn, LogOut, Activity, User, LayoutDashboard, ChevronDown, Users, Briefcase, FileText, UserCheck, Calendar, FileCheck2, MessageSquare, Award, BarChart3 } from 'lucide-react';
+import { Menu, LogIn, LogOut, Activity, User, LayoutDashboard, ChevronDown, Users, Briefcase, FileText, UserCheck, Calendar, FileCheck2, MessageSquare, Award, BarChart3, Sparkles, Bell } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import StatusBadge from '../common/StatusBadge';
 import ThemeToggle from '../common/ThemeToggle';
@@ -42,10 +42,8 @@ export const TopNavbar = ({ onToggleSidebar, healthStatus, onOpenLogin }) => {
           <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-medium">
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
             <span>Smart Internship Management System</span>
-            <span className="text-slate-300 dark:text-slate-700">|</span>
-            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-              Phase 12 • College Demo Ready (v1.0)
-            </span>
+           
+           
           </div>
 
         </div>
@@ -54,20 +52,21 @@ export const TopNavbar = ({ onToggleSidebar, healthStatus, onOpenLogin }) => {
         <div className="flex items-center gap-2 sm:gap-3">
           <Link
             to="/internships"
-            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-850 transition-colors"
+            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-stone-700 dark:text-stone-200 hover:bg-champagne-50 dark:hover:bg-warmdark-850 transition-colors"
           >
             <Briefcase className="w-3.5 h-3.5 text-brand-500" />
-            <span>Explore Internships</span>
+            <span>Internships</span>
           </Link>
 
-          {/* Health Pill */}
-          <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-850 border border-slate-200 dark:border-slate-700/80 text-xs">
-            <Activity className="w-3.5 h-3.5 text-brand-500 animate-pulse" />
-            <span className="text-slate-500 dark:text-slate-400">API:</span>
-            <span className={`font-semibold ${isHealthy ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500'}`}>
-              {isHealthy ? 'Connected (5001)' : 'Checking'}
-            </span>
-          </div>
+          <Link
+            to="/external-jobs"
+            className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-burgundy-800 dark:text-champagne-300 bg-champagne-100/90 dark:bg-warmdark-850 border border-champagne-300/80 dark:border-stone-750 hover:bg-champagne-200 transition-colors"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-champagne-600" />
+            <span>Jobs & LinkedIn</span>
+          </Link>
+
+          
 
           <ThemeToggle />
 
@@ -117,6 +116,18 @@ export const TopNavbar = ({ onToggleSidebar, healthStatus, onOpenLogin }) => {
                 onClick={() => navigate('/dashboard')}
               >
                 My Dashboard
+              </DropdownItem>
+              <DropdownItem
+                icon={Sparkles}
+                onClick={() => navigate('/external-jobs')}
+              >
+                Jobs & LinkedIn Radar
+              </DropdownItem>
+              <DropdownItem
+                icon={Bell}
+                onClick={() => navigate('/notifications')}
+              >
+                Notification Center
               </DropdownItem>
               <DropdownItem
                 icon={User}

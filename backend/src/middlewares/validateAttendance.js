@@ -1,5 +1,6 @@
 import { Attendance, ATTENDANCE_STATUSES, ATTENDANCE_REVIEW_STATUSES } from '../models/Attendance.js';
 import { Allocation, ALLOCATION_STATUSES } from '../models/Allocation.js';
+import { Application, APPLICATION_STATUSES } from '../models/Application.js';
 import { ROLES } from '../models/User.js';
 
 /**
@@ -16,13 +17,49 @@ export const validateSubmitAttendance = async (req, res, next) => {
     const { date, status, checkInTime, checkOutTime, workSummary } = req.body;
 
     // Student must have an active allocation
-    const activeAllocation = await Allocation.findOne({
+    let activeAllocation = await Allocation.findOne({
       student: studentId,
       status: ALLOCATION_STATUSES.ACTIVE,
     });
 
     if (!activeAllocation) {
-      const error = new Error('No active internship allocation found. You must be actively placed to log attendance.');
+      // Check if student has an accepted application to auto-provision active allocation
+      const acceptedApplication = await Application.findOne({
+        student: studentId,
+        status: { $in: ['accepted', 'selected'] },
+      }).populate('internship');
+
+      if (acceptedApplication && acceptedApplication.internship) {
+        const startDate = new Date();
+        const durationMonths = parseInt(acceptedApplication.internship.duration, 10) || 3;
+        const endDate = new Date(startDate.getTime() + durationMonths * 30 * 24 * 60 * 60 * 1000);
+
+        activeAllocation = await Allocation.create({
+          student: studentId,
+          internship: acceptedApplication.internship._id,
+          company: acceptedApplication.company,
+          application: acceptedApplication._id,
+          startDate,
+          endDate,
+          status: ALLOCATION_STATUSES.ACTIVE,
+          allocatedBy: acceptedApplication.company || studentId,
+          notes: 'Auto-provisioned upon daily attendance logging from accepted internship application.',
+          statusHistory: [
+            {
+              status: ALLOCATION_STATUSES.ACTIVE,
+              changedBy: studentId,
+              changedByName: req.user.name,
+              changedAt: new Date(),
+              note: 'Auto-activated for daily attendance submission.',
+              reason: 'Accepted application activation',
+            },
+          ],
+        });
+      }
+    }
+
+    if (!activeAllocation) {
+      const error = new Error('No active internship placement found. You must have an accepted internship placement to log daily attendance.');
       error.statusCode = 400;
       error.code = 'NO_ACTIVE_ALLOCATION';
       return next(error);

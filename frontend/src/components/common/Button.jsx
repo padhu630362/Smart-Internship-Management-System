@@ -14,15 +14,20 @@ export const Button = ({
   onClick,
   ...props
 }) => {
-  const baseStyles = 'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed select-none';
+  const baseStyles = 'inline-flex items-center justify-center font-medium rounded-xl transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed select-none active:scale-[0.98]';
 
   const variants = {
-    primary: 'bg-brand-600 hover:bg-brand-700 text-white shadow-sm focus:ring-brand-500 border border-transparent dark:bg-brand-600 dark:hover:bg-brand-500',
-    secondary: 'bg-slate-100 hover:bg-slate-200 text-slate-800 focus:ring-slate-400 border border-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 dark:border-slate-700',
-    outline: 'bg-transparent hover:bg-slate-100 text-slate-700 focus:ring-slate-400 border border-slate-300 dark:hover:bg-slate-800 dark:text-slate-200 dark:border-slate-700',
-    ghost: 'bg-transparent hover:bg-slate-100 text-slate-600 focus:ring-slate-300 border border-transparent dark:hover:bg-slate-800 dark:text-slate-300',
+    primary: 'bg-brand-500 hover:bg-brand-600 text-white shadow-sm hover:shadow-burgundy focus:ring-brand-400 border border-transparent',
+    gradient: 'gradient-brand text-white shadow-sm hover:shadow-burgundy focus:ring-brand-400 border border-transparent hover:brightness-105',
+    burgundy: 'bg-burgundy-600 hover:bg-burgundy-700 text-white shadow-sm hover:shadow-burgundy focus:ring-burgundy-400 border border-transparent',
+    champagne: 'bg-champagne-500 hover:bg-champagne-600 text-stone-900 font-bold shadow-sm hover:shadow-champagne focus:ring-champagne-400 border border-transparent',
+    peach: 'bg-champagne-500 hover:bg-champagne-600 text-stone-900 font-bold shadow-sm hover:shadow-champagne focus:ring-champagne-400 border border-transparent',
+    blush: 'bg-burgundy-600 hover:bg-burgundy-700 text-white shadow-sm hover:shadow-burgundy focus:ring-burgundy-400 border border-transparent',
+    secondary: 'bg-champagne-50/90 hover:bg-champagne-100 text-stone-800 focus:ring-champagne-300 border border-champagne-200/80 dark:bg-warmdark-850 dark:hover:bg-warmdark-800 dark:text-stone-200 dark:border-warmdark-700',
+    outline: 'bg-transparent hover:bg-champagne-50/80 text-stone-700 focus:ring-champagne-400 border border-champagne-300 dark:hover:bg-warmdark-850 dark:text-stone-200 dark:border-warmdark-700',
+    ghost: 'bg-transparent hover:bg-champagne-50/70 text-stone-600 focus:ring-champagne-300 border border-transparent dark:hover:bg-warmdark-850 dark:text-stone-300',
     danger: 'bg-rose-600 hover:bg-rose-700 text-white shadow-sm focus:ring-rose-500 border border-transparent',
-    accent: 'bg-accent-600 hover:bg-accent-700 text-white shadow-sm focus:ring-accent-500 border border-transparent',
+    accent: 'bg-champagne-500 hover:bg-champagne-600 text-stone-900 font-bold shadow-sm hover:shadow-champagne focus:ring-champagne-400 border border-transparent',
   };
 
   const sizes = {

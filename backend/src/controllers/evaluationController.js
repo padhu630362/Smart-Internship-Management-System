@@ -4,6 +4,7 @@ import { Allocation } from '../models/Allocation.js';
 import { Notification, NOTIFICATION_TYPES } from '../models/Notification.js';
 import { emitNotificationToUser } from '../socket.js';
 import { ROLES } from '../models/User.js';
+import { issueCertificate } from '../services/certificateService.js';
 
 /**
  * Submit internship evaluation
@@ -69,11 +70,47 @@ export const createEvaluation = async (req, res, next) => {
       console.warn('Could not dispatch evaluation notification:', notifErr.message);
     }
 
+    // Auto-issue completion certificate if final evaluation is passed
+    let issuedCertificate = null;
+    if (evaluationType === 'final' && Boolean(isPassed)) {
+      try {
+        issuedCertificate = await issueCertificate({
+          allocation,
+          internship: populatedEvaluation.internship,
+          student: populatedEvaluation.student,
+          company: allocation.company,
+          mentor: populatedEvaluation.evaluator,
+          evaluation: populatedEvaluation,
+          finalRating: populatedEvaluation.ratings?.overallRating || 4.5,
+          recommendation,
+        });
+
+        // Dispatch completion certificate notification
+        const certNotif = await Notification.create({
+          recipient: allocation.student._id,
+          sender: evaluatorId,
+          type: NOTIFICATION_TYPES.CERTIFICATE_ISSUED || 'certificate_issued',
+          title: 'Completion Certificate Issued!',
+          message: `Congratulations! Your official completion certificate for "${allocation.internship?.title || 'Internship'}" is ready to view and download.`,
+          link: '/certificates',
+          metadata: {
+            certificateId: issuedCertificate._id,
+            certificateNumber: issuedCertificate.certificateNumber,
+            verificationCode: issuedCertificate.verificationCode,
+          },
+        });
+        emitNotificationToUser(allocation.student._id, certNotif);
+      } catch (certErr) {
+        console.warn('Could not auto-issue certificate:', certErr.message);
+      }
+    }
+
     res.status(201).json({
       success: true,
       message: 'Internship evaluation recorded successfully.',
       data: {
         evaluation: populatedEvaluation,
+        certificate: issuedCertificate,
       },
     });
   } catch (err) {

@@ -23,8 +23,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
+  FileText,
+  History,
 } from 'lucide-react';
 import userService from '../services/userService';
+import auditLogService from '../services/auditLogService';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
@@ -41,6 +44,7 @@ export const AdminUsersPage = () => {
     activeUsers: 0,
     students: 0,
     companies: 0,
+    mentors: 0,
     coordinators: 0,
     admins: 0,
   });
@@ -82,6 +86,49 @@ export const AdminUsersPage = () => {
     status: '',
     password: '',
   });
+
+  // Tab State
+  const [activeTab, setActiveTab] = useState('users'); // 'users' | 'audit'
+
+  // Audit Logs State
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditSearch, setAuditSearch] = useState('');
+  const [auditActionFilter, setAuditActionFilter] = useState('all');
+  const [distinctActions, setDistinctActions] = useState([]);
+  const [auditPagination, setAuditPagination] = useState({
+    page: 1,
+    limit: 15,
+    total: 0,
+    totalPages: 1,
+  });
+
+  const fetchAuditLogs = async (page = 1) => {
+    try {
+      setAuditLoading(true);
+      const res = await auditLogService.getAuditLogs({
+        page,
+        limit: auditPagination.limit,
+        search: auditSearch.trim() || undefined,
+        action: auditActionFilter !== 'all' ? auditActionFilter : undefined,
+      });
+      if (res?.data) {
+        setAuditLogs(res.data.logs || []);
+        if (res.data.pagination) setAuditPagination(res.data.pagination);
+        if (res.data.distinctActions) setDistinctActions(res.data.distinctActions);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch audit logs:', err.message);
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'audit') {
+      fetchAuditLogs(1);
+    }
+  }, [activeTab, auditActionFilter]);
 
   useEffect(() => {
     fetchUsers(1);
@@ -232,21 +279,54 @@ export const AdminUsersPage = () => {
           </p>
         </div>
 
-        <Button
-          variant="primary"
-          icon={UserPlus}
-          onClick={() => {
-            setErrorMessage('');
-            setIsCreateOpen(true);
-          }}
-          className="shadow-sm font-semibold"
-        >
-          Add New User
-        </Button>
+        {activeTab === 'users' && (
+          <Button
+            variant="primary"
+            icon={UserPlus}
+            onClick={() => {
+              setErrorMessage('');
+              setIsCreateOpen(true);
+            }}
+            className="shadow-sm font-semibold"
+          >
+            Add New User
+          </Button>
+        )}
       </div>
 
-      {/* Metric Counters */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+      {/* Primary Navigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab('users')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            activeTab === 'users'
+              ? 'bg-brand-500 text-white shadow-2xs'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-850'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>User Directory ({stats.totalUsers})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('audit')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            activeTab === 'audit'
+              ? 'bg-brand-500 text-white shadow-2xs'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-850'
+          }`}
+        >
+          <History className="w-4 h-4" />
+          <span>Platform Audit Logs</span>
+        </button>
+      </div>
+
+      {activeTab === 'users' && (
+        <>
+          {/* Metric Counters */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 sm:gap-4">
         <div className="surface-card p-4 rounded-xl border border-slate-200 dark:border-slate-800">
           <p className="text-xs text-slate-500 font-medium">Total Users</p>
           <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-1">
@@ -272,6 +352,13 @@ export const AdminUsersPage = () => {
           <p className="text-xs text-purple-600 font-medium">Companies</p>
           <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-1">
             {stats.companies}
+          </p>
+        </div>
+
+        <div className="surface-card p-4 rounded-xl border border-slate-200 dark:border-slate-800">
+          <p className="text-xs text-indigo-600 font-medium">Mentors</p>
+          <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-1">
+            {stats.mentors || 0}
           </p>
         </div>
 
@@ -550,6 +637,159 @@ export const AdminUsersPage = () => {
           </div>
         )}
       </div>
+      </>
+    )}
+
+      {/* Audit Logs Tab Content */}
+      {activeTab === 'audit' && (
+        <div className="space-y-4 animate-fade-in">
+          {/* Audit Filter & Search */}
+          <div className="surface-card p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+              <input
+                type="text"
+                value={auditSearch}
+                onChange={(e) => setAuditSearch(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && fetchAuditLogs(1)}
+                placeholder="Search audit trail by actor email, action event, or resource..."
+                className="w-full pl-9 pr-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-brand-500/20"
+              />
+            </div>
+
+            <div className="w-full sm:w-56">
+              <select
+                value={auditActionFilter}
+                onChange={(e) => setAuditActionFilter(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white"
+              >
+                <option value="all">All Regulatory Actions</option>
+                {distinctActions.map((act) => (
+                  <option key={act} value={act}>
+                    {act}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              icon={RefreshCw}
+              onClick={() => fetchAuditLogs(1)}
+              className="text-xs"
+            >
+              Refresh
+            </Button>
+          </div>
+
+          {/* Audit Logs Table */}
+          <div className="surface-card rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs">
+            {auditLoading ? (
+              <LoadingState message="Querying immutable regulatory audit trail..." />
+            ) : auditLogs.length === 0 ? (
+              <EmptyState
+                icon={History}
+                title="No Audit Log Events Found"
+                description="Administrative actions, account modifications, status changes, and evaluation records are logged here automatically."
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 uppercase tracking-wider font-semibold">
+                    <tr>
+                      <th className="px-4 py-3">Timestamp</th>
+                      <th className="px-4 py-3">Action Event</th>
+                      <th className="px-4 py-3">Performed By</th>
+                      <th className="px-4 py-3">Target Resource</th>
+                      <th className="px-4 py-3">Status / IP</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {auditLogs.map((log) => {
+                      const isSuccess = log.status !== 'failure';
+                      return (
+                        <tr key={log._id} className="hover:bg-slate-50/60 dark:hover:bg-slate-900/40 transition-colors">
+                          <td className="px-4 py-3 text-slate-500 font-mono whitespace-nowrap">
+                            {new Date(log.createdAt).toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className="font-mono font-bold text-[11px] px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
+                              {log.action}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-semibold text-slate-900 dark:text-white">
+                              {log.performedBy?.name || log.performedByEmail || 'System'}
+                            </div>
+                            <div className="text-[11px] text-slate-400 font-mono">
+                              {log.performedBy?.email || log.performedByEmail || 'system@internal'}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                            <span className="font-medium text-slate-900 dark:text-white">
+                              {log.resourceType || 'Resource'}
+                            </span>
+                            {log.targetResource && (
+                              <span className="text-[10px] text-slate-400 font-mono block">
+                                ID: {log.targetResource.toString().slice(-8)}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`inline-block w-2 h-2 rounded-full ${
+                                  isSuccess ? 'bg-emerald-500' : 'bg-rose-500'
+                                }`}
+                              />
+                              <span className="font-semibold capitalize text-slate-800 dark:text-slate-200">
+                                {log.status || 'success'}
+                              </span>
+                            </div>
+                            {log.ipAddress && (
+                              <span className="text-[10px] text-slate-400 font-mono block">
+                                IP: {log.ipAddress}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Audit Pagination */}
+            {!auditLoading && auditPagination.totalPages > 1 && (
+              <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 flex items-center justify-between text-xs text-slate-500">
+                <span>
+                  Showing page {auditPagination.page} of {auditPagination.totalPages} ({auditPagination.total} events)
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={auditPagination.page <= 1}
+                    onClick={() => fetchAuditLogs(auditPagination.page - 1)}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={auditPagination.page >= auditPagination.totalPages}
+                    onClick={() => fetchAuditLogs(auditPagination.page + 1)}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Create User Modal */}
       <Modal

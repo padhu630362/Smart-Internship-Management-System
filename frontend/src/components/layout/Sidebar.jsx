@@ -20,6 +20,8 @@ import {
   MessageSquare,
   Award,
   BarChart3,
+  Sparkles,
+  Bell,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import SimsLogo from '../common/SimsLogo';
@@ -44,9 +46,11 @@ export const Sidebar = ({ isOpen, onClose, healthStatus }) => {
   const mainNav = [
     { name: 'System Overview', path: '/', icon: LayoutDashboard },
     { name: 'Internship Directory', path: '/internships', icon: Briefcase },
+    { name: 'Jobs & LinkedIn Radar', path: '/external-jobs', icon: Sparkles },
     ...(isAuthenticated
       ? [
           { name: 'My Dashboard', path: '/dashboard', icon: LayoutDashboard },
+          { name: 'Notifications', path: '/notifications', icon: Bell },
           { name: 'Direct & Group Chat', path: '/chat', icon: MessageSquare },
           { name: 'Evaluations', path: '/evaluations', icon: Award },
           { name: 'My Profile', path: '/profile', icon: User },
@@ -55,6 +59,7 @@ export const Sidebar = ({ isOpen, onClose, healthStatus }) => {
                 { name: 'My Applications', path: '/my-applications', icon: FileText },
                 { name: 'Daily Attendance', path: '/my-attendance', icon: Calendar },
                 { name: 'Milestone Tasks', path: '/my-tasks', icon: FileCheck2 },
+                { name: 'My Certificates', path: '/my-certificates', icon: Award },
               ]
             : []),
           ...(isManager
@@ -72,6 +77,7 @@ export const Sidebar = ({ isOpen, onClose, healthStatus }) => {
             : []),
         ]
       : []),
+    { name: 'Verify Certificate', path: '/verify-certificate', icon: ShieldCheck },
     { name: 'Implementation Roadmap', path: '/roadmap', icon: Map },
   ];
 

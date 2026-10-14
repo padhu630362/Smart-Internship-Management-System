@@ -6,6 +6,7 @@ import {
   logout,
   forgotPassword,
   resetPassword,
+  googleLogin,
 } from '../controllers/authController.js';
 import { authenticateToken, requireRoles } from '../middlewares/auth.js';
 import {
@@ -22,6 +23,7 @@ const router = Router();
 // Public Authentication Endpoints
 router.post('/register', authRateLimiter, validateRegister, register);
 router.post('/login', authRateLimiter, validateLogin, login);
+router.post('/google', authRateLimiter, googleLogin);
 router.post('/forgot-password', authRateLimiter, validateForgotPassword, forgotPassword);
 router.post('/reset-password', authRateLimiter, validateResetPassword, resetPassword);
 

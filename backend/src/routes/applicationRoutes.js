@@ -13,6 +13,7 @@ import {
   getCompanyApplications,
   getApplicationById,
   updateApplicationStatus,
+  analyzeApplicationResume,
 } from '../controllers/applicationController.js';
 
 const router = Router();
@@ -41,6 +42,16 @@ router.patch(
   requireRoles(ROLES.STUDENT),
   validateWithdrawApplication,
   withdrawApplication
+);
+
+// ==========================================
+// AI Resume Analysis & Screening Endpoints
+// ==========================================
+router.post(
+  '/:id/analyze-resume',
+  authenticateToken,
+  requireRoles(ROLES.COMPANY, ROLES.MENTOR, ROLES.COORDINATOR, ROLES.ADMIN, ROLES.STUDENT),
+  analyzeApplicationResume
 );
 
 // ==========================================

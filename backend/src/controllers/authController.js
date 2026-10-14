@@ -224,6 +224,122 @@ export const resetPassword = async (req, res, next) => {
   }
 };
 
+/**
+ * Handle Google OAuth Sign-In and auto-provisioning.
+ */
+export const googleLogin = async (req, res, next) => {
+  try {
+    const { credential, role = ROLES.STUDENT } = req.body;
+    if (!credential) {
+      return next(new AppError('Google credential token is required.', 400, 'MISSING_CREDENTIAL'));
+    }
+
+    let googlePayload;
+    // Allow predictable testing in automated test suites
+    if (process.env.NODE_ENV === 'test' && credential.startsWith('test_google_token_')) {
+      googlePayload = {
+        sub: credential.replace('test_google_token_', 'gid_'),
+        email: req.body.email || 'test.google.user@example.com',
+        name: req.body.name || 'Google Test User',
+        picture: 'https://lh3.googleusercontent.com/a/default-user',
+        email_verified: true,
+      };
+    } else {
+      // Official Google tokeninfo verification
+      try {
+        const response = await fetch(
+          `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`,
+          { signal: AbortSignal.timeout(6000) }
+        );
+        if (!response.ok) {
+          return next(new AppError('Invalid or expired Google authentication token.', 401, 'INVALID_GOOGLE_TOKEN'));
+        }
+        googlePayload = await response.json();
+      } catch (fetchErr) {
+        return next(new AppError('Unable to reach Google verification service.', 503, 'GOOGLE_SERVICE_UNAVAILABLE'));
+      }
+
+      if (env.GOOGLE_CLIENT_ID && googlePayload.aud !== env.GOOGLE_CLIENT_ID) {
+        return next(new AppError('Google token audience mismatch.', 401, 'INVALID_AUDIENCE'));
+      }
+    }
+
+    const email = googlePayload.email?.toLowerCase().trim();
+    if (!email) {
+      return next(new AppError('Google account does not provide a valid email address.', 400, 'NO_EMAIL'));
+    }
+
+    let user = await User.findOne({ email });
+    let isNewUser = false;
+
+    if (user) {
+      if (user.status === 'suspended') {
+        return next(new AppError('Your account has been suspended. Please contact administration.', 403, 'ACCOUNT_SUSPENDED'));
+      }
+      if (user.status === 'inactive') {
+        return next(new AppError('Your account has been deactivated. Please contact administration.', 403, 'ACCOUNT_DEACTIVATED'));
+      }
+
+      if (!user.googleId) {
+        user.googleId = googlePayload.sub;
+      }
+      if (!user.profile?.avatarUrl && googlePayload.picture) {
+        user.profile = user.profile || {};
+        user.profile.avatarUrl = googlePayload.picture;
+      }
+      user.lastLoginAt = new Date();
+      await user.save();
+    } else {
+      // Self-registration via Google
+      isNewUser = true;
+      const randomPassword = (await generateRandomToken()) + '!A1a';
+      const passwordHash = await hashPassword(randomPassword);
+      const chosenRole = ALLOWED_SELF_REGISTRATION_ROLES.includes(role) ? role : ROLES.STUDENT;
+
+      user = await User.create({
+        name: googlePayload.name || email.split('@')[0],
+        email,
+        passwordHash,
+        role: chosenRole,
+        googleId: googlePayload.sub,
+        authProvider: 'google',
+        status: 'active',
+        profile: {
+          avatarUrl: googlePayload.picture || '',
+        },
+        lastLoginAt: new Date(),
+      });
+    }
+
+    // Issue JWT token
+    const token = signToken({
+      id: user._id.toString(),
+      role: user.role,
+      email: user.email,
+    });
+
+    // Record security audit log
+    await recordAuditLog({
+      action: isNewUser ? 'USER_REGISTER_GOOGLE' : 'USER_LOGIN_GOOGLE',
+      req,
+      targetUser: user._id,
+      resourceType: 'Auth',
+      details: { email: user.email, role: user.role, provider: 'google' },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: isNewUser ? 'Account registered successfully with Google.' : 'Google sign-in successful.',
+      data: {
+        user,
+        token,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export default {
   register,
   login,
@@ -231,4 +347,5 @@ export default {
   logout,
   forgotPassword,
   resetPassword,
+  googleLogin,
 };

@@ -10,7 +10,7 @@ export const ROLES = {
 };
 
 // Roles that can be registered by the public self-registration flow
-export const ALLOWED_SELF_REGISTRATION_ROLES = [ROLES.STUDENT, ROLES.COMPANY];
+export const ALLOWED_SELF_REGISTRATION_ROLES = [ROLES.STUDENT, ROLES.COMPANY, ROLES.MENTOR];
 
 export const USER_STATUSES = {
   ACTIVE: 'active',
@@ -114,6 +114,18 @@ const userSchema = new mongoose.Schema(
       },
     },
 
+    googleId: {
+      type: String,
+      default: null,
+      sparse: true,
+      index: true,
+    },
+    authProvider: {
+      type: String,
+      enum: ['local', 'google'],
+      default: 'local',
+      index: true,
+    },
     lastLoginAt: {
       type: Date,
     },

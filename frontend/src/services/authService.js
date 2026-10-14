@@ -65,6 +65,17 @@ export const authService = {
     });
     return response.data;
   },
+
+  /**
+   * Google OAuth sign-in and registration
+   */
+  googleLogin: async ({ credential, role }) => {
+    const response = await apiClient.post('/auth/google', {
+      credential,
+      role,
+    });
+    return response.data;
+  },
 };
 
 export default authService;

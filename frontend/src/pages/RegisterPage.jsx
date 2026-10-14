@@ -16,6 +16,7 @@ import Input from '../components/common/Input';
 import Button from '../components/common/Button';
 import { Card, CardContent } from '../components/common/Card';
 import SimsLogo from '../components/common/SimsLogo';
+import GoogleSignInButton from '../components/common/GoogleSignInButton';
 
 export const RegisterPage = () => {
   const { register } = useAuth();
@@ -65,7 +66,9 @@ export const RegisterPage = () => {
         profile:
           role === 'student'
             ? { studentDetails: { university: extraField } }
-            : { companyDetails: { companyName: extraField } },
+            : role === 'company'
+            ? { companyDetails: { companyName: extraField } }
+            : { mentorDetails: { companyName: extraField } },
       };
 
       await register(payload);
@@ -88,7 +91,7 @@ export const RegisterPage = () => {
             Create Your SIMS Account
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            Join the smart internship ecosystem as an eligible Student or Host Employer
+            Join the smart internship ecosystem as a Student, Host Employer, or Mentor
           </p>
         </div>
 
@@ -107,30 +110,42 @@ export const RegisterPage = () => {
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
                   Select Account Role <span className="text-rose-500">*</span>
                 </label>
-                <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
                   <button
                     type="button"
                     onClick={() => setRole('student')}
-                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+                    className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
                       role === 'student'
                         ? 'bg-white dark:bg-slate-800 text-brand-600 dark:text-brand-400 shadow-xs'
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
                     }`}
                   >
-                    <GraduationCap className="w-4 h-4" />
-                    <span>Student / Intern</span>
+                    <GraduationCap className="w-3.5 h-3.5" />
+                    <span>Student</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setRole('company')}
-                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+                    className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
                       role === 'company'
                         ? 'bg-white dark:bg-slate-800 text-brand-600 dark:text-brand-400 shadow-xs'
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
                     }`}
                   >
-                    <Building2 className="w-4 h-4" />
-                    <span>Company / Employer</span>
+                    <Building2 className="w-3.5 h-3.5" />
+                    <span>Company</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRole('mentor')}
+                    className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
+                      role === 'mentor'
+                        ? 'bg-white dark:bg-slate-800 text-brand-600 dark:text-brand-400 shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                    }`}
+                  >
+                    <User className="w-3.5 h-3.5" />
+                    <span>Mentor</span>
                   </button>
                 </div>
               </div>
@@ -154,10 +169,10 @@ export const RegisterPage = () => {
               />
 
               <Input
-                label={role === 'student' ? 'Student University Email' : 'Corporate Company Email'}
+                label={role === 'student' ? 'Student University Email' : role === 'company' ? 'Corporate Company Email' : 'Professional Email'}
                 type="email"
                 icon={Mail}
-                placeholder={role === 'student' ? 'name@university.edu' : 'hiring@company.com'}
+                placeholder={role === 'student' ? 'name@university.edu' : role === 'company' ? 'hiring@company.com' : 'mentor@company.com'}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -205,6 +220,19 @@ export const RegisterPage = () => {
               >
                 Complete Registration
               </Button>
+
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-champagne-200 dark:border-warmdark-700" />
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="px-2 bg-white dark:bg-[#1a1114] text-stone-500 font-medium">
+                    or sign up with
+                  </span>
+                </div>
+              </div>
+
+              <GoogleSignInButton role={role} text={`Sign up as ${role.charAt(0).toUpperCase() + role.slice(1)} with Google`} />
             </form>
 
             <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800 text-center text-xs text-slate-500 dark:text-slate-400">

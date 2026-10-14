@@ -39,11 +39,11 @@ export const SimsLogo = ({ size = 'md', showText = true, className = '' }) => {
             strokeLinecap="round"
             strokeLinejoin="round"
           />
-          {/* Right Stage Node (Industry Milestone) */}
-          <circle cx="20" cy="14" r="1.5" fill="#38bdf8" />
+          {/* Right Stage Node (Industry Milestone in radiant Champagne Gold) */}
+          <circle cx="20" cy="14" r="1.5" fill="#dfc798" />
           <path
             d="M20 9.5V13"
-            stroke="#38bdf8"
+            stroke="#dfc798"
             strokeWidth="1.5"
             strokeLinecap="round"
           />

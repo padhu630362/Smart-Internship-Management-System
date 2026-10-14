@@ -6,6 +6,7 @@ import Input from '../components/common/Input';
 import Button from '../components/common/Button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/common/Card';
 import SimsLogo from '../components/common/SimsLogo';
+import GoogleSignInButton from '../components/common/GoogleSignInButton';
 import authService from '../services/authService';
 
 export const LoginPage = () => {
@@ -137,6 +138,19 @@ export const LoginPage = () => {
                 >
                   Sign In
                 </Button>
+
+                <div className="relative my-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-champagne-200 dark:border-warmdark-700" />
+                  </div>
+                  <div className="relative flex justify-center text-xs">
+                    <span className="px-2 bg-white dark:bg-[#1a1114] text-stone-500 font-medium">
+                      or continue with
+                    </span>
+                  </div>
+                </div>
+
+                <GoogleSignInButton text="Sign in with Google" />
               </form>
             ) : (
               <form onSubmit={handleForgotSubmit} className="space-y-4 animate-in fade-in">
