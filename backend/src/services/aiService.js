@@ -235,7 +235,7 @@ Return a strictly valid JSON object (no markdown code fences, no extra text) wit
       improvements: Array.isArray(parsed.improvements) ? parsed.improvements : [],
       overallAssessment: parsed.overallAssessment || 'Candidate evaluated against posted opportunity specifications.',
       isGeminiGenerated: true,
-      engine: 'Google Gemini 1.5 Flash',
+      engine: 'AI Candidate Screening Engine',
       analyzedAt: new Date(),
     };
   } catch (error) {
@@ -403,7 +403,7 @@ Return STRICT JSON ONLY (no markdown code blocks, no backticks, no explanatory t
       fitReason: parsed.fitReason || `Opportunity aligns with candidate profile for ${jobTitle}.`,
       recommendationLevel: recLevel,
       isGeminiGenerated: true,
-      engine: 'Google Gemini 1.5 Flash',
+      engine: 'AI Candidate Screening Engine',
       analyzedAt: new Date(),
     };
   } catch (err) {

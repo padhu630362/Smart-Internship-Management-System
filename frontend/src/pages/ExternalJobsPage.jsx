@@ -222,7 +222,7 @@ export const ExternalJobsPage = () => {
           </h1>
 
           <p className="text-sm sm:text-base text-champagne-100 leading-relaxed max-w-2xl font-normal">
-            Aggregated from verified authorized tech career networks and matched to your academic skill set using Google Gemini AI. Every opportunity includes deep links directly into LinkedIn’s official job ecosystem.
+            Aggregated from verified authorized tech career networks and matched to your academic skill set using intelligent AI algorithms. Every opportunity includes deep links directly into LinkedIn’s official job ecosystem.
           </p>
 
           <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -718,7 +718,7 @@ export const ExternalJobsPage = () => {
                 </div>
 
                 <div className="text-[10px] text-stone-400 flex items-center justify-between pt-1">
-                  <span>Engine: {selectedJobDetail.matchRationale.engine || 'Google Gemini 1.5 Flash'}</span>
+                  <span>Engine: {selectedJobDetail.matchRationale.engine || 'AI Candidate Screening Engine'}</span>
                   <span>Evaluated specifically against your student profile</span>
                 </div>
               </div>

@@ -456,6 +456,16 @@ export const getDashboardAnalytics = async (req, res, next) => {
         ).length,
       };
 
+      const allocationIds = managedAllocations.map((a) => a._id);
+      const pendingAttendanceRecords = await Attendance.find({
+        allocation: { $in: allocationIds },
+        reviewStatus: 'submitted',
+      })
+        .populate('student', 'name email profile')
+        .sort({ date: -1 })
+        .limit(10)
+        .lean();
+
       return res.status(200).json({
         success: true,
         data: {
@@ -463,6 +473,7 @@ export const getDashboardAnalytics = async (req, res, next) => {
           opportunities: {
             total: myOpportunities.length,
             published: myOpportunities.filter((o) => o.status === INTERNSHIP_STATUSES.PUBLISHED).length,
+            list: myOpportunities.slice(0, 5),
           },
           applicants: {
             total: totalApplicants,
@@ -472,6 +483,10 @@ export const getDashboardAnalytics = async (req, res, next) => {
             total: managedAllocations.length,
             active: activeInterns.length,
             list: managedAllocations,
+          },
+          attendance: {
+            pendingReviewsCount: pendingAttendanceRecords.length,
+            pendingList: pendingAttendanceRecords,
           },
           tasks: {
             ...taskStats,

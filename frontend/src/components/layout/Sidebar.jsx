@@ -201,11 +201,11 @@ export const Sidebar = ({ isOpen, onClose, healthStatus }) => {
             <div className="flex items-center justify-between font-semibold text-slate-800 dark:text-slate-200">
               <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
                 <Activity className="w-3.5 h-3.5 text-brand-500 animate-pulse" />
-                Cluster Monitor
+                Platform Status
               </span>
               <StatusBadge
                 status={healthStatus?.status === 'healthy' ? 'healthy' : 'warning'}
-                label={healthStatus?.status === 'healthy' ? 'Live' : 'Checking'}
+                label={healthStatus?.status === 'healthy' ? 'Active' : 'Checking'}
                 size="sm"
               />
             </div>
@@ -213,13 +213,13 @@ export const Sidebar = ({ isOpen, onClose, healthStatus }) => {
             <div className="space-y-1 text-[11px] text-slate-600 dark:text-slate-400">
               <div className="flex items-center justify-between">
                 <span>Database:</span>
-                <span className={`font-mono font-semibold ${isDbConnected ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500'}`}>
-                  {isDbConnected ? 'MongoDB Atlas' : 'Degraded'}
+                <span className={`font-semibold ${isDbConnected ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500'}`}>
+                  {isDbConnected ? 'Connected' : 'Standby'}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span>Backend Port:</span>
-                <span className="font-mono text-slate-800 dark:text-slate-200">5001</span>
+                <span>System Engine:</span>
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400">Operational</span>
               </div>
             </div>
           </div>

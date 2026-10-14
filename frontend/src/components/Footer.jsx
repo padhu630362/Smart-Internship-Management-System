@@ -77,7 +77,7 @@ export const Footer = ({ healthStatus }) => {
             <div className="flex items-center gap-4 font-mono text-[11px] text-stone-500 dark:text-stone-400">
               <div className="flex items-center gap-1.5">
                 <Server className="w-3.5 h-3.5 text-burgundy-600 dark:text-champagne-400" />
-                <span>API: <strong className="text-stone-700 dark:text-stone-300">Port 5001</strong></span>
+                <span>API: <strong className="text-stone-700 dark:text-stone-300">Operational</strong></span>
               </div>
 
               <div className="flex items-center gap-1.5">
@@ -103,7 +103,7 @@ export const Footer = ({ healthStatus }) => {
               <SimsLogo size="md" />
               <p className="text-stone-600 dark:text-stone-400 leading-relaxed max-w-sm">
                 Next-generation institutional internship governance unifying students, host employers, faculty mentors,
-                and academic coordinators with Gemini AI resume screening, attendance logging, and verifiable certificates.
+                and academic coordinators with intelligent AI resume screening, attendance logging, and verifiable certificates.
               </p>
               <div className="flex items-center gap-2 pt-1">
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-burgundy-50 dark:bg-burgundy-950/60 text-burgundy-800 dark:text-champagne-300 border border-burgundy-200 dark:border-burgundy-900/60 text-[10px] font-semibold">
@@ -129,7 +129,7 @@ export const Footer = ({ healthStatus }) => {
                   </Link>
                 </li>
                 <li>
-                  <Link to="/company/applications" className="hover:text-burgundy-700 dark:hover:text-champagne-300 transition-colors flex items-center gap-1.5">
+                  <Link to="/manage/applications" className="hover:text-burgundy-700 dark:hover:text-champagne-300 transition-colors flex items-center gap-1.5">
                     <Building2 className="w-3.5 h-3.5 text-stone-400" />
                     <span>Employer Pipeline</span>
                   </Link>

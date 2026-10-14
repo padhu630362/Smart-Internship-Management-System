@@ -103,9 +103,9 @@ export const PolicyModal = ({ isOpen, onClose, initialTab = 'privacy' }) => {
               </section>
 
               <section className="space-y-2">
-                <h3 className="font-bold text-sm text-stone-900 dark:text-white">2. AI Resume Screening & Gemini Integration</h3>
+                <h3 className="font-bold text-sm text-stone-900 dark:text-white">2. AI Resume Screening & Matching Engine</h3>
                 <p>
-                  When students upload resumes or apply for opportunities, SIMS utilizes Google Gemini AI to analyze keyword relevance against job descriptions.
+                  When students upload resumes or apply for opportunities, SIMS utilizes secure AI models to analyze keyword relevance against job descriptions.
                   Resume text sent for analysis is processed via transient, encrypted backend API calls and is never used to train public foundational models.
                 </p>
               </section>
@@ -250,3 +250,4 @@ export const PolicyModal = ({ isOpen, onClose, initialTab = 'privacy' }) => {
 };
 
 export default PolicyModal;
+

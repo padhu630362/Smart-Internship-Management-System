@@ -127,9 +127,9 @@ export const PoliciesPage = () => {
               </section>
 
               <section className="space-y-2">
-                <h3 className="font-bold text-sm text-stone-900 dark:text-white">2. Artificial Intelligence & Gemini Processing</h3>
+                <h3 className="font-bold text-sm text-stone-900 dark:text-white">2. Artificial Intelligence & Resume Processing</h3>
                 <p>
-                  Students opting to use the AI Resume Analysis feature consent to having their uploaded resume text analyzed by Google Gemini 1.5 Flash.
+                  Students opting to use the AI Resume Analysis feature consent to having their uploaded resume text analyzed by secure, enterprise-grade AI algorithms.
                   This analysis extracts skill proficiencies and compares them to employer job requirements.
                   Resume data is transmitted over TLS with zero persistent retention by third-party model trainers.
                 </p>
@@ -262,3 +262,4 @@ export const PoliciesPage = () => {
 };
 
 export default PoliciesPage;
+

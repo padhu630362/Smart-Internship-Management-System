@@ -32,7 +32,7 @@ export const RoadmapPage = () => {
       statusLabel: 'Completed & Verified',
       icon: Database,
       category: 'completed',
-      description: 'Monorepo scaffolding, Express backend on port 5001, MongoDB Atlas verified connectivity, centralized operational error handling, and complete enterprise design system with light/dark theme toggle.',
+      description: 'Monorepo scaffolding, Scalable Express REST backend, high-availability database connectivity, centralized operational error handling, and complete enterprise design system with light/dark theme toggle.',
       deliverables: [
         'Monorepo directory layout (frontend/, backend/, docs/)',
         'Express server with helmet, CORS, and centralized AppError handler',
