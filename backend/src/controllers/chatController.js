@@ -1,0 +1,515 @@
+import mongoose from 'mongoose';
+import { Conversation, CONVERSATION_TYPES } from '../models/Conversation.js';
+import { Message } from '../models/Message.js';
+import { User, ROLES } from '../models/User.js';
+import { Allocation } from '../models/Allocation.js';
+import { Application } from '../models/Application.js';
+import {
+  emitChatMessage,
+  emitConversationUpdated,
+  emitReadReceipt,
+  getOnlineUserIds,
+} from '../socket.js';
+import { logger } from '../utils/logger.js';
+
+/**
+ * List all conversations for the authenticated user with unread counts
+ */
+export const getConversations = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+
+    const conversations = await Conversation.find({ participants: userId })
+      .populate('participants', 'name email role profile')
+      .populate('creator', 'name email role')
+      .populate('groupAdmins', 'name email role')
+      .populate({
+        path: 'lastMessage',
+        select: 'content sender createdAt isDeleted',
+        populate: { path: 'sender', select: 'name email role' },
+      })
+      .sort({ lastMessageAt: -1 })
+      .lean();
+
+    // Calculate unread message counts for each conversation
+    const onlineIds = new Set(getOnlineUserIds());
+
+    const enrichedConversations = await Promise.all(
+      conversations.map(async (conv) => {
+        // Find user's lastReadAt timestamp
+        const receipt = (conv.readReceipts || []).find(
+          (r) => r.user?.toString() === userId
+        );
+        const lastReadAt = receipt ? new Date(receipt.lastReadAt) : new Date(0);
+
+        const unreadCount = await Message.countDocuments({
+          conversation: conv._id,
+          sender: { $ne: userId },
+          createdAt: { $gt: lastReadAt },
+          isDeleted: false,
+        });
+
+        // For direct chats, calculate partner's online status
+        let isPartnerOnline = false;
+        let partner = null;
+        if (conv.type === CONVERSATION_TYPES.DIRECT) {
+          partner = conv.participants.find((p) => p._id?.toString() !== userId);
+          if (partner && onlineIds.has(partner._id?.toString())) {
+            isPartnerOnline = true;
+          }
+        }
+
+        return {
+          ...conv,
+          unreadCount,
+          isPartnerOnline,
+          partner,
+        };
+      })
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        conversations: enrichedConversations,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Create a new direct or group conversation
+ */
+export const createConversation = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { type = CONVERSATION_TYPES.DIRECT } = req.body;
+
+    if (type === CONVERSATION_TYPES.GROUP) {
+      const { name, description, participants } = req.validatedGroup;
+
+      const readReceipts = participants.map((pId) => ({
+        user: pId,
+        lastReadAt: pId === userId ? new Date() : new Date(0),
+      }));
+
+      const newGroup = await Conversation.create({
+        type: CONVERSATION_TYPES.GROUP,
+        name,
+        description: description || '',
+        participants,
+        groupAdmins: [userId],
+        creator: userId,
+        readReceipts,
+        lastMessageAt: new Date(),
+      });
+
+      const populatedGroup = await Conversation.findById(newGroup._id)
+        .populate('participants', 'name email role profile')
+        .populate('creator', 'name email role')
+        .populate('groupAdmins', 'name email role');
+
+      emitConversationUpdated(populatedGroup._id, populatedGroup, participants);
+
+      return res.status(201).json({
+        success: true,
+        message: 'Group conversation created successfully.',
+        data: { conversation: populatedGroup },
+      });
+    }
+
+    // Direct Conversation
+    const targetRecipient = req.targetRecipient;
+    const recipientId = targetRecipient._id.toString();
+
+    // Check if direct conversation already exists between the two users
+    let directConv = await Conversation.findOne({
+      type: CONVERSATION_TYPES.DIRECT,
+      participants: { $all: [userId, recipientId], $size: 2 },
+    })
+      .populate('participants', 'name email role profile')
+      .populate({
+        path: 'lastMessage',
+        select: 'content sender createdAt',
+        populate: { path: 'sender', select: 'name email role' },
+      });
+
+    if (directConv) {
+      return res.status(200).json({
+        success: true,
+        message: 'Existing direct conversation retrieved.',
+        data: { conversation: directConv },
+      });
+    }
+
+    // Create new direct conversation
+    const newConv = await Conversation.create({
+      type: CONVERSATION_TYPES.DIRECT,
+      participants: [userId, recipientId],
+      creator: userId,
+      readReceipts: [
+        { user: userId, lastReadAt: new Date() },
+        { user: recipientId, lastReadAt: new Date(0) },
+      ],
+      lastMessageAt: new Date(),
+    });
+
+    directConv = await Conversation.findById(newConv._id).populate(
+      'participants',
+      'name email role profile'
+    );
+
+    emitConversationUpdated(directConv._id, directConv, [userId, recipientId]);
+
+    res.status(201).json({
+      success: true,
+      message: 'Direct conversation started successfully.',
+      data: { conversation: directConv },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Retrieve single conversation details
+ */
+export const getConversationById = async (req, res, next) => {
+  try {
+    const conversation = req.conversation;
+    const userId = req.user.id;
+
+    // Calculate unread count
+    const receipt = (conversation.readReceipts || []).find(
+      (r) => r.user?.toString() === userId
+    );
+    const lastReadAt = receipt ? new Date(receipt.lastReadAt) : new Date(0);
+
+    const unreadCount = await Message.countDocuments({
+      conversation: conversation._id,
+      sender: { $ne: userId },
+      createdAt: { $gt: lastReadAt },
+      isDeleted: false,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        conversation,
+        unreadCount,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Get paginated messages for a conversation
+ */
+export const getMessages = async (req, res, next) => {
+  try {
+    const conversationId = req.conversation._id;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 30));
+    const skip = (page - 1) * limit;
+
+    const query = {
+      conversation: conversationId,
+      isDeleted: false,
+    };
+
+    const [messagesDesc, total] = await Promise.all([
+      Message.find(query)
+        .populate('sender', 'name email role profile')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Message.countDocuments(query),
+    ]);
+
+    // Reverse to display in chronological order
+    const messages = messagesDesc.reverse();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        messages,
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit) || 1,
+        },
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Send a new text message in conversation
+ */
+export const sendMessage = async (req, res, next) => {
+  try {
+    const conversation = req.conversation;
+    const userId = req.user.id;
+    const content = req.sanitizedContent;
+
+    const newMessage = await Message.create({
+      conversation: conversation._id,
+      sender: userId,
+      content,
+      readBy: [userId],
+    });
+
+    const populatedMessage = await Message.findById(newMessage._id)
+      .populate('sender', 'name email role profile')
+      .lean();
+
+    // Update conversation last message timestamp & sender read receipt
+    const now = new Date();
+    await Conversation.findByIdAndUpdate(conversation._id, {
+      $set: {
+        lastMessage: newMessage._id,
+        lastMessageAt: now,
+      },
+    });
+
+    // Update sender's readReceipt in conversation
+    await Conversation.updateOne(
+      { _id: conversation._id, 'readReceipts.user': userId },
+      { $set: { 'readReceipts.$.lastReadAt': now } }
+    );
+
+    // Real-time Socket.IO emission to room and individual user rooms
+    emitChatMessage(conversation._id, populatedMessage, conversation.participants);
+
+    res.status(201).json({
+      success: true,
+      message: 'Message sent successfully.',
+      data: { message: populatedMessage },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Mark conversation as read for current user
+ */
+export const markConversationRead = async (req, res, next) => {
+  try {
+    const conversationId = req.conversation._id;
+    const userId = req.user.id;
+    const now = new Date();
+
+    // Update read receipt in conversation
+    const updateResult = await Conversation.updateOne(
+      { _id: conversationId, 'readReceipts.user': userId },
+      { $set: { 'readReceipts.$.lastReadAt': now } }
+    );
+
+    // If receipt entry didn't exist, push it
+    if (updateResult.matchedCount === 0) {
+      await Conversation.updateOne(
+        { _id: conversationId },
+        { $push: { readReceipts: { user: userId, lastReadAt: now } } }
+      );
+    }
+
+    // Add current user to readBy in messages
+    await Message.updateMany(
+      { conversation: conversationId, sender: { $ne: userId } },
+      { $addToSet: { readBy: userId } }
+    );
+
+    emitReadReceipt(conversationId, userId, now, req.conversation.participants);
+
+    res.status(200).json({
+      success: true,
+      message: 'Conversation marked as read.',
+      data: { conversationId, lastReadAt: now, unreadCount: 0 },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Manage group conversation members and name
+ */
+export const updateGroupMembers = async (req, res, next) => {
+  try {
+    const conversation = req.conversation;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    if (conversation.type !== CONVERSATION_TYPES.GROUP) {
+      const error = new Error('Member management is only available for group conversations.');
+      error.statusCode = 400;
+      error.code = 'INVALID_CONVERSATION_TYPE';
+      return next(error);
+    }
+
+    // Authorization: Only group creator, group admin, or system admin/coordinator can manage group
+    const isCreator = conversation.creator?.toString() === userId;
+    const isGroupAdmin = conversation.groupAdmins?.some(
+      (a) => (a._id || a).toString() === userId
+    );
+    const isSystemAdmin = userRole === ROLES.ADMIN || userRole === ROLES.COORDINATOR;
+
+    if (!isCreator && !isGroupAdmin && !isSystemAdmin) {
+      const error = new Error('Access denied: Only group administrators can manage group members.');
+      error.statusCode = 403;
+      error.code = 'FORBIDDEN_GROUP_ADMIN';
+      return next(error);
+    }
+
+    const { name, description, addMemberIds, removeMemberIds, action, userId: targetMemberId } = req.body;
+
+    if (name && name.trim()) {
+      conversation.name = name.trim().slice(0, 100);
+    }
+
+    if (description !== undefined) {
+      conversation.description = description.trim().slice(0, 300);
+    }
+
+    let currentParticipants = conversation.participants.map((p) =>
+      (p._id || p).toString()
+    );
+
+    const toAdd = Array.isArray(addMemberIds) ? [...addMemberIds] : [];
+    if (action === 'add' && targetMemberId) {
+      toAdd.push(targetMemberId);
+    }
+
+    const toRemove = Array.isArray(removeMemberIds) ? [...removeMemberIds] : [];
+    if (action === 'remove' && targetMemberId) {
+      toRemove.push(targetMemberId);
+    }
+
+    // Add members
+    if (toAdd.length > 0) {
+      for (const newId of toAdd) {
+        if (mongoose.Types.ObjectId.isValid(newId)) {
+          const idStr = newId.toString();
+          if (!currentParticipants.includes(idStr)) {
+            currentParticipants.push(idStr);
+            conversation.readReceipts.push({ user: idStr, lastReadAt: new Date(0) });
+          }
+        }
+      }
+    }
+
+    // Remove members
+    if (toRemove.length > 0) {
+      const removeSet = new Set(toRemove.map((id) => id.toString()));
+      currentParticipants = currentParticipants.filter((id) => !removeSet.has(id));
+      conversation.readReceipts = conversation.readReceipts.filter(
+        (r) => !removeSet.has(r.user?.toString())
+      );
+    }
+
+    if (currentParticipants.length < 2) {
+      const error = new Error('A group conversation must have at least 2 members.');
+      error.statusCode = 400;
+      error.code = 'INSUFFICIENT_PARTICIPANTS';
+      return next(error);
+    }
+
+    conversation.participants = currentParticipants;
+    await conversation.save();
+
+    const updatedConv = await Conversation.findById(conversation._id)
+      .populate('participants', 'name email role profile')
+      .populate('creator', 'name email role')
+      .populate('groupAdmins', 'name email role');
+
+    emitConversationUpdated(conversation._id, updatedConv, currentParticipants);
+
+    res.status(200).json({
+      success: true,
+      message: 'Group updated successfully.',
+      data: { conversation: updatedConv },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Retrieve permitted contacts for starting new conversations
+ */
+export const getContacts = async (req, res, next) => {
+  try {
+    const user = req.user;
+    const userId = user.id;
+    let query = { _id: { $ne: userId }, status: 'active' };
+
+    // If student, return mentors, coordinators, company contacts of applications/allocations
+    if (user.role === ROLES.STUDENT) {
+      const [allocations, applications] = await Promise.all([
+        Allocation.find({ student: userId, status: 'active' }).select('company mentor'),
+        Application.find({ student: userId }).select('company'),
+      ]);
+
+      const allowedUserIds = new Set();
+      // Admins & Coordinators always reachable
+      const staff = await User.find({
+        role: { $in: [ROLES.ADMIN, ROLES.COORDINATOR] },
+        status: 'active',
+      }).select('_id');
+      staff.forEach((s) => allowedUserIds.add(s._id.toString()));
+
+      allocations.forEach((a) => {
+        if (a.company) allowedUserIds.add(a.company.toString());
+        if (a.mentor) allowedUserIds.add(a.mentor.toString());
+      });
+
+      applications.forEach((a) => {
+        if (a.company) allowedUserIds.add(a.company.toString());
+      });
+
+      query._id = { $in: Array.from(allowedUserIds) };
+    }
+
+    const contacts = await User.find(query)
+      .select('name email role profile')
+      .sort({ name: 1 })
+      .lean();
+
+    const onlineSet = new Set(getOnlineUserIds());
+    const enrichedContacts = contacts.map((c) => ({
+      ...c,
+      isOnline: onlineSet.has(c._id.toString()),
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: {
+        contacts: enrichedContacts,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Get online status of users
+ */
+export const getOnlineUsers = (req, res) => {
+  const onlineUserIds = getOnlineUserIds();
+  res.status(200).json({
+    success: true,
+    data: {
+      onlineUserIds,
+    },
+  });
+};

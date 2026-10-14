@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900 transition-colors duration-200 antialiased selection:bg-brand-500 selection:text-white dark:bg-[#070b14] dark:text-slate-100;
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  /* Surface styles */
+  .surface-card {
+    @apply bg-white border border-slate-200/80 shadow-sm rounded-xl transition-all duration-200 dark:bg-[#0d1424] dark:border-slate-800/80;
+  }
+
+  .surface-panel {
+    @apply bg-white/90 backdrop-blur-md border border-slate-200/90 dark:bg-[#0a0f1d]/90 dark:border-slate-800/80;
+  }
+
+  .surface-hover {
+    @apply hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-card;
+  }
+
+  .surface-sidebar {
+    @apply bg-white border-r border-slate-200 text-slate-700 dark:bg-[#070c18] dark:border-slate-800/90 dark:text-slate-300;
+  }
+
+  .text-secondary {
+    @apply text-slate-500 dark:text-slate-400;
+  }
+
+  .text-primary {
+    @apply text-slate-900 dark:text-slate-100;
+  }
+}
+
+@layer utilities {
+  .gradient-brand {
+    background: linear-gradient(135deg, #4f46e5 0%, #2563eb 50%, #0284c7 100%);
+  }
+
+  .gradient-brand-text {
+    background: linear-gradient(135deg, #4f46e5 0%, #2563eb 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
