@@ -29,8 +29,8 @@ export const AppLayout = ({ children, healthStatus, onOpenLogin }) => {
           {children}
         </main>
 
-        {/* Footer */}
-        <Footer />
+        {/* Real-Time Footer */}
+        <Footer healthStatus={healthStatus} />
       </div>
     </div>
   );

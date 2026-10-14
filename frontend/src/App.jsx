@@ -27,6 +27,7 @@ import CertificatesPage from './pages/CertificatesPage';
 import VerifyCertificatePage from './pages/VerifyCertificatePage';
 import ExternalJobsPage from './pages/ExternalJobsPage';
 import NotificationsPage from './pages/NotificationsPage';
+import PoliciesPage from './pages/PoliciesPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import healthService from './services/healthService';
 
@@ -59,6 +60,11 @@ export const App = () => {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/verify-certificate" element={<VerifyCertificatePage />} />
             <Route path="/verify-certificate/:code" element={<VerifyCertificatePage />} />
+            <Route path="/policies" element={<PoliciesPage />} />
+            <Route path="/privacy" element={<PoliciesPage />} />
+            <Route path="/terms" element={<PoliciesPage />} />
+            <Route path="/security-policy" element={<PoliciesPage />} />
+            <Route path="/cookies" element={<PoliciesPage />} />
 
             {/* Protected authenticated routes */}
             <Route
