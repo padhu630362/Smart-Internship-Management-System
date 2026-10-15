@@ -186,7 +186,7 @@ export const Footer = () => {
           {/* Bottom Bar: Copyright, Links & Operational Status */}
           <div className="border-t border-champagne-200/90 dark:border-warmdark-800 pt-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px]">
             <div className="text-stone-500">
-              © {new Date().getFullYear()} <strong>Smart Internship Management System (SIMS)</strong>. All rights reserved.
+              © {new Date().getFullYear()} <strong>Smart Internship Management (SIM)</strong>. All rights reserved.
             </div>
 
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-stone-500">

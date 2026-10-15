@@ -88,7 +88,7 @@ export const RegisterPage = () => {
             <SimsLogo size="md" />
           </div>
           <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-            Create Your SIMS Account
+            Create Your SIM Account
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
             Join the smart internship ecosystem as a Student, Host Employer, or Mentor

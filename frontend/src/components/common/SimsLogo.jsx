@@ -54,10 +54,7 @@ export const SimsLogo = ({ size = 'md', showText = true, className = '' }) => {
         <div className="leading-tight">
           <div className="flex items-center gap-1.5">
             <span className={`font-extrabold tracking-tight text-slate-900 dark:text-white ${currentSize.text}`}>
-              SIMS
-            </span>
-            <span className="text-[10px] font-bold tracking-wider uppercase px-1.5 py-0.5 rounded bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20">
-              Enterprise
+              SIM
             </span>
           </div>
           <p className={`text-slate-500 dark:text-slate-400 font-medium ${currentSize.subtext}`}>

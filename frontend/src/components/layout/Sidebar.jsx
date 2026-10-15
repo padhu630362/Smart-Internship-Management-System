@@ -7,7 +7,6 @@ import {
   Building2,
   UserCheck,
   ShieldCheck,
-  Lock,
   X,
   LogOut,
   User,
@@ -152,9 +151,8 @@ export const Sidebar = ({ isOpen, onClose, healthStatus }) => {
 
           {/* Role Workspaces */}
           <div>
-            <div className="px-3 mb-2 text-[10px] font-bold tracking-wider text-slate-400 uppercase flex items-center justify-between">
+            <div className="px-3 mb-2 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
               <span>Role Workspaces</span>
-              <span className="text-[9px] font-medium text-slate-400 lowercase">rbac</span>
             </div>
             <div className="space-y-1">
               {roleWorkspaces.map((ws) => {
@@ -176,14 +174,9 @@ export const Sidebar = ({ isOpen, onClose, healthStatus }) => {
                       <Icon className={`w-4 h-4 ${isUserRole ? 'text-brand-600 dark:text-brand-400' : 'text-slate-400'}`} />
                       <span>{ws.name}</span>
                     </div>
-                    {isUserRole ? (
+                    {isUserRole && (
                       <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
                         Active
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700">
-                        <Lock className="w-2.5 h-2.5" />
-                        RBAC
                       </span>
                     )}
                   </NavLink>
@@ -221,12 +214,9 @@ export const Sidebar = ({ isOpen, onClose, healthStatus }) => {
               </button>
             </div>
           ) : (
-            <>
-              <div className="text-[11px] text-slate-500 font-mono">
-                v1.0 • College Demo Ready
-              </div>
+            <div className="flex items-center justify-end w-full">
               <ThemeToggle />
-            </>
+            </div>
           )}
         </div>
       </aside>

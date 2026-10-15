@@ -26,7 +26,7 @@ export const LoginModal = ({ isOpen, onClose }) => {
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="SIMS Stakeholder Access"
+      title="SIM Stakeholder Access"
       description="Select your role to sign into your authenticated workspace"
     >
       <form onSubmit={handleSubmit} className="space-y-4">

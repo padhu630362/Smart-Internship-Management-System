@@ -63,31 +63,31 @@ export const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-[75vh] flex items-center justify-center py-6 px-4">
-      <div className="w-full max-w-md space-y-6">
-        <div className="text-center space-y-2">
+    <div className="w-full h-full flex items-center justify-center py-1 sm:py-2 px-3">
+      <div className="w-full max-w-md space-y-3">
+        <div className="text-center space-y-1.5">
           <div className="inline-block">
-            <SimsLogo size="md" />
+            <SimsLogo size="sm" />
           </div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
             Sign In to Your Workspace
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            Secure JWT access for Students, Companies, Mentors, Coordinators, and Admins
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Secure access for Students, Companies, Mentors, and Coordinators
           </p>
         </div>
 
         <Card className="shadow-lg border-slate-200 dark:border-slate-800">
-          <CardContent className="p-6 sm:p-8">
+          <CardContent className="p-5 sm:p-6">
             {(formError || authError) && (
-              <div className="mb-5 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-xs text-rose-700 dark:text-rose-400 flex items-start gap-2.5 animate-in fade-in">
+              <div className="mb-4 p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-xs text-rose-700 dark:text-rose-400 flex items-start gap-2.5 animate-in fade-in">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 <span className="font-medium">{formError || authError}</span>
               </div>
             )}
 
             {!showForgot ? (
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-3">
                 <Input
                   label="Email Address"
                   type="email"
@@ -110,7 +110,7 @@ export const LoginPage = () => {
                   required
                 />
 
-                <div className="flex items-center justify-between text-xs text-slate-500">
+                <div className="flex items-center justify-between text-xs text-slate-500 pt-0.5">
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
                       type="checkbox"
@@ -134,12 +134,12 @@ export const LoginPage = () => {
                   size="md"
                   icon={LogIn}
                   isLoading={submitting}
-                  className="w-full font-semibold shadow-sm mt-2"
+                  className="w-full font-semibold shadow-sm mt-1"
                 >
                   Sign In
                 </Button>
 
-                <div className="relative my-4">
+                <div className="relative my-2.5">
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-champagne-200 dark:border-warmdark-700" />
                   </div>
@@ -200,7 +200,7 @@ export const LoginPage = () => {
               </form>
             )}
 
-            <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800 text-center text-xs text-slate-500 dark:text-slate-400">
+            <div className="mt-3.5 pt-3 border-t border-slate-100 dark:border-slate-800 text-center text-xs text-slate-500 dark:text-slate-400">
               <span>Don't have an account? </span>
               <Link
                 to="/register"
@@ -213,9 +213,9 @@ export const LoginPage = () => {
         </Card>
 
         {/* Security Notice */}
-        <div className="p-3.5 rounded-xl bg-slate-100 dark:bg-[#0d1424] border border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 flex items-center justify-center gap-2 text-center">
-          <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
-          <span>Server-side RBAC protection • Session tokens encrypted with HS256</span>
+        <div className="py-2 px-3 rounded-xl bg-slate-100/80 dark:bg-[#0d1424] border border-slate-200/80 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-center gap-2 text-center">
+          <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+          <span>Server-side authentication • Session tokens encrypted with HS256</span>
         </div>
       </div>
     </div>
