@@ -69,6 +69,8 @@ web_modules/
 .env
 .env.*
 !.env.example
+serviceAccountKey.json
+*serviceAccount*.json
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache

@@ -102,3 +102,102 @@
     background: rgba(190, 147, 76, 0.6);
   }
 }
+
+/* =========================================================================
+   Theme 3: Midnight Sapphire (Executive Tech & Electric Cyan)
+   Specifically crafted for high-performance university & tech career governance
+   ========================================================================= */
+
+html.theme-sapphire body {
+  background-color: #060b14 !important;
+  color: #f1f5f9 !important;
+}
+
+html.theme-sapphire div[class*="bg-[#fcfaf7]"],
+html.theme-sapphire div[class*="dark:bg-[#12090d]"],
+html.theme-sapphire div[class*="dark:bg-[#070b14]"] {
+  background-color: #060b14 !important;
+}
+
+html.theme-sapphire .surface-card {
+  background-color: rgba(11, 20, 38, 0.94) !important;
+  border-color: rgba(30, 64, 175, 0.35) !important;
+  box-shadow: 0 10px 30px -10px rgba(2, 6, 23, 0.7) !important;
+}
+
+html.theme-sapphire .surface-panel {
+  background-color: rgba(8, 15, 29, 0.94) !important;
+  border-color: rgba(30, 64, 175, 0.4) !important;
+}
+
+html.theme-sapphire .surface-sidebar {
+  background-color: rgba(6, 12, 23, 0.98) !important;
+  border-color: rgba(30, 58, 138, 0.35) !important;
+}
+
+html.theme-sapphire .surface-hover:hover {
+  border-color: rgba(56, 189, 248, 0.6) !important;
+  box-shadow: 0 10px 25px -5px rgba(14, 165, 233, 0.2) !important;
+}
+
+/* Gradients in Midnight Sapphire */
+html.theme-sapphire .gradient-brand {
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 45%, #06b6d4 100%) !important;
+}
+
+html.theme-sapphire .gradient-brand-text {
+  background: linear-gradient(135deg, #60a5fa 0%, #38bdf8 50%, #06b6d4 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+html.theme-sapphire .gradient-burgundy {
+  background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 50%, #0c4a6e 100%) !important;
+}
+
+html.theme-sapphire .gradient-champagne {
+  background: linear-gradient(135deg, #38bdf8 0%, #06b6d4 50%, #0284c7 100%) !important;
+}
+
+/* Badges */
+html.theme-sapphire .badge-burgundy {
+  background-color: rgba(30, 58, 138, 0.35) !important;
+  color: #93c5fd !important;
+  border-color: rgba(59, 130, 246, 0.4) !important;
+}
+
+html.theme-sapphire .badge-champagne {
+  background-color: rgba(6, 182, 212, 0.18) !important;
+  color: #67e8f9 !important;
+  border-color: rgba(6, 182, 212, 0.4) !important;
+}
+
+/* Sapphire Scrollbars */
+html.theme-sapphire ::-webkit-scrollbar-thumb {
+  background: rgba(37, 99, 235, 0.35) !important;
+}
+
+html.theme-sapphire ::-webkit-scrollbar-thumb:hover {
+  background: rgba(56, 189, 248, 0.65) !important;
+}
+
+/* Adapt Burgundy and Champagne Elements to Sapphire Tone */
+html.theme-sapphire [class*="from-burgundy-900"],
+html.theme-sapphire [class*="from-burgundy-950"],
+html.theme-sapphire [class*="from-burgundy-800"],
+html.theme-sapphire [class*="from-burgundy-700"] {
+  --tw-gradient-from: #1e3a8a var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: #0c4a6e var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), #1d4ed8, var(--tw-gradient-to) !important;
+}
+
+html.theme-sapphire header {
+  border-color: rgba(30, 64, 175, 0.4) !important;
+  background-color: rgba(8, 15, 29, 0.92) !important;
+}
+
+html.theme-sapphire footer {
+  background: linear-gradient(180deg, #070d18 0%, #040810 100%) !important;
+  border-color: rgba(30, 64, 175, 0.35) !important;
+}
+

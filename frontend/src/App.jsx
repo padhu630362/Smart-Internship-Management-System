@@ -7,6 +7,7 @@ import HomePage from './pages/HomePage';
 import RoadmapPage from './pages/RoadmapPage';
 import NotFoundPage from './pages/NotFoundPage';
 import LoginPage from './pages/LoginPage';
+import AdminLoginPage from './pages/AdminLoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
@@ -57,6 +58,7 @@ export const App = () => {
             <Route path="/internships" element={<InternshipsDirectoryPage />} />
             <Route path="/external-jobs" element={<ExternalJobsPage />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/admin/login" element={<AdminLoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/verify-certificate" element={<VerifyCertificatePage />} />
             <Route path="/verify-certificate/:code" element={<VerifyCertificatePage />} />

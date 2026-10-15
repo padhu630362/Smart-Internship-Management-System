@@ -4,6 +4,7 @@ import { signToken } from '../utils/jwt.js';
 import { AppError } from '../utils/AppError.js';
 import { env } from '../config/env.js';
 import { recordAuditLog } from '../services/auditService.js';
+import { getFirebaseAuth } from '../config/firebaseAdmin.js';
 
 /**
  * Handle new user registration.
@@ -235,32 +236,60 @@ export const googleLogin = async (req, res, next) => {
     }
 
     let googlePayload;
-    // Allow predictable testing in automated test suites
-    if (process.env.NODE_ENV === 'test' && credential.startsWith('test_google_token_')) {
+    // Allow predictable testing and seamless development Google login
+    const isDevOrTest = process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
+    const isMockToken = credential.startsWith('test_google_token_') || credential.startsWith('dev_google_token_');
+
+    if (isDevOrTest && isMockToken) {
       googlePayload = {
-        sub: credential.replace('test_google_token_', 'gid_'),
-        email: req.body.email || 'test.google.user@example.com',
-        name: req.body.name || 'Google Test User',
+        sub: credential.replace(/^(test_|dev_)google_token_/, 'gid_'),
+        email: req.body.email || 'google.student@sims.edu',
+        name: req.body.name || 'Google Student Intern',
         picture: 'https://lh3.googleusercontent.com/a/default-user',
         email_verified: true,
       };
     } else {
-      // Official Google tokeninfo verification
-      try {
-        const response = await fetch(
-          `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`,
-          { signal: AbortSignal.timeout(6000) }
-        );
-        if (!response.ok) {
-          return next(new AppError('Invalid or expired Google authentication token.', 401, 'INVALID_GOOGLE_TOKEN'));
+      let verified = false;
+
+      // 1. First attempt Firebase Admin ID token verification
+      const firebaseAuth = getFirebaseAuth();
+      if (firebaseAuth) {
+        try {
+          const decoded = await firebaseAuth.verifyIdToken(credential);
+          googlePayload = {
+            sub: decoded.uid,
+            email: decoded.email,
+            name: decoded.name || req.body.name || (decoded.email ? decoded.email.split('@')[0] : 'Google User'),
+            picture: decoded.picture || req.body.picture || 'https://lh3.googleusercontent.com/a/default-user',
+            email_verified: decoded.email_verified,
+          };
+          verified = true;
+        } catch (firebaseErr) {
+          // Token may be a direct Google OAuth token rather than Firebase JWT; fall through
         }
-        googlePayload = await response.json();
-      } catch (fetchErr) {
-        return next(new AppError('Unable to reach Google verification service.', 503, 'GOOGLE_SERVICE_UNAVAILABLE'));
       }
 
-      if (env.GOOGLE_CLIENT_ID && googlePayload.aud !== env.GOOGLE_CLIENT_ID) {
-        return next(new AppError('Google token audience mismatch.', 401, 'INVALID_AUDIENCE'));
+      // 2. Fallback to standard Google OAuth tokeninfo verification
+      if (!verified) {
+        try {
+          const response = await fetch(
+            `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`,
+            { signal: AbortSignal.timeout(6000) }
+          );
+          if (response.ok) {
+            googlePayload = await response.json();
+            if (env.GOOGLE_CLIENT_ID && googlePayload.aud !== env.GOOGLE_CLIENT_ID) {
+              return next(new AppError('Google token audience mismatch.', 401, 'INVALID_AUDIENCE'));
+            }
+            verified = true;
+          }
+        } catch (fetchErr) {
+          // Fall through
+        }
+      }
+
+      if (!verified || !googlePayload) {
+        return next(new AppError('Invalid or expired Google authentication token.', 401, 'INVALID_GOOGLE_TOKEN'));
       }
     }
 

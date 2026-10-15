@@ -2,31 +2,53 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const ThemeContext = createContext();
 
+export const THEMES = {
+  BURGUNDY: 'burgundy',
+  SAPPHIRE: 'sapphire',
+  LIGHT: 'light',
+};
+
 export const ThemeProvider = ({ children }) => {
   const [theme, setTheme] = useState(() => {
     // Check saved local preference
     const saved = localStorage.getItem('sims-theme');
-    if (saved) return saved;
-    // Default to dark mode for modern developer experience, or system preference
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    if (saved && ['burgundy', 'sapphire', 'light', 'dark'].includes(saved)) {
+      return saved === 'dark' ? 'burgundy' : saved;
+    }
+    // Default to signature Burgundy theme
+    return 'burgundy';
   });
 
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
+
+    // Remove existing theme classes
+    root.classList.remove('dark', 'theme-sapphire', 'theme-burgundy', 'theme-light');
+
+    if (theme === 'sapphire') {
+      root.classList.add('dark', 'theme-sapphire');
+    } else if (theme === 'light') {
+      root.classList.add('theme-light');
     } else {
-      root.classList.remove('dark');
+      // Default: Royal Burgundy (dark)
+      root.classList.add('dark', 'theme-burgundy');
     }
+
     localStorage.setItem('sims-theme', theme);
   }, [theme]);
 
   const toggleTheme = () => {
-    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+    setTheme((prev) => {
+      if (prev === 'burgundy' || prev === 'dark') return 'sapphire';
+      if (prev === 'sapphire') return 'light';
+      return 'burgundy';
+    });
   };
 
+  const isDark = theme !== 'light';
+
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, isDark: theme === 'dark' }}>
+    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme, isDark, THEMES }}>
       {children}
     </ThemeContext.Provider>
   );
