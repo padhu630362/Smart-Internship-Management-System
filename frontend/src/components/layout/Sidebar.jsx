@@ -7,7 +7,6 @@ import {
   Building2,
   UserCheck,
   ShieldCheck,
-  Activity,
   Lock,
   X,
   LogOut,
@@ -25,7 +24,6 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import SimsLogo from '../common/SimsLogo';
-import StatusBadge from '../common/StatusBadge';
 import ThemeToggle from '../common/ThemeToggle';
 
 export const Sidebar = ({ isOpen, onClose, healthStatus }) => {
@@ -88,8 +86,6 @@ export const Sidebar = ({ isOpen, onClose, healthStatus }) => {
     { name: 'Coordinator Hub', role: 'coordinator', icon: GraduationCap },
     { name: 'Admin Console', role: 'admin', icon: ShieldCheck },
   ];
-
-  const isDbConnected = healthStatus?.database?.connected;
 
   return (
     <>
@@ -193,34 +189,6 @@ export const Sidebar = ({ isOpen, onClose, healthStatus }) => {
                   </NavLink>
                 );
               })}
-            </div>
-          </div>
-
-          {/* Live System Diagnostics Box */}
-          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#0d1424] border border-slate-200/90 dark:border-slate-800 text-xs space-y-2.5">
-            <div className="flex items-center justify-between font-semibold text-slate-800 dark:text-slate-200">
-              <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
-                <Activity className="w-3.5 h-3.5 text-brand-500 animate-pulse" />
-                Platform Status
-              </span>
-              <StatusBadge
-                status={healthStatus?.status === 'healthy' ? 'healthy' : 'warning'}
-                label={healthStatus?.status === 'healthy' ? 'Active' : 'Checking'}
-                size="sm"
-              />
-            </div>
-
-            <div className="space-y-1 text-[11px] text-slate-600 dark:text-slate-400">
-              <div className="flex items-center justify-between">
-                <span>Database:</span>
-                <span className={`font-semibold ${isDbConnected ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500'}`}>
-                  {isDbConnected ? 'Connected' : 'Standby'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>System Engine:</span>
-                <span className="font-semibold text-emerald-600 dark:text-emerald-400">Operational</span>
-              </div>
             </div>
           </div>
         </div>

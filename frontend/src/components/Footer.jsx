@@ -1,18 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ShieldCheck,
   FileText,
   Lock,
   Cookie,
-  Activity,
   Radio,
-  Clock,
   ExternalLink,
-  Terminal,
-  Cpu,
-  Database,
-  Server,
   Sparkles,
   Award,
   Briefcase,
@@ -23,78 +17,19 @@ import {
 } from 'lucide-react';
 import SimsLogo from './common/SimsLogo';
 import PolicyModal from './common/PolicyModal';
-import { useSocket } from '../context/SocketContext';
 
-export const Footer = ({ healthStatus }) => {
-  const { isConnected } = useSocket();
+export const Footer = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalTab, setModalTab] = useState('privacy');
-  const [currentDateTime, setCurrentDateTime] = useState(new Date());
-
-  // Live real-time ticking clock
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentDateTime(new Date());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   const openPolicy = (tab = 'privacy') => {
     setModalTab(tab);
     setModalOpen(true);
   };
 
-  const isDbConnected = healthStatus?.database?.connected !== false;
-
   return (
     <>
       <footer className="border-t border-champagne-300/80 dark:border-burgundy-900/60 bg-gradient-to-b from-[#fcfaf7] to-white dark:from-[#12090d] dark:to-[#0a0407] text-stone-600 dark:text-stone-400 text-xs transition-colors mt-auto">
-        {/* Real-Time Live Telemetry Bar */}
-        <div className="border-b border-champagne-200/80 dark:border-warmdark-800 bg-champagne-50/70 dark:bg-warmdark-900/80 py-2.5 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-[11px]">
-            {/* Live Socket Status */}
-            <div className="flex items-center gap-2 font-medium">
-              <span className="relative flex h-2 w-2">
-                <span
-                  className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                    isConnected ? 'bg-emerald-400' : 'bg-amber-400'
-                  }`}
-                />
-                <span
-                  className={`relative inline-flex rounded-full h-2 w-2 ${
-                    isConnected ? 'bg-emerald-500' : 'bg-amber-500'
-                  }`}
-                />
-              </span>
-              <span className="font-semibold text-stone-800 dark:text-stone-200">
-                {isConnected ? 'Real-Time WebSocket Connected' : 'Real-Time Telemetry Active'}
-              </span>
-              <span className="text-stone-400 hidden sm:inline">•</span>
-              <span className="text-stone-500 hidden sm:inline">Socket.IO Push Daemon Online</span>
-            </div>
-
-            {/* Server Health & Live Ticking Clock */}
-            <div className="flex items-center gap-4 font-mono text-[11px] text-stone-500 dark:text-stone-400">
-              <div className="flex items-center gap-1.5">
-                <Server className="w-3.5 h-3.5 text-burgundy-600 dark:text-champagne-400" />
-                <span>API: <strong className="text-stone-700 dark:text-stone-300">Operational</strong></span>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <Database className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span>DB: <strong className={isDbConnected ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500'}>
-                  {isDbConnected ? 'Active' : 'Standby'}
-                </strong></span>
-              </div>
-
-              <div className="flex items-center gap-1.5 text-stone-600 dark:text-stone-300">
-                <Clock className="w-3.5 h-3.5 text-champagne-600" />
-                <span>{currentDateTime.toLocaleTimeString()}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Main 4-Column Footer Navigation */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 mb-8">
