@@ -8,10 +8,29 @@ const __dirname = path.dirname(__filename);
 // Load .env from backend directory if present
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
+function resolveMongoUri() {
+  const baseUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/smart_internship_db';
+  if (process.env.NODE_ENV === 'test') {
+    if (process.env.TEST_MONGO_URI) return process.env.TEST_MONGO_URI;
+    // Route automated test fixtures to an isolated database so tests never pollute live user data
+    if (baseUri.includes('?')) {
+      const parts = baseUri.split('?');
+      const prefix = parts[0].endsWith('/')
+        ? parts[0] + 'internhub_automated_tests'
+        : (parts[0].includes('.net/') || parts[0].includes('.com/')
+            ? parts[0] + '_test'
+            : parts[0] + '/internhub_automated_tests');
+      return `${prefix}?${parts[1]}`;
+    }
+    return baseUri.endsWith('/') ? `${baseUri}internhub_automated_tests` : `${baseUri}_test`;
+  }
+  return baseUri;
+}
+
 export const env = {
   NODE_ENV: process.env.NODE_ENV || 'development',
   PORT: parseInt(process.env.PORT, 10) || 5001,
-  MONGO_URI: process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/smart_internship_db',
+  MONGO_URI: resolveMongoUri(),
   DNS_SERVERS: process.env.DNS_SERVERS || '8.8.8.8,1.1.1.1',
   CLIENT_URL: process.env.CLIENT_URL || process.env.CORS_ORIGIN || 'http://localhost:5173',
   ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS || '',

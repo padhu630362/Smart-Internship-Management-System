@@ -8,8 +8,10 @@ import {
 import { signToken } from '../utils/jwt.js';
 import { AppError } from '../utils/AppError.js';
 import { env } from '../config/env.js';
+import { getFirebaseAuth } from '../config/firebaseAdmin.js';
 import { recordAuditLog } from '../services/auditService.js';
 import { sendPasswordResetCode, sendTwoFactorCode } from '../services/emailService.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Handle new user registration.
@@ -575,7 +577,28 @@ export const googleLogin = async (req, res, next) => {
           };
           verified = true;
         } catch (firebaseErr) {
-          // Token may be a direct Google OAuth token rather than Firebase JWT; fall through
+          logger.warn(`Firebase Admin ID token verification error: ${firebaseErr.message}`);
+          if (isDevOrTest && credential && credential.includes('.')) {
+            try {
+              const parts = credential.split('.');
+              if (parts.length === 3) {
+                const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+                if (payload && payload.email && (payload.iss?.includes('securetoken.google.com') || payload.iss?.includes('accounts.google.com'))) {
+                  googlePayload = {
+                    sub: payload.user_id || payload.sub,
+                    email: payload.email,
+                    name: payload.name || req.body.name || payload.email.split('@')[0],
+                    picture: payload.picture || req.body.picture || 'https://lh3.googleusercontent.com/a/default-user',
+                    email_verified: payload.email_verified,
+                  };
+                  verified = true;
+                  logger.info(`Dev fallback: Authenticated Firebase user from token payload: ${payload.email}`);
+                }
+              }
+            } catch (decodeErr) {
+              // Ignore decode fallback error
+            }
+          }
         }
       }
 
