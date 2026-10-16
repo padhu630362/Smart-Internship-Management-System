@@ -92,9 +92,9 @@ export const ReportsPage = () => {
     }
   };
 
-  const records = reportData?.records || [];
-  const pagination = reportData?.pagination || { total: 0, totalPages: 1 };
-  const summary = reportData?.summary || {};
+  const records = reportData?.type === reportType ? (reportData?.records || []) : [];
+  const pagination = reportData?.type === reportType ? (reportData?.pagination || { total: 0, totalPages: 1 }) : { total: 0, totalPages: 1 };
+  const summary = reportData?.type === reportType ? (reportData?.summary || {}) : {};
 
   return (
     <div className="space-y-6">
@@ -143,6 +143,7 @@ export const ReportsPage = () => {
               key={tab.id}
               onClick={() => {
                 setReportType(tab.id);
+                setReportData(null);
                 setPage(1);
                 setStatus('all');
               }}
@@ -434,7 +435,11 @@ export const ReportsPage = () => {
                           {app.internship?.companyName || 'Company'}
                         </td>
                         <td className="p-3">
-                          <StatusBadge status="healthy" label={app.status.replace('_', ' ')} size="sm" />
+                          <StatusBadge
+                            status="healthy"
+                            label={typeof app.status === 'string' ? app.status.replace(/_/g, ' ') : (app.status || 'submitted')}
+                            size="sm"
+                          />
                         </td>
                         <td className="p-3 text-slate-400 font-mono text-[11px]">
                           {app.createdAt ? new Date(app.createdAt).toISOString().split('T')[0] : 'N/A'}
@@ -485,26 +490,42 @@ export const ReportsPage = () => {
                     ))}
 
                   {reportType === 'evaluations' &&
-                    records.map((ev) => (
-                      <tr key={ev._id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/50">
-                        <td className="p-3 font-bold text-slate-900 dark:text-white">{ev.student?.name}</td>
-                        <td className="p-3">
-                          {ev.evaluator?.name} ({ev.evaluator?.role})
-                        </td>
-                        <td className="p-3 uppercase text-[10px] font-bold">
-                          {ev.evaluationType.replace('_', ' ')}
-                        </td>
-                        <td className="p-3 font-black text-amber-500">
-                          {ev.ratings?.overallRating} / 5
-                        </td>
-                        <td className="p-3 capitalize">
-                          {ev.recommendation?.replace('_', ' ')}
-                        </td>
-                        <td className="p-3 text-slate-400 font-mono text-[11px]">
-                          {ev.submittedAt ? new Date(ev.submittedAt).toISOString().split('T')[0] : ''}
-                        </td>
-                      </tr>
-                    ))}
+                    records.map((ev) => {
+                      const studentName = ev.student?.name || (typeof ev.student === 'string' ? ev.student : 'Unassigned Student');
+                      const evaluatorName = ev.evaluator?.name || (typeof ev.evaluator === 'string' ? ev.evaluator : 'Assigned Mentor');
+                      const evaluatorRole = ev.evaluator?.role ? `(${ev.evaluator.role})` : '';
+                      const rawType = ev.evaluationType || ev.type || '';
+                      const evalType = typeof rawType === 'string' && rawType.trim() ? rawType.replace(/_/g, ' ') : 'Academic Appraisal';
+                      const overallScore = ev.ratings?.overallRating != null
+                        ? `${ev.ratings.overallRating} / 5`
+                        : (typeof ev.score === 'number' ? `${ev.score} / 5` : '—');
+                      const rawRec = ev.recommendation || ev.status || '';
+                      const recommendation = typeof rawRec === 'string' && rawRec.trim() ? rawRec.replace(/_/g, ' ') : '—';
+                      const submittedDate = ev.submittedAt || ev.createdAt
+                        ? new Date(ev.submittedAt || ev.createdAt).toISOString().split('T')[0]
+                        : '—';
+
+                      return (
+                        <tr key={ev._id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/50">
+                          <td className="p-3 font-bold text-slate-900 dark:text-white">{studentName}</td>
+                          <td className="p-3 text-slate-600 dark:text-slate-300">
+                            {evaluatorName} {evaluatorRole}
+                          </td>
+                          <td className="p-3 uppercase text-[10px] font-bold">
+                            {evalType}
+                          </td>
+                          <td className="p-3 font-black text-amber-500">
+                            {overallScore}
+                          </td>
+                          <td className="p-3 capitalize">
+                            {recommendation}
+                          </td>
+                          <td className="p-3 text-slate-400 font-mono text-[11px]">
+                            {submittedDate}
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             </div>

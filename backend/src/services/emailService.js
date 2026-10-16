@@ -4,6 +4,12 @@ import { logger } from '../utils/logger.js';
 
 let transporter = null;
 
+function getFromAddress() {
+  const from = env.EMAIL_FROM || env.SMTP_USER || 'InternHub Security <security@internhub.edu>';
+  if (from.includes('<') && from.includes('>')) return from;
+  return `InternHub Security <${from}>`;
+}
+
 function getTransporter() {
   if (!transporter && env.SMTP_USER && env.SMTP_PASS) {
     const isGmail =
@@ -21,7 +27,7 @@ function getTransporter() {
       : {
           host: env.SMTP_HOST,
           port: env.SMTP_PORT || 587,
-          secure: env.SMTP_SECURE,
+          secure: env.SMTP_SECURE || env.SMTP_PORT === 465,
           auth: {
             user: env.SMTP_USER,
             pass: env.SMTP_PASS,
@@ -51,7 +57,7 @@ export async function sendTwoFactorCode({ to, name = 'User', code }) {
   if (mailTransporter) {
     try {
       const info = await mailTransporter.sendMail({
-        from: env.EMAIL_FROM || 'InternHub Security <security@internhub.edu>',
+        from: getFromAddress(),
         to,
         subject: `${code} is your InternHub 2-Step Verification Code`,
         text: `Hello ${name},\n\nYour 6-digit two-step verification code for InternHub is: ${code}\n\nThis code expires in 10 minutes. Enter this code on the sign-in screen to verify your identity and access your account.\n\nIf you did not attempt to sign in to InternHub, please secure your account immediately.\n\nBest regards,\nThe InternHub Security Team`,
@@ -85,6 +91,12 @@ export async function sendTwoFactorCode({ to, name = 'User', code }) {
       return { sent: true, provider: 'smtp', message: 'Verification code sent to your personal email.' };
     } catch (err) {
       logger.error(`Failed to dispatch 2FA email via SMTP: ${err.message}`);
+      return {
+        sent: false,
+        provider: 'smtp',
+        error: err.message,
+        message: `Failed to dispatch verification email: ${err.message}`,
+      };
     }
   }
 
@@ -106,6 +118,7 @@ SMTP Status: ${missingConfigs.length > 0 ? `Unconfigured (${missingConfigs.join(
   return {
     sent: false,
     provider: 'console',
+    error: missingConfigs.length > 0 ? `Missing SMTP configuration (${missingConfigs.join(', ')})` : 'SMTP service unavailable',
     message: 'Verification code generated. Please check your email inbox and enter the 6-digit code.',
   };
 }
@@ -125,7 +138,7 @@ export async function sendPasswordResetCode({ to, name = 'User', code }) {
   if (mailTransporter) {
     try {
       const info = await mailTransporter.sendMail({
-        from: env.EMAIL_FROM || 'InternHub Security <security@internhub.edu>',
+        from: getFromAddress(),
         to,
         subject: `${code} is your InternHub Password Reset Code`,
         text: `Hello ${name},\n\nYour 6-digit verification code to reset your InternHub account password is: ${code}\n\nThis verification code expires in 15 minutes. If you did not request this password reset, please ignore this email.\n\nBest regards,\nThe InternHub Team`,
@@ -157,6 +170,12 @@ export async function sendPasswordResetCode({ to, name = 'User', code }) {
       return { sent: true, provider: 'smtp', message: 'Verification code sent to your personal email.' };
     } catch (err) {
       logger.error(`Failed to send password reset email via SMTP: ${err.message}`);
+      return {
+        sent: false,
+        provider: 'smtp',
+        error: err.message,
+        message: `Failed to deliver verification email: ${err.message}`,
+      };
     }
   }
 
@@ -178,6 +197,7 @@ SMTP Status: ${missingConfigs.length > 0 ? `Unconfigured (${missingConfigs.join(
   return {
     sent: false,
     provider: 'console',
+    error: missingConfigs.length > 0 ? `Missing SMTP configuration (${missingConfigs.join(', ')})` : 'SMTP service unavailable',
     message: 'Verification code generated. Please check your email inbox and enter the 6-digit code.',
   };
 }

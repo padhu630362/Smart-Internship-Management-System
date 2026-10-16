@@ -15,7 +15,6 @@ import { Notification, NOTIFICATION_TYPES } from '../src/models/Notification.js'
 import { Conversation, CONVERSATION_TYPES } from '../src/models/Conversation.js';
 import { Message } from '../src/models/Message.js';
 import { Evaluation, EVALUATION_TYPES, EVALUATION_RECOMMENDATIONS } from '../src/models/Evaluation.js';
-import { AuditLog } from '../src/models/AuditLog.js';
 import { hashPassword } from '../src/utils/security.js';
 import { signToken } from '../src/utils/jwt.js';
 
@@ -750,12 +749,6 @@ describe('Phase 11: Full System Integration & Regression Testing Suite', () => {
         .set('Authorization', `Bearer ${student1Token}`)
         .send({ title: 'Rogue Internship' });
       assert.strictEqual(studentCreate.status, 403);
-
-      // Student cannot access audit logs
-      const auditBlock = await request(app)
-        .get('/api/audit-logs')
-        .set('Authorization', `Bearer ${student1Token}`);
-      assert.strictEqual(auditBlock.status, 403);
 
       // Student cannot access institutional reports
       const reportBlock = await request(app)

@@ -8,7 +8,6 @@ import { Internship, INTERNSHIP_STATUSES, WORK_MODES } from '../src/models/Inter
 import { Application, APPLICATION_STATUSES } from '../src/models/Application.js';
 import { Allocation, ALLOCATION_STATUSES } from '../src/models/Allocation.js';
 import { Attendance, ATTENDANCE_STATUSES, ATTENDANCE_REVIEW_STATUSES } from '../src/models/Attendance.js';
-import { AuditLog, AUDIT_ACTIONS } from '../src/models/AuditLog.js';
 import { hashPassword } from '../src/utils/security.js';
 import { signToken } from '../src/utils/jwt.js';
 import { createRateLimiter } from '../src/middlewares/rateLimiter.js';
@@ -164,7 +163,6 @@ describe('Phase 10: Security, Reliability Hardening & Audit Logging Integration 
 
   after(async () => {
     // Clean up created test records
-    await AuditLog.deleteMany({ performedBy: { $in: [adminUser._id, mentorUser._id, companyUser._id] } });
     await Attendance.deleteMany({ allocation: testAllocation?._id });
     await Allocation.deleteMany({ _id: testAllocation?._id });
     await Application.deleteMany({ _id: testApplication?._id });
@@ -370,9 +368,9 @@ describe('Phase 10: Security, Reliability Hardening & Audit Logging Integration 
   });
 
   // =========================================================================
-  // 6. Regulatory & Administrative Audit Logging
+  // 6. Regulatory & Administrative Management Tests
   // =========================================================================
-  test('TC-PH10-10: Admin role change creates USER_ROLE_CHANGED audit log in MongoDB', async () => {
+  test('TC-PH10-10: Admin role change persists new role in MongoDB', async () => {
     const roleChangeUser = await User.create({
       name: 'Role Change Target',
       email: `target_role_${Date.now()}@university.edu`,
@@ -389,22 +387,15 @@ describe('Phase 10: Security, Reliability Hardening & Audit Logging Integration 
 
     assert.strictEqual(updateRes.status, 200);
 
-    // Verify audit log entry
-    const auditEntry = await AuditLog.findOne({
-      action: AUDIT_ACTIONS.USER_ROLE_CHANGED,
-      targetUser: roleChangeUser._id,
-    });
-
-    assert.ok(auditEntry, 'Audit log entry must exist for role change');
-    assert.strictEqual(auditEntry.performedBy.toString(), adminUser._id.toString());
-    assert.strictEqual(auditEntry.details.previousRole, ROLES.STUDENT);
-    assert.strictEqual(auditEntry.details.newRole, ROLES.MENTOR);
+    // Verify user role was updated directly in MongoDB
+    const updatedUser = await User.findById(roleChangeUser._id);
+    assert.ok(updatedUser);
+    assert.strictEqual(updatedUser.role, ROLES.MENTOR);
 
     await User.findByIdAndDelete(roleChangeUser._id);
-    await AuditLog.deleteMany({ targetUser: roleChangeUser._id });
   });
 
-  test('TC-PH10-11: Attendance correction records ATTENDANCE_CORRECTED audit log', async () => {
+  test('TC-PH10-11: Attendance correction updates review status and attendance status in MongoDB', async () => {
     const reviewRes = await request(app)
       .patch(`/api/attendance/${testAttendance._id}/review`)
       .set('Authorization', `Bearer ${mentorToken}`)
@@ -416,19 +407,15 @@ describe('Phase 10: Security, Reliability Hardening & Audit Logging Integration 
 
     assert.strictEqual(reviewRes.status, 200);
 
-    // Verify audit log was created
-    const auditEntry = await AuditLog.findOne({
-      action: AUDIT_ACTIONS.ATTENDANCE_CORRECTED,
-      targetResource: testAttendance._id.toString(),
-    });
-
-    assert.ok(auditEntry, 'Audit log must record attendance correction');
-    assert.strictEqual(auditEntry.performedBy.toString(), mentorUser._id.toString());
-    assert.strictEqual(auditEntry.details.newStatus, ATTENDANCE_STATUSES.HALF_DAY);
-    assert.strictEqual(auditEntry.details.reason, 'Student left early for verified academic exam.');
+    // Verify attendance was updated directly in MongoDB
+    const updatedAttendance = await Attendance.findById(testAttendance._id);
+    assert.ok(updatedAttendance);
+    assert.strictEqual(updatedAttendance.status, ATTENDANCE_STATUSES.HALF_DAY);
+    assert.strictEqual(updatedAttendance.reviewStatus, ATTENDANCE_REVIEW_STATUSES.CORRECTED);
+    assert.strictEqual(updatedAttendance.correctionHistory[0].reason, 'Student left early for verified academic exam.');
   });
 
-  test('TC-PH10-12: Application decision records APPLICATION_DECISION audit log', async () => {
+  test('TC-PH10-12: Application decision updates application review status in MongoDB', async () => {
     const decisionRes = await request(app)
       .patch(`/api/applications/${testApplication._id}/status`)
       .set('Authorization', `Bearer ${companyToken}`)
@@ -439,33 +426,19 @@ describe('Phase 10: Security, Reliability Hardening & Audit Logging Integration 
 
     assert.strictEqual(decisionRes.status, 200);
 
-    // Verify audit log
-    const auditEntry = await AuditLog.findOne({
-      action: AUDIT_ACTIONS.APPLICATION_DECISION,
-      targetResource: testApplication._id.toString(),
-    });
-
-    assert.ok(auditEntry, 'Audit log must record application decision');
-    assert.strictEqual(auditEntry.performedBy.toString(), companyUser._id.toString());
-    assert.strictEqual(auditEntry.details.newStatus, APPLICATION_STATUSES.UNDER_REVIEW);
+    // Verify application status was updated directly in MongoDB
+    const updatedApp = await Application.findById(testApplication._id);
+    assert.ok(updatedApp);
+    assert.strictEqual(updatedApp.status, APPLICATION_STATUSES.UNDER_REVIEW);
+    assert.strictEqual(updatedApp.reviewNotes, 'Impressive cryptography knowledge demonstrated.');
   });
 
-  test('TC-PH10-13: Audit logs endpoint is protected (student blocked 403; admin succeeds 200)', async () => {
-    // Student blocked
-    const studentRes = await request(app)
+  test('TC-PH10-13: Audit logs endpoint is cleanly removed (returns 404)', async () => {
+    const res = await request(app)
       .get('/api/audit-logs')
-      .set('Authorization', `Bearer ${student1Token}`);
-    assert.strictEqual(studentRes.status, 403);
-
-    // Admin succeeds
-    const adminRes = await request(app)
-      .get('/api/audit-logs?page=1&limit=10')
       .set('Authorization', `Bearer ${adminToken}`);
 
-    assert.strictEqual(adminRes.status, 200);
-    assert.strictEqual(adminRes.body.success, true);
-    assert.ok(Array.isArray(adminRes.body.data.logs));
-    assert.ok(adminRes.body.data.pagination.total >= 3);
+    assert.strictEqual(res.status, 404);
   });
 
   // =========================================================================

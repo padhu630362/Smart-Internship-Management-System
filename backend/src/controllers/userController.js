@@ -4,7 +4,6 @@ import { User, ROLES, USER_STATUSES } from '../models/User.js';
 import { hashPassword } from '../utils/security.js';
 import { UPLOAD_DIR } from '../utils/fileUpload.js';
 import { logger } from '../utils/logger.js';
-import { recordAuditLog } from '../services/auditService.js';
 import { escapeRegex } from '../middlewares/sanitize.js';
 
 /**
@@ -421,15 +420,6 @@ export const createUser = async (req, res, next) => {
       createdBy: req.user.id,
     });
 
-    // Record administrative audit log
-    await recordAuditLog({
-      action: 'USER_CREATED',
-      req,
-      targetUser: newUser._id,
-      resourceType: 'User',
-      details: { role: newUser.role, status: newUser.status, name: newUser.name, email: newUser.email },
-    });
-
     res.status(201).json({
       success: true,
       message: `User created successfully with role '${role}'.`,
@@ -480,35 +470,6 @@ export const updateUser = async (req, res, next) => {
 
     await targetUser.save();
 
-    // Record audit logs for role and status changes
-    if (role && role !== previousRole) {
-      await recordAuditLog({
-        action: 'USER_ROLE_CHANGED',
-        req,
-        targetUser: targetUser._id,
-        resourceType: 'User',
-        details: { previousRole, newRole: role, targetEmail: targetUser.email },
-      });
-    }
-
-    if (status && status !== previousStatus) {
-      await recordAuditLog({
-        action: 'USER_STATUS_CHANGED',
-        req,
-        targetUser: targetUser._id,
-        resourceType: 'User',
-        details: { previousStatus, newStatus: status, targetEmail: targetUser.email },
-      });
-    }
-
-    await recordAuditLog({
-      action: 'USER_UPDATED',
-      req,
-      targetUser: targetUser._id,
-      resourceType: 'User',
-      details: { targetEmail: targetUser.email, updatedFields: Object.keys(req.body) },
-    });
-
     res.status(200).json({
       success: true,
       message: 'User updated successfully.',
@@ -530,15 +491,6 @@ export const updateUserStatus = async (req, res, next) => {
 
     targetUser.status = status;
     await targetUser.save();
-
-    // Record status change audit log
-    await recordAuditLog({
-      action: 'USER_STATUS_CHANGED',
-      req,
-      targetUser: targetUser._id,
-      resourceType: 'User',
-      details: { previousStatus, newStatus: status, targetEmail: targetUser.email },
-    });
 
     res.status(200).json({
       success: true,
@@ -588,15 +540,6 @@ export const deleteUser = async (req, res, next) => {
     }
 
     await User.findByIdAndDelete(targetUserId);
-
-    // Record deletion audit log
-    await recordAuditLog({
-      action: 'USER_DELETED',
-      req,
-      targetUser: targetUserId,
-      resourceType: 'User',
-      details: { deletedEmail: targetUser.email, role: targetUser.role },
-    });
 
     res.status(200).json({
       success: true,

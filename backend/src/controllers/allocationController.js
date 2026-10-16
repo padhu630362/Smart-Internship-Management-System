@@ -4,7 +4,6 @@ import {
   createAndDispatchNotification,
   NOTIFICATION_TYPES,
 } from '../services/notificationService.js';
-import { recordAuditLog } from '../services/auditService.js';
 
 /**
  * Create a new internship allocation
@@ -213,22 +212,6 @@ export const updateAllocationStatus = async (req, res, next) => {
     });
 
     await allocation.save();
-
-    // Record regulatory audit log
-    await recordAuditLog({
-      action: 'ALLOCATION_STATUS_CHANGED',
-      req,
-      targetUser: allocation.student,
-      targetResource: allocation._id,
-      resourceType: 'Allocation',
-      details: {
-        internshipId: allocation.internship,
-        previousStatus,
-        newStatus: status,
-        note: note ? note.trim() : undefined,
-        reason: reason ? reason.trim() : undefined,
-      },
-    });
 
     res.status(200).json({
       success: true,

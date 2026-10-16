@@ -9,7 +9,6 @@ import { signToken } from '../utils/jwt.js';
 import { AppError } from '../utils/AppError.js';
 import { env } from '../config/env.js';
 import { getFirebaseAuth } from '../config/firebaseAdmin.js';
-import { recordAuditLog } from '../services/auditService.js';
 import { sendPasswordResetCode, sendTwoFactorCode } from '../services/emailService.js';
 import { logger } from '../utils/logger.js';
 
@@ -110,14 +109,17 @@ export const login = async (req, res, next) => {
         code: sixDigitCode,
       });
 
-      // Record security audit log
-      await recordAuditLog({
-        action: '2FA_CODE_DISPATCHED',
-        req,
-        targetUser: user._id,
-        resourceType: 'Auth',
-        details: { email: user.email, provider: emailResult.provider },
-      });
+      if (!emailResult.sent && process.env.NODE_ENV !== 'test') {
+        return next(
+          new AppError(
+            emailResult.error
+              ? `Failed to send 2FA verification email: ${emailResult.error}`
+              : 'Email delivery failed. SMTP service is unconfigured or unable to reach the mail server.',
+            502,
+            'EMAIL_DELIVERY_FAILED'
+          )
+        );
+      }
 
       return res.status(200).json({
         success: true,
@@ -136,15 +138,6 @@ export const login = async (req, res, next) => {
 
     user.lastLoginAt = new Date();
     await user.save({ validateBeforeSave: false });
-
-    // Record security audit log
-    await recordAuditLog({
-      action: 'LOGIN_SUCCESS',
-      req,
-      targetUser: user._id,
-      resourceType: 'Auth',
-      details: { email: user.email, role: user.role },
-    });
 
     // Remove passwordHash from response
     user.passwordHash = undefined;
@@ -225,15 +218,6 @@ export const verifyTwoFactor = async (req, res, next) => {
       email: user.email,
     });
 
-    // Record security audit log
-    await recordAuditLog({
-      action: 'LOGIN_2FA_SUCCESS',
-      req,
-      targetUser: user._id,
-      resourceType: 'Auth',
-      details: { email: user.email, role: user.role },
-    });
-
     res.status(200).json({
       success: true,
       message: 'Two-step verification successful. Welcome back!',
@@ -293,13 +277,17 @@ export const resendTwoFactorCode = async (req, res, next) => {
       code: sixDigitCode,
     });
 
-    await recordAuditLog({
-      action: '2FA_CODE_RESENT',
-      req,
-      targetUser: user._id,
-      resourceType: 'Auth',
-      details: { email: user.email, provider: emailResult.provider },
-    });
+    if (!emailResult.sent && process.env.NODE_ENV !== 'test') {
+      return next(
+        new AppError(
+          emailResult.error
+            ? `Failed to send 2FA verification email: ${emailResult.error}`
+            : 'Email delivery failed. SMTP service is unconfigured or unable to reach the mail server.',
+          502,
+          'EMAIL_DELIVERY_FAILED'
+        )
+      );
+    }
 
     res.status(200).json({
       success: true,
@@ -382,18 +370,21 @@ export const forgotPassword = async (req, res, next) => {
       code: sixDigitCode,
     });
 
-    // Record security audit log
-    await recordAuditLog({
-      action: 'PASSWORD_RESET_REQUESTED',
-      req,
-      targetUser: user._id,
-      resourceType: 'Auth',
-      details: { email: user.email, provider: emailResult.provider },
-    });
+    if (!emailResult.sent && process.env.NODE_ENV !== 'test') {
+      return next(
+        new AppError(
+          emailResult.error
+            ? `Failed to send verification email: ${emailResult.error}. Please check your SMTP configuration.`
+            : 'Email delivery failed. SMTP service is unconfigured or unable to reach the mail server.',
+          502,
+          'EMAIL_DELIVERY_FAILED'
+        )
+      );
+    }
 
     res.status(200).json({
       success: true,
-      message: 'If the email exists in our records, a 6-digit verification code has been dispatched to your email address.',
+      message: 'A 6-digit verification code has been dispatched to your email address.',
       provider: emailResult.provider,
       ...(process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development'
         ? { devResetToken: resetToken, devVerificationCode: sixDigitCode, token: resetToken }
@@ -518,15 +509,6 @@ export const resetPassword = async (req, res, next) => {
     user.resetPasswordAttempts = 0;
     user.resetPasswordCooldown = undefined;
     await user.save();
-
-    // Record security audit log
-    await recordAuditLog({
-      action: 'PASSWORD_RESET_COMPLETED',
-      req,
-      targetUser: user._id,
-      resourceType: 'Auth',
-      details: { email: user.email },
-    });
 
     res.status(200).json({
       success: true,
@@ -678,15 +660,6 @@ export const googleLogin = async (req, res, next) => {
       id: user._id.toString(),
       role: user.role,
       email: user.email,
-    });
-
-    // Record security audit log
-    await recordAuditLog({
-      action: isNewUser ? 'USER_REGISTER_GOOGLE' : 'USER_LOGIN_GOOGLE',
-      req,
-      targetUser: user._id,
-      resourceType: 'Auth',
-      details: { email: user.email, role: user.role, provider: 'google' },
     });
 
     res.status(200).json({

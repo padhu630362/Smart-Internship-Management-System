@@ -4,7 +4,6 @@ import {
   createAndDispatchNotification,
   NOTIFICATION_TYPES,
 } from '../services/notificationService.js';
-import { recordAuditLog } from '../services/auditService.js';
 
 /**
  * Intern submits daily attendance
@@ -225,23 +224,6 @@ export const reviewAttendanceRecord = async (req, res, next) => {
     }
 
     await attendance.save();
-
-    // Record regulatory audit log
-    await recordAuditLog({
-      action: 'ATTENDANCE_CORRECTED',
-      req,
-      targetUser: attendance.student,
-      targetResource: attendance._id,
-      resourceType: 'Attendance',
-      details: {
-        previousReviewStatus: prevReviewStatus,
-        newReviewStatus: reviewStatus,
-        previousStatus: prevStatus,
-        newStatus: newStatus || prevStatus,
-        reason: reason ? reason.trim() : undefined,
-        attendanceDate: attendance.date,
-      },
-    });
 
     // Notify student of attendance review
     const formattedDate = new Date(attendance.date).toLocaleDateString('en-US', {

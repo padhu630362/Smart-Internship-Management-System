@@ -8,7 +8,6 @@ import {
   createAndDispatchNotification,
   NOTIFICATION_TYPES,
 } from '../services/notificationService.js';
-import { recordAuditLog } from '../services/auditService.js';
 import { escapeRegex } from '../middlewares/sanitize.js';
 import { extractResumeText, analyzeResumeWithGemini } from '../services/aiService.js';
 import { UPLOAD_DIR } from '../utils/fileUpload.js';
@@ -401,22 +400,6 @@ export const updateApplicationStatus = async (req, res, next) => {
     });
 
     await application.save();
-
-    // Record decision audit log
-    await recordAuditLog({
-      action: 'APPLICATION_DECISION',
-      req,
-      targetUser: application.student,
-      targetResource: application._id,
-      resourceType: 'Application',
-      details: {
-        internshipId: application.internship,
-        previousStatus,
-        newStatus: targetStatus,
-        reviewNotes: reviewNotes ? reviewNotes.trim() : undefined,
-        reason: req.finalReason ? req.finalReason.trim() : undefined,
-      },
-    });
 
     // Notify applicant student of status change
     const internshipTitle =

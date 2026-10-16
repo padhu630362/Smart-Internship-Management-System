@@ -12,7 +12,6 @@ import chatRoutes from './chatRoutes.js';
 import evaluationRoutes from './evaluationRoutes.js';
 import analyticsRoutes from './analyticsRoutes.js';
 import reportRoutes from './reportRoutes.js';
-import auditLogRoutes from './auditLogRoutes.js';
 import certificateRoutes from './certificateRoutes.js';
 import externalJobRoutes from './externalJobRoutes.js';
 
@@ -39,7 +38,6 @@ router.get('/', (req, res) => {
       evaluations: '/api/evaluations',
       analytics: '/api/analytics',
       reports: '/api/reports',
-      auditLogs: '/api/audit-logs',
       certificates: '/api/certificates',
       externalJobs: '/api/external-jobs',
     },
@@ -60,7 +58,6 @@ router.use('/chat', chatRoutes);
 router.use('/evaluations', evaluationRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/reports', reportRoutes);
-router.use('/audit-logs', auditLogRoutes);
 router.use('/certificates', certificateRoutes);
 router.use('/external-jobs', externalJobRoutes);
 
