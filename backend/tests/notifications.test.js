@@ -469,6 +469,11 @@ describe('Phase 7: Real-Time Notifications and Socket.IO Integration Tests', () 
     if (httpServer) {
       await new Promise((resolve) => httpServer.close(resolve));
     }
+    try {
+      await Notification.deleteMany({
+        title: 'Urgent: Midterm Presentation Schedule',
+      });
+    } catch {}
   });
 });
 

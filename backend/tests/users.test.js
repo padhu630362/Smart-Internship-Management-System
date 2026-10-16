@@ -320,17 +320,27 @@ describe('Phase 3: User Profiles and User Management Tests', () => {
       );
     }
 
-    const res = await request(app)
-      .put(`/api/users/${adminUser._id}`)
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({
-        role: ROLES.STUDENT, // Demote sole admin
-      });
+    try {
+      const res = await request(app)
+        .put(`/api/users/${adminUser._id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          role: ROLES.STUDENT, // Demote sole admin
+        });
 
-    assert.equal(res.status, 400);
-    assert.equal(res.body.success, false);
-    assert.equal(res.body.error.code, 'LAST_ADMIN_PROTECTED');
-    assert.ok(res.body.error.message.includes('last active administrator'));
+      assert.equal(res.status, 400);
+      assert.equal(res.body.success, false);
+      assert.equal(res.body.error.code, 'LAST_ADMIN_PROTECTED');
+      assert.ok(res.body.error.message.includes('last active administrator'));
+    } finally {
+      if (temporarilySuspendedAdmins.length > 0) {
+        await User.updateMany(
+          { _id: { $in: temporarilySuspendedAdmins } },
+          { $set: { status: USER_STATUSES.ACTIVE } }
+        );
+        temporarilySuspendedAdmins = [];
+      }
+    }
   });
 
   it('TC-ADMIN-06: Safety Guard - Should allow demoting an admin when another active admin exists', async () => {

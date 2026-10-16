@@ -1,5 +1,6 @@
 import { verifyToken } from '../utils/jwt.js';
 import { User } from '../models/User.js';
+import { Session } from '../models/Session.js';
 import { AppError } from '../utils/AppError.js';
 
 /**
@@ -49,6 +50,29 @@ export const authenticateToken = async (req, res, next) => {
       return next(
         new AppError('Your account is pending verification.', 403, 'ACCOUNT_PENDING')
       );
+    }
+
+    // Session revocation check: verify if session was revoked on backend
+    if (payload.sessionId) {
+      const activeSession = await Session.findOne({ sessionId: payload.sessionId });
+      if (activeSession) {
+        if (activeSession.isRevoked) {
+          return next(
+            new AppError('Your session has been logged out or revoked. Please sign in again.', 401, 'SESSION_REVOKED')
+          );
+        }
+        if (activeSession.expiresAt && activeSession.expiresAt < new Date()) {
+          return next(
+            new AppError('Your session has expired. Please sign in again.', 401, 'SESSION_EXPIRED')
+          );
+        }
+        // Throttled lastActiveAt update (every 60s)
+        if (Date.now() - activeSession.lastActiveAt.getTime() > 60000) {
+          activeSession.lastActiveAt = new Date();
+          await activeSession.save({ validateBeforeSave: false });
+        }
+      }
+      req.sessionId = payload.sessionId;
     }
 
     // Session revocation: Check if password was changed after token issuance

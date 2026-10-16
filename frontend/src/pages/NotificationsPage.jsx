@@ -17,6 +17,7 @@ import {
   Filter,
   Sparkles,
   ShieldCheck,
+  MessageSquare,
   X,
 } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
@@ -46,7 +47,10 @@ export const NotificationsPage = () => {
   const [filterType, setFilterType] = useState('all'); // 'all' | 'unread' | 'job_alert' | 'application' | 'task'
 
   // Map destination link intelligently based on user role
-  const resolveTargetLink = (link) => {
+  const resolveTargetLink = (link, type) => {
+    if (type === NOTIFICATION_TYPES.NEW_MESSAGE || link?.includes('chat')) {
+      return link || '/chat';
+    }
     if (!link) return '/dashboard';
     if (user?.role === 'student') {
       if (link.includes('application')) return '/my-applications';
@@ -73,12 +77,13 @@ export const NotificationsPage = () => {
     if (!notif.isRead) {
       markAsRead(notif._id);
     }
-    const target = resolveTargetLink(notif.link);
+    const target = resolveTargetLink(notif.link, notif.type);
     navigate(target);
   };
 
   const filteredNotifications = notifications.filter((notif) => {
     if (filterType === 'unread') return !notif.isRead;
+    if (filterType === 'messages') return notif.type === NOTIFICATION_TYPES.NEW_MESSAGE;
     if (filterType === 'job_alert') return notif.type === NOTIFICATION_TYPES.JOB_ALERT;
     if (filterType === 'application')
       return [NOTIFICATION_TYPES.APPLICATION_SUBMITTED, NOTIFICATION_TYPES.APPLICATION_STATUS].includes(notif.type);
@@ -89,6 +94,8 @@ export const NotificationsPage = () => {
 
   const getTypeIcon = (type) => {
     switch (type) {
+      case NOTIFICATION_TYPES.NEW_MESSAGE:
+        return <MessageSquare className="w-5 h-5 text-purple-600 dark:text-purple-400" />;
       case NOTIFICATION_TYPES.JOB_ALERT:
         return <Sparkles className="w-5 h-5 text-peach-500" />;
       case NOTIFICATION_TYPES.OPPORTUNITY_PUBLISHED:
@@ -253,6 +260,19 @@ export const NotificationsPage = () => {
         >
           <Calendar className="w-3 h-3" />
           <span>Tasks & Deadlines</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFilterType('messages')}
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+            filterType === 'messages'
+              ? 'bg-purple-600 text-white shadow-xs'
+              : 'text-stone-600 hover:bg-champagne-50 dark:text-stone-400'
+          }`}
+        >
+          <MessageSquare className="w-3 h-3" />
+          <span>Messages</span>
         </button>
       </div>
 

@@ -15,6 +15,12 @@ import {
   NOTIFICATION_TYPES,
 } from '../services/notificationService.js';
 import { logger } from '../utils/logger.js';
+import {
+  issueUserSession,
+  revokeSession,
+  revokeAllOtherSessions,
+  listActiveSessions,
+} from '../utils/sessionHelper.js';
 
 /**
  * Handle new user registration.
@@ -43,12 +49,8 @@ export const register = async (req, res, next) => {
       status: 'active',
     });
 
-    // Generate JWT token
-    const token = signToken({
-      id: user._id.toString(),
-      role: user.role,
-      email: user.email,
-    });
+    // Issue JWT token and create session
+    const { token } = await issueUserSession({ user, req });
 
     // Notify administrators and coordinators of new registration
     User.find({ role: { $in: [ROLES.ADMIN, ROLES.COORDINATOR] }, status: 'active' })
@@ -156,15 +158,14 @@ export const login = async (req, res, next) => {
         requiresTwoFactor: true,
         email: user.email,
         message: `A 6-digit verification code has been dispatched to ${user.email}. Please enter it to complete sign-in.`,
+        ...(process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development'
+          ? { devCode: sixDigitCode }
+          : {}),
       });
     }
 
-    // Direct successful authentication
-    const token = signToken({
-      id: user._id.toString(),
-      role: user.role,
-      email: user.email,
-    });
+    // Direct successful authentication with managed session
+    const { token } = await issueUserSession({ user, req });
 
     user.lastLoginAt = new Date();
     await user.save({ validateBeforeSave: false });
@@ -241,12 +242,8 @@ export const verifyTwoFactor = async (req, res, next) => {
     user.lastLoginAt = new Date();
     await user.save({ validateBeforeSave: false });
 
-    // Generate JWT token
-    const token = signToken({
-      id: user._id.toString(),
-      role: user.role,
-      email: user.email,
-    });
+    // Issue JWT token and create managed session
+    const { token } = await issueUserSession({ user, req });
 
     res.status(200).json({
       success: true,
@@ -341,13 +338,21 @@ export const getMe = async (req, res) => {
 };
 
 /**
- * Handle user logout.
+ * Handle user logout and invalidate session on the backend.
  */
-export const logout = (req, res) => {
+export const logout = async (req, res) => {
+  try {
+    if (req.sessionId) {
+      await revokeSession(req.sessionId, req.user?._id);
+    }
+  } catch (err) {
+    logger.warn(`Session revocation on logout: ${err.message}`);
+  }
+
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
   res.status(200).json({
     success: true,
-    message: 'Logged out successfully. Please clear client-side credentials.',
+    message: 'Logged out successfully. Your session has been revoked on the server.',
   });
 };
 
@@ -696,12 +701,8 @@ export const googleLogin = async (req, res, next) => {
       }
     }
 
-    // Issue JWT token
-    const token = signToken({
-      id: user._id.toString(),
-      role: user.role,
-      email: user.email,
-    });
+    // Issue JWT token and create managed session
+    const { token } = await issueUserSession({ user, req });
 
     res.status(200).json({
       success: true,
@@ -716,6 +717,237 @@ export const googleLogin = async (req, res, next) => {
   }
 };
 
+/**
+ * Get current Two-Factor Authentication status for authenticated user.
+ */
+export const getTwoFactorStatus = async (req, res) => {
+  res.status(200).json({
+    success: true,
+    data: {
+      twoFactorEnabled: !!req.user.twoFactorEnabled,
+    },
+  });
+};
+
+/**
+ * Request to enable Two-Factor Authentication (dispatches 6-digit confirmation OTP).
+ */
+export const requestEnableTwoFactor = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id).select('+twoFactorCode +twoFactorExpires +twoFactorCooldown');
+    if (!user) {
+      return next(new AppError('User account not found.', 404, 'USER_NOT_FOUND'));
+    }
+
+    if (user.twoFactorEnabled) {
+      return res.status(200).json({
+        success: true,
+        message: 'Two-factor authentication is already active on your account.',
+        data: { twoFactorEnabled: true },
+      });
+    }
+
+    if (user.twoFactorCooldown && user.twoFactorCooldown > new Date()) {
+      const waitSeconds = Math.ceil((user.twoFactorCooldown.getTime() - Date.now()) / 1000);
+      return next(
+        new AppError(
+          `Please wait ${waitSeconds} seconds before requesting another verification code.`,
+          429,
+          'RATE_LIMITED'
+        )
+      );
+    }
+
+    const sixDigitCode = generateSixDigitCode();
+    const hashedCode = hashResetToken(sixDigitCode);
+
+    user.twoFactorCode = hashedCode;
+    user.twoFactorExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    user.twoFactorAttempts = 0;
+    user.twoFactorCooldown = new Date(Date.now() + 60 * 1000); // 60s cooldown
+    await user.save({ validateBeforeSave: false });
+
+    const emailResult = await sendTwoFactorCode({
+      to: user.email,
+      name: user.name,
+      code: sixDigitCode,
+    });
+
+    if (!emailResult.sent && process.env.NODE_ENV !== 'test') {
+      return next(
+        new AppError(
+          emailResult.error
+            ? `Failed to send verification email: ${emailResult.error}`
+            : 'Email delivery failed. Please verify your SMTP configuration.',
+          502,
+          'EMAIL_DELIVERY_FAILED'
+        )
+      );
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `A 6-digit confirmation code has been dispatched to ${user.email}.`,
+      ...(process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development'
+        ? { devCode: sixDigitCode }
+        : {}),
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Confirm enabling Two-Factor Authentication with verified 6-digit code.
+ */
+export const confirmEnableTwoFactor = async (req, res, next) => {
+  try {
+    const { code } = req.body;
+    if (!code) {
+      return next(new AppError('6-digit verification code is required.', 400, 'MISSING_CODE'));
+    }
+
+    const user = await User.findById(req.user._id).select(
+      '+twoFactorCode +twoFactorExpires +twoFactorAttempts'
+    );
+
+    if (!user || !user.twoFactorCode || !user.twoFactorExpires) {
+      return next(
+        new AppError('No pending 2FA activation request found. Please request a new code.', 400, 'NO_PENDING_2FA')
+      );
+    }
+
+    if (user.twoFactorExpires < new Date()) {
+      user.twoFactorCode = undefined;
+      user.twoFactorExpires = undefined;
+      await user.save({ validateBeforeSave: false });
+      return next(new AppError('Verification code has expired. Please request a new code.', 400, 'CODE_EXPIRED'));
+    }
+
+    const rawCode = String(code).trim();
+    const hashedInputCode = hashResetToken(rawCode);
+
+    if (hashedInputCode !== user.twoFactorCode) {
+      user.twoFactorAttempts = (user.twoFactorAttempts || 0) + 1;
+      await user.save({ validateBeforeSave: false });
+      return next(new AppError('Invalid verification code.', 400, 'INVALID_CODE'));
+    }
+
+    // Success: Activate 2FA on account
+    user.twoFactorEnabled = true;
+    user.twoFactorCode = undefined;
+    user.twoFactorExpires = undefined;
+    user.twoFactorAttempts = 0;
+    await user.save({ validateBeforeSave: false });
+
+    res.status(200).json({
+      success: true,
+      message: 'Two-factor authentication has been successfully activated for your account.',
+      data: {
+        twoFactorEnabled: true,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Disable Two-Factor Authentication with password verification.
+ */
+export const disableTwoFactor = async (req, res, next) => {
+  try {
+    const { password } = req.body;
+    if (!password) {
+      return next(
+        new AppError('Current password is required to disable two-factor authentication.', 400, 'PASSWORD_REQUIRED')
+      );
+    }
+
+    const user = await User.findById(req.user._id).select('+passwordHash');
+    if (!user) {
+      return next(new AppError('User not found.', 404, 'USER_NOT_FOUND'));
+    }
+
+    const isMatch = await user.isValidPassword(password);
+    if (!isMatch) {
+      return next(new AppError('Incorrect password. 2FA was not disabled.', 401, 'INVALID_PASSWORD'));
+    }
+
+    user.twoFactorEnabled = false;
+    user.twoFactorCode = undefined;
+    user.twoFactorExpires = undefined;
+    user.twoFactorAttempts = 0;
+    await user.save({ validateBeforeSave: false });
+
+    res.status(200).json({
+      success: true,
+      message: 'Two-factor authentication has been disabled.',
+      data: {
+        twoFactorEnabled: false,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Get all active login sessions for the authenticated user.
+ */
+export const getActiveUserSessions = async (req, res, next) => {
+  try {
+    const sessions = await listActiveSessions(req.user._id, req.sessionId);
+    res.status(200).json({
+      success: true,
+      data: {
+        sessions,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Revoke a specific active session.
+ */
+export const revokeUserSessionById = async (req, res, next) => {
+  try {
+    const { sessionId } = req.params;
+    if (!sessionId) {
+      return next(new AppError('Session ID is required.', 400, 'MISSING_SESSION_ID'));
+    }
+
+    await revokeSession(sessionId, req.user._id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Session has been revoked successfully.',
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Revoke all other active sessions for the authenticated user.
+ */
+export const revokeOtherUserSessions = async (req, res, next) => {
+  try {
+    const revokedCount = await revokeAllOtherSessions(req.sessionId, req.user._id);
+    res.status(200).json({
+      success: true,
+      message: `${revokedCount} other session(s) revoked successfully.`,
+      data: {
+        revokedCount,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export default {
   register,
   login,
@@ -726,4 +958,11 @@ export default {
   forgotPassword,
   resetPassword,
   googleLogin,
+  getTwoFactorStatus,
+  requestEnableTwoFactor,
+  confirmEnableTwoFactor,
+  disableTwoFactor,
+  getActiveUserSessions,
+  revokeUserSessionById,
+  revokeOtherUserSessions,
 };

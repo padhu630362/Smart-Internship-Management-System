@@ -14,6 +14,7 @@ export const NOTIFICATION_TYPES = {
   CERTIFICATE_ISSUED: 'certificate_issued',
   JOB_ALERT: 'job_alert',
   USER_REGISTERED: 'user_registered',
+  NEW_MESSAGE: 'new_message',
 };
 
 export const notificationService = {

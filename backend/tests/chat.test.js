@@ -13,6 +13,7 @@ import { initSocket, getIO } from '../src/socket.js';
 import { User, ROLES, USER_STATUSES } from '../src/models/User.js';
 import { Conversation, CONVERSATION_TYPES } from '../src/models/Conversation.js';
 import { Message } from '../src/models/Message.js';
+import { Notification, NOTIFICATION_TYPES } from '../src/models/Notification.js';
 import { hashPassword } from '../src/utils/security.js';
 import { signToken } from '../src/utils/jwt.js';
 
@@ -150,6 +151,9 @@ describe('Phase 8: Secure Real-Time Chat & Group Messaging Tests', () => {
     } catch {}
 
     try {
+      await Notification.deleteMany({
+        recipient: { $in: [coordinatorUser?._id, student1User?._id, student2User?._id, outsiderUser?._id].filter(Boolean) },
+      });
       await mongoose.disconnect();
     } catch {}
 
@@ -208,6 +212,15 @@ describe('Phase 8: Secure Real-Time Chat & Group Messaging Tests', () => {
     // Verify Conversation lastMessage updated
     const convo = await Conversation.findById(directConversationId);
     assert.equal(convo.lastMessage.toString(), savedMsg._id.toString());
+
+    // Verify in-app notification created for recipient
+    const notif = await Notification.findOne({
+      recipient: coordinatorUser._id,
+      type: NOTIFICATION_TYPES.NEW_MESSAGE,
+    });
+    assert.ok(notif, 'Real-time in-app notification must be dispatched to recipient');
+    assert.ok(notif.title.includes(student1User.name));
+    assert.equal(notif.link, `/chat?conversationId=${directConversationId}`);
   });
 
   it('TC-CHAT-03: Security - Non-member cannot access conversation details', async () => {

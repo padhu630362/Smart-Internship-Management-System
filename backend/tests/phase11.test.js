@@ -135,6 +135,23 @@ describe('Phase 11: Full System Integration & Regression Testing Suite', () => {
     if (fs.existsSync(testPdfPath)) fs.unlinkSync(testPdfPath);
     if (fs.existsSync(testExePath)) fs.unlinkSync(testExePath);
 
+    // Clean up created test entities
+    try {
+      const p11Pattern = new RegExp(`p11_${timestamp}`);
+      await User.deleteMany({ email: p11Pattern });
+      if (createdOpportunity?._id) await Internship.findByIdAndDelete(createdOpportunity._id);
+      if (createdApplication?._id) await Application.findByIdAndDelete(createdApplication._id);
+      if (createdAllocation?._id) await Allocation.findByIdAndDelete(createdAllocation._id);
+      if (createdTask?._id) await Task.findByIdAndDelete(createdTask._id);
+      if (createdAttendance?._id) await Attendance.findByIdAndDelete(createdAttendance._id);
+      await Notification.deleteMany({
+        $or: [
+          { title: 'Sprint 3 Code Freeze & Architecture Showcase' },
+          { sender: adminUser?._id },
+        ],
+      });
+    } catch {}
+
     if (mongoose.connection.readyState !== 0) {
       await mongoose.connection.close();
     }

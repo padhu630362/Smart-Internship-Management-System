@@ -16,6 +16,7 @@ import {
   Radio,
   Sparkles,
   ShieldCheck,
+  MessageSquare,
   X,
 } from 'lucide-react';
 import { useSocket } from '../../context/SocketContext';
@@ -64,6 +65,9 @@ export const NotificationBell = () => {
 
   // Map destination link intelligently based on user role
   const resolveTargetLink = (link, type) => {
+    if (type === NOTIFICATION_TYPES.NEW_MESSAGE || link?.includes('chat')) {
+      return link || '/chat';
+    }
     if (type === NOTIFICATION_TYPES.JOB_ALERT || link?.includes('external-jobs')) {
       return '/external-jobs';
     }
@@ -113,6 +117,8 @@ export const NotificationBell = () => {
 
   const getTypeIcon = (type) => {
     switch (type) {
+      case NOTIFICATION_TYPES.NEW_MESSAGE:
+        return <MessageSquare className="w-4 h-4 text-purple-600 dark:text-purple-400" />;
       case NOTIFICATION_TYPES.JOB_ALERT:
         return <Sparkles className="w-4 h-4 text-champagne-500" />;
       case NOTIFICATION_TYPES.OPPORTUNITY_PUBLISHED:

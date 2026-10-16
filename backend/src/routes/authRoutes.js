@@ -10,6 +10,13 @@ import {
   verifyResetCode,
   resetPassword,
   googleLogin,
+  getTwoFactorStatus,
+  requestEnableTwoFactor,
+  confirmEnableTwoFactor,
+  disableTwoFactor,
+  getActiveUserSessions,
+  revokeUserSessionById,
+  revokeOtherUserSessions,
 } from '../controllers/authController.js';
 import { authenticateToken, requireRoles } from '../middlewares/auth.js';
 import {
@@ -37,6 +44,17 @@ router.post('/reset-password', authRateLimiter, validateResetPassword, resetPass
 // Authenticated Endpoints
 router.get('/me', authenticateToken, getMe);
 router.post('/logout', authenticateToken, logout);
+
+// Two-Factor Authentication (2FA) Management Endpoints
+router.get('/2fa/status', authenticateToken, getTwoFactorStatus);
+router.post('/2fa/enable-request', authenticateToken, authRateLimiter, requestEnableTwoFactor);
+router.post('/2fa/enable-confirm', authenticateToken, authRateLimiter, confirmEnableTwoFactor);
+router.post('/2fa/disable', authenticateToken, authRateLimiter, disableTwoFactor);
+
+// Session Management Endpoints
+router.get('/sessions', authenticateToken, getActiveUserSessions);
+router.delete('/sessions/:sessionId', authenticateToken, revokeUserSessionById);
+router.post('/sessions/revoke-others', authenticateToken, revokeOtherUserSessions);
 
 // RBAC Role Verification Test Endpoints
 router.get('/admin-access-test', authenticateToken, requireRoles(ROLES.ADMIN), (req, res) => {

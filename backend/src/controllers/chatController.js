@@ -10,6 +10,10 @@ import {
   emitReadReceipt,
   getOnlineUserIds,
 } from '../socket.js';
+import {
+  createAndDispatchNotification,
+  NOTIFICATION_TYPES,
+} from '../services/notificationService.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -288,6 +292,26 @@ export const sendMessage = async (req, res, next) => {
 
     // Real-time Socket.IO emission to room and individual user rooms
     emitChatMessage(conversation._id, populatedMessage, conversation.participants);
+
+    // Dispatch real-time in-app notification to all other participants
+    for (const participantId of conversation.participants) {
+      const pIdStr = (participantId._id || participantId).toString();
+      if (pIdStr !== userId.toString()) {
+        createAndDispatchNotification({
+          recipientId: pIdStr,
+          senderId: userId,
+          type: NOTIFICATION_TYPES.NEW_MESSAGE,
+          title: `New message from ${req.user.name}`,
+          message: content.length > 80 ? `${content.substring(0, 77)}...` : content,
+          link: `/chat?conversationId=${conversation._id}`,
+          eventKey: `MSG:${newMessage._id}:${pIdStr}`,
+          metadata: {
+            conversationId: conversation._id,
+            messageId: newMessage._id,
+          },
+        }).catch((err) => logger.warn(`Failed to dispatch message notification: ${err.message}`));
+      }
+    }
 
     res.status(201).json({
       success: true,

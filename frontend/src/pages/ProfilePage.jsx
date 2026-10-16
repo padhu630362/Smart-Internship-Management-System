@@ -20,14 +20,26 @@ import {
   Shield,
   Clock,
   Sparkles,
+  ShieldCheck,
+  Smartphone,
+  Monitor,
+  Laptop,
+  Key,
+  RefreshCw,
+  LogOut,
+  CheckCircle2,
+  Lock,
+  AlertTriangle,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import userService from '../services/userService';
+import authService from '../services/authService';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import StatusBadge from '../components/common/StatusBadge';
 import LoadingState from '../components/common/LoadingState';
+import Modal from '../components/common/Modal';
 
 export const ProfilePage = () => {
   const { user: authUser, updateUserState, reloadUser, token } = useAuth();
@@ -88,8 +100,161 @@ export const ProfilePage = () => {
   const [skillInput, setSkillInput] = useState('');
   const [expertiseInput, setExpertiseInput] = useState('');
 
+  // Tab State: 'profile' | 'security'
+  const [activeTab, setActiveTab] = useState('profile');
+
+  // Two-Factor Authentication (2FA) State
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(Boolean(authUser?.twoFactorEnabled));
+  const [showEnable2FAModal, setShowEnable2FAModal] = useState(false);
+  const [enable2FACode, setEnable2FACode] = useState('');
+  const [enable2FALoading, setEnable2FALoading] = useState(false);
+  const [enable2FAError, setEnable2FAError] = useState('');
+  const [enable2FANotice, setEnable2FANotice] = useState('');
+  const [enable2FACooldown, setEnable2FACooldown] = useState(0);
+
+  const [showDisable2FAModal, setShowDisable2FAModal] = useState(false);
+  const [disable2FAPassword, setDisable2FAPassword] = useState('');
+  const [disable2FALoading, setDisable2FALoading] = useState(false);
+  const [disable2FAError, setDisable2FAError] = useState('');
+
+  // Active Sessions State
+  const [sessions, setSessions] = useState([]);
+  const [loadingSessions, setLoadingSessions] = useState(false);
+  const [revokingSessionId, setRevokingSessionId] = useState(null);
+  const [revokingOthers, setRevokingOthers] = useState(false);
+
+  // 2FA Cooldown countdown
+  useEffect(() => {
+    if (enable2FACooldown <= 0) return;
+    const timer = setInterval(() => {
+      setEnable2FACooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [enable2FACooldown]);
+
+  const fetch2FAStatus = async () => {
+    try {
+      const res = await authService.getTwoFactorStatus();
+      if (res?.data) {
+        setTwoFactorEnabled(!!res.data.twoFactorEnabled);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch 2FA status:', err);
+    }
+  };
+
+  const handleStartEnable2FA = async () => {
+    setEnable2FALoading(true);
+    setEnable2FAError('');
+    try {
+      const res = await authService.requestEnableTwoFactor();
+      setEnable2FANotice(res?.message || 'A 6-digit confirmation code has been dispatched to your email.');
+      setEnable2FACode('');
+      setEnable2FACooldown(60);
+      setShowEnable2FAModal(true);
+    } catch (err) {
+      setErrorMessage(err.response?.data?.error?.message || err.message || 'Failed to request 2FA confirmation code.');
+    } finally {
+      setEnable2FALoading(false);
+    }
+  };
+
+  const handleConfirmEnable2FA = async (e) => {
+    e.preventDefault();
+    if (!enable2FACode || enable2FACode.length !== 6) {
+      setEnable2FAError('Please enter the complete 6-digit verification code.');
+      return;
+    }
+    setEnable2FALoading(true);
+    setEnable2FAError('');
+    try {
+      await authService.confirmEnableTwoFactor({ code: enable2FACode });
+      setTwoFactorEnabled(true);
+      if (typeof updateUserState === 'function') {
+        updateUserState({ twoFactorEnabled: true });
+      }
+      setShowEnable2FAModal(false);
+      setSuccessMessage('Two-factor authentication has been successfully activated!');
+      setTimeout(() => setSuccessMessage(''), 4000);
+    } catch (err) {
+      setEnable2FAError(err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Invalid or expired confirmation code.');
+    } finally {
+      setEnable2FALoading(false);
+    }
+  };
+
+  const handleDisable2FA = async (e) => {
+    e.preventDefault();
+    if (!disable2FAPassword) {
+      setDisable2FAError('Please enter your current account password.');
+      return;
+    }
+    setDisable2FALoading(true);
+    setDisable2FAError('');
+    try {
+      await authService.disableTwoFactor({ password: disable2FAPassword });
+      setTwoFactorEnabled(false);
+      if (typeof updateUserState === 'function') {
+        updateUserState({ twoFactorEnabled: false });
+      }
+      setShowDisable2FAModal(false);
+      setDisable2FAPassword('');
+      setSuccessMessage('Two-factor authentication has been disabled.');
+      setTimeout(() => setSuccessMessage(''), 4000);
+    } catch (err) {
+      setDisable2FAError(err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Incorrect password.');
+    } finally {
+      setDisable2FALoading(false);
+    }
+  };
+
+  const fetchSessions = async () => {
+    try {
+      setLoadingSessions(true);
+      const res = await authService.getSessions();
+      if (res?.data?.sessions) {
+        setSessions(res.data.sessions);
+      }
+    } catch (err) {
+      console.warn('Failed to load active sessions:', err);
+    } finally {
+      setLoadingSessions(false);
+    }
+  };
+
+  const handleRevokeSession = async (sessionId) => {
+    if (!window.confirm('Log out this session? The device will immediately lose access.')) return;
+    try {
+      setRevokingSessionId(sessionId);
+      await authService.revokeSession(sessionId);
+      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+      setSuccessMessage('Session revoked successfully.');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err) {
+      setErrorMessage(err.message || 'Failed to revoke session.');
+    } finally {
+      setRevokingSessionId(null);
+    }
+  };
+
+  const handleRevokeOtherSessions = async () => {
+    if (!window.confirm('Log out all other active sessions? All devices except this one will be signed out.')) return;
+    try {
+      setRevokingOthers(true);
+      const res = await authService.revokeOtherSessions();
+      await fetchSessions();
+      setSuccessMessage(res?.message || 'All other active sessions have been logged out.');
+      setTimeout(() => setSuccessMessage(''), 4000);
+    } catch (err) {
+      setErrorMessage(err.message || 'Failed to revoke other sessions.');
+    } finally {
+      setRevokingOthers(false);
+    }
+  };
+
   useEffect(() => {
     fetchProfile();
+    fetch2FAStatus();
   }, []);
 
   const fetchProfile = async () => {
@@ -389,16 +554,32 @@ export const ProfilePage = () => {
             </div>
           </div>
 
-          <Button
-            type="submit"
-            form="profile-form"
-            variant="primary"
-            icon={Save}
-            loading={saving}
-            className="w-full sm:w-auto shadow-sm"
-          >
-            Save Profile
-          </Button>
+          {activeTab === 'profile' ? (
+            <Button
+              type="submit"
+              form="profile-form"
+              variant="primary"
+              icon={Save}
+              loading={saving}
+              className="w-full sm:w-auto shadow-sm"
+            >
+              Save Profile
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              icon={RefreshCw}
+              loading={loadingSessions}
+              onClick={() => {
+                fetch2FAStatus();
+                fetchSessions();
+              }}
+              className="w-full sm:w-auto text-xs"
+            >
+              Refresh Sessions
+            </Button>
+          )}
         </div>
       </div>
 
@@ -417,7 +598,44 @@ export const ProfilePage = () => {
         </div>
       )}
 
-      <form id="profile-form" onSubmit={handleSave} className="space-y-6">
+      {/* Navigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab('profile')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all ${
+            activeTab === 'profile'
+              ? 'bg-burgundy-700 text-white shadow-xs'
+              : 'text-stone-600 dark:text-stone-400 hover:bg-champagne-50 dark:hover:bg-warmdark-850'
+          }`}
+        >
+          <UserIcon className="w-4 h-4" />
+          <span>Profile Details</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('security');
+            fetchSessions();
+            fetch2FAStatus();
+          }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all ${
+            activeTab === 'security'
+              ? 'bg-burgundy-700 text-white shadow-xs'
+              : 'text-stone-600 dark:text-stone-400 hover:bg-champagne-50 dark:hover:bg-warmdark-850'
+          }`}
+        >
+          <ShieldCheck className="w-4 h-4" />
+          <span>Security & Sessions</span>
+          {twoFactorEnabled && (
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse ml-0.5" />
+          )}
+        </button>
+      </div>
+
+      {activeTab === 'profile' && (
+        <form id="profile-form" onSubmit={handleSave} className="space-y-6">
         {/* Core Personal Details */}
         <Card
           title="Account & Contact Information"
@@ -986,6 +1204,335 @@ export const ProfilePage = () => {
           </Button>
         </div>
       </form>
+      )}
+
+      {/* Security & Active Sessions View */}
+      {activeTab === 'security' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Two-Factor Authentication Card */}
+          <Card
+            title="Two-Factor Authentication (2FA)"
+            subtitle="Add a critical extra layer of defense by requiring an email verification code on sign-in."
+          >
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800">
+              <div className="flex items-start gap-3.5">
+                <div
+                  className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
+                    twoFactorEnabled
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+                      : 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
+                  }`}
+                >
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2.5">
+                    <h4 className="text-sm font-bold text-stone-900 dark:text-white">
+                      Email-Based 2FA Protection
+                    </h4>
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                        twoFactorEnabled
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+                          : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
+                      }`}
+                    >
+                      {twoFactorEnabled ? 'Active (Protected)' : 'Inactive'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-stone-500 dark:text-stone-400 mt-1 max-w-xl leading-relaxed">
+                    {twoFactorEnabled
+                      ? 'Whenever you sign in with your password, a real 6-digit verification code will be sent to your registered email address before dashboard access is granted.'
+                      : 'Two-factor authentication is currently disabled. Protect your account from unauthorized access by activating 2-step verification.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="shrink-0">
+                {twoFactorEnabled ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    icon={Lock}
+                    onClick={() => {
+                      setDisable2FAPassword('');
+                      setDisable2FAError('');
+                      setShowDisable2FAModal(true);
+                    }}
+                    className="text-xs border-rose-300 text-rose-700 hover:bg-rose-50 dark:border-rose-900/60 dark:text-rose-400"
+                  >
+                    Disable 2FA
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    icon={ShieldCheck}
+                    loading={enable2FALoading}
+                    onClick={handleStartEnable2FA}
+                    className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                  >
+                    Enable 2FA
+                  </Button>
+                )}
+              </div>
+            </div>
+          </Card>
+
+          {/* Active Sessions Card */}
+          <Card
+            title="Active Login Sessions"
+            subtitle="View devices and browsers that currently hold an authenticated session on your account."
+          >
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-stone-500 dark:text-stone-400">
+                  {sessions.length} active session{sessions.length === 1 ? '' : 's'} recorded
+                </span>
+                {sessions.filter((s) => !s.isCurrent).length > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    icon={LogOut}
+                    loading={revokingOthers}
+                    onClick={handleRevokeOtherSessions}
+                    className="text-xs text-rose-600 border-rose-200 hover:bg-rose-50 dark:border-rose-900/40 dark:text-rose-400"
+                  >
+                    Log Out All Other Devices
+                  </Button>
+                )}
+              </div>
+
+              {loadingSessions ? (
+                <div className="py-8">
+                  <LoadingState message="Checking active sessions..." />
+                </div>
+              ) : sessions.length === 0 ? (
+                <div className="text-center py-6 text-xs text-stone-400">
+                  No other active sessions detected.
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200/80 dark:border-slate-800 rounded-xl overflow-hidden">
+                  {sessions.map((sess) => {
+                    const isMobile = sess.deviceType === 'Mobile';
+                    const isTablet = sess.deviceType === 'Tablet';
+                    const IconComponent = isMobile ? Smartphone : isTablet ? Laptop : Monitor;
+
+                    return (
+                      <div
+                        key={sess.id}
+                        className={`p-4 flex items-center justify-between gap-4 transition-colors ${
+                          sess.isCurrent
+                            ? 'bg-champagne-50/40 dark:bg-warmdark-900/30'
+                            : 'hover:bg-slate-50/60 dark:hover:bg-slate-850/40'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3.5">
+                          <div
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                              sess.isCurrent
+                                ? 'bg-burgundy-100 text-burgundy-700 dark:bg-burgundy-950/60 dark:text-champagne-400'
+                                : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                            }`}
+                          >
+                            <IconComponent className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs sm:text-sm font-bold text-stone-900 dark:text-white">
+                                {sess.browser} on {sess.os}
+                              </span>
+                              {sess.isCurrent && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                                  Current Device
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-stone-500 font-mono">
+                              <span>IP: {sess.ip}</span>
+                              <span>•</span>
+                              <span>
+                                Active: {new Date(sess.lastActiveAt).toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          {!sess.isCurrent && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              icon={LogOut}
+                              loading={revokingSessionId === sess.id}
+                              onClick={() => handleRevokeSession(sess.id)}
+                              className="text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                            >
+                              Revoke
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Enable 2FA Verification Modal */}
+      <Modal
+        isOpen={showEnable2FAModal}
+        onClose={() => {
+          if (!enable2FALoading) {
+            setShowEnable2FAModal(false);
+            setEnable2FAError('');
+          }
+        }}
+        title="Activate Two-Factor Authentication"
+        subtitle="Confirm email delivery to secure your account."
+        size="md"
+      >
+        <form onSubmit={handleConfirmEnable2FA} className="space-y-4 pt-2">
+          {enable2FANotice && (
+            <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 text-xs text-emerald-700 dark:text-emerald-400 flex items-start gap-2">
+              <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{enable2FANotice}</span>
+            </div>
+          )}
+
+          {enable2FAError && (
+            <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-xs text-rose-700 dark:text-rose-400 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{enable2FAError}</span>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 text-center">
+              Enter 6-Digit Confirmation Code
+            </label>
+            <input
+              type="text"
+              maxLength={6}
+              value={enable2FACode}
+              onChange={(e) => setEnable2FACode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="123456"
+              className="w-full text-center tracking-[0.5em] font-mono text-2xl py-3 px-4 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-burgundy-500/20 focus:border-burgundy-600 shadow-inner"
+              autoFocus
+              required
+            />
+            <p className="text-[11px] text-stone-500 text-center">
+              The code was sent to <span className="font-semibold font-mono">{authUser?.email}</span>. Valid for 10 minutes.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between pt-2">
+            <button
+              type="button"
+              disabled={enable2FACooldown > 0 || enable2FALoading}
+              onClick={handleStartEnable2FA}
+              className="text-xs font-semibold text-burgundy-700 dark:text-champagne-400 hover:underline disabled:opacity-50 disabled:no-underline flex items-center gap-1"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${enable2FALoading ? 'animate-spin' : ''}`} />
+              <span>
+                {enable2FACooldown > 0 ? `Resend in ${enable2FACooldown}s` : 'Resend code'}
+              </span>
+            </button>
+
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowEnable2FAModal(false)}
+                disabled={enable2FALoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                loading={enable2FALoading}
+                disabled={enable2FACode.length !== 6 || enable2FALoading}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+              >
+                Confirm & Enable
+              </Button>
+            </div>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Disable 2FA Verification Modal */}
+      <Modal
+        isOpen={showDisable2FAModal}
+        onClose={() => {
+          if (!disable2FALoading) {
+            setShowDisable2FAModal(false);
+            setDisable2FAError('');
+          }
+        }}
+        title="Disable Two-Factor Authentication"
+        subtitle="Confirm your current account password to turn off 2FA."
+        size="md"
+      >
+        <form onSubmit={handleDisable2FA} className="space-y-4 pt-2">
+          {disable2FAError && (
+            <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-xs text-rose-700 dark:text-rose-400 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{disable2FAError}</span>
+            </div>
+          )}
+
+          <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>
+              Disabling two-factor authentication lowers your account security. Only password credentials will be required to sign in.
+            </span>
+          </div>
+
+          <Input
+            label="Current Account Password"
+            type="password"
+            icon={Key}
+            placeholder="••••••••••••"
+            value={disable2FAPassword}
+            onChange={(e) => setDisable2FAPassword(e.target.value)}
+            required
+            autoFocus
+          />
+
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowDisable2FAModal(false)}
+              disabled={disable2FALoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              loading={disable2FALoading}
+              disabled={!disable2FAPassword || disable2FALoading}
+              className="bg-rose-600 hover:bg-rose-700 text-white font-bold"
+            >
+              Turn Off 2FA
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

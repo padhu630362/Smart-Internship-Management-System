@@ -102,6 +102,62 @@ export const authService = {
     });
     return response.data;
   },
+
+  /**
+   * Get Two-Factor Authentication status.
+   */
+  getTwoFactorStatus: async () => {
+    const response = await apiClient.get('/auth/2fa/status');
+    return response.data;
+  },
+
+  /**
+   * Request 6-digit confirmation code to enable 2FA.
+   */
+  requestEnableTwoFactor: async () => {
+    const response = await apiClient.post('/auth/2fa/enable-request');
+    return response.data;
+  },
+
+  /**
+   * Confirm enabling 2FA with 6-digit OTP.
+   */
+  confirmEnableTwoFactor: async ({ code }) => {
+    const response = await apiClient.post('/auth/2fa/enable-confirm', { code });
+    return response.data;
+  },
+
+  /**
+   * Disable 2FA with current password.
+   */
+  disableTwoFactor: async ({ password }) => {
+    const response = await apiClient.post('/auth/2fa/disable', { password });
+    return response.data;
+  },
+
+  /**
+   * Fetch active login sessions.
+   */
+  getSessions: async () => {
+    const response = await apiClient.get('/auth/sessions');
+    return response.data;
+  },
+
+  /**
+   * Revoke a specific active session.
+   */
+  revokeSession: async (sessionId) => {
+    const response = await apiClient.delete(`/auth/sessions/${sessionId}`);
+    return response.data;
+  },
+
+  /**
+   * Revoke all other active sessions.
+   */
+  revokeOtherSessions: async () => {
+    const response = await apiClient.post('/auth/sessions/revoke-others');
+    return response.data;
+  },
 };
 
 export default authService;

@@ -161,14 +161,6 @@ describe('Phase 10: Security, Reliability Hardening & Audit Logging Integration 
     });
   });
 
-  after(async () => {
-    // Clean up created test records
-    await Attendance.deleteMany({ allocation: testAllocation?._id });
-    await Allocation.deleteMany({ _id: testAllocation?._id });
-    await Application.deleteMany({ _id: testApplication?._id });
-    await Internship.deleteMany({ _id: testInternship?._id });
-    await User.deleteMany({ _id: { $in: [adminUser._id, companyUser._id, mentorUser._id, student1._id, student2._id] } });
-  });
 
   // =========================================================================
   // 1. Deactivated & Suspended Account Handling
@@ -371,6 +363,7 @@ describe('Phase 10: Security, Reliability Hardening & Audit Logging Integration 
   // 6. Regulatory & Administrative Management Tests
   // =========================================================================
   test('TC-PH10-10: Admin role change persists new role in MongoDB', async () => {
+    await User.updateOne({ _id: adminUser._id }, { $set: { status: USER_STATUSES.ACTIVE, role: ROLES.ADMIN } });
     const roleChangeUser = await User.create({
       name: 'Role Change Target',
       email: `target_role_${Date.now()}@university.edu`,
@@ -510,6 +503,13 @@ describe('Phase 10: Security, Reliability Hardening & Audit Logging Integration 
   });
 
   after(async () => {
+    // Clean up created test records
+    await Attendance.deleteMany({ allocation: testAllocation?._id });
+    await Allocation.deleteMany({ _id: testAllocation?._id });
+    await Application.deleteMany({ _id: testApplication?._id });
+    await Internship.deleteMany({ _id: testInternship?._id });
+    await User.deleteMany({ _id: { $in: [adminUser?._id, companyUser?._id, mentorUser?._id, student1?._id, student2?._id] } });
+
     if (mongoose.connection.readyState !== 0) {
       await mongoose.connection.close();
     }
