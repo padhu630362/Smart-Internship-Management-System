@@ -4,6 +4,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { auth, googleProvider, signInWithPopup } from '../../config/firebase';
 
+import { getRoleDashboardRoute } from '../../utils/navigation';
+
 export const GoogleSignInButton = ({
   role = 'student',
   onSuccess,
@@ -26,7 +28,7 @@ export const GoogleSignInButton = ({
       const user = result.user;
       const idToken = await user.getIdToken();
 
-      // 2. Transmit verified Firebase ID token to SIMS backend
+      // 2. Transmit verified Firebase ID token to backend
       const res = await loginWithGoogle({
         credential: idToken,
         role,
@@ -36,7 +38,8 @@ export const GoogleSignInButton = ({
       });
 
       if (onSuccess) onSuccess(res);
-      navigate('/dashboard', { replace: true });
+      const targetRoute = getRoleDashboardRoute(res?.user?.role || role);
+      navigate(targetRoute, { replace: true });
     } catch (err) {
       // User closed popup without signing in
       if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {

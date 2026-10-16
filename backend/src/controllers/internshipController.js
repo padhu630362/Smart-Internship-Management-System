@@ -276,6 +276,20 @@ export const createInternship = async (req, res, next) => {
       targetCompanyName = manualCompanyName.trim();
     }
 
+    // Deduplication guard: prevent creating duplicate internship for the same company and title
+    const existingInternship = await Internship.findOne({
+      company: targetCompanyId,
+      title: new RegExp(`^${title.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
+      status: { $ne: INTERNSHIP_STATUSES.ARCHIVED },
+    });
+
+    if (existingInternship) {
+      const conflictError = new Error('An active or published internship with this title already exists for this organization.');
+      conflictError.statusCode = 409;
+      conflictError.code = 'DUPLICATE_INTERNSHIP';
+      return next(conflictError);
+    }
+
     const newOpportunity = await Internship.create({
       title: title.trim(),
       description: description.trim(),

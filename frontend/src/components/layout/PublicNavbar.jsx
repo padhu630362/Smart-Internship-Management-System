@@ -76,7 +76,7 @@ export const PublicNavbar = () => {
           <Link
             to="/"
             className="flex items-center gap-2 group transition-transform duration-200 hover:scale-105"
-            aria-label="SIM Home"
+            aria-label="InternHub Home"
           >
             <SimsLogo size="md" />
           </Link>

@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react';
 
 export const Button = ({
   children,
+  as: Component = 'button',
   variant = 'primary',
   size = 'md',
   isLoading = false,
@@ -37,9 +38,9 @@ export const Button = ({
   };
 
   return (
-    <button
-      type={type}
-      disabled={disabled || isLoading}
+    <Component
+      type={Component === 'button' ? type : undefined}
+      disabled={Component === 'button' ? (disabled || isLoading) : undefined}
       onClick={onClick}
       className={`${baseStyles} ${variants[variant] || variants.primary} ${sizes[size] || sizes.md} ${className}`}
       {...props}
@@ -53,7 +54,7 @@ export const Button = ({
           {Icon && iconPosition === 'right' && <Icon className="w-4 h-4 shrink-0" />}
         </>
       )}
-    </button>
+    </Component>
   );
 };
 

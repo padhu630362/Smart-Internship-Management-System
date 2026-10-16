@@ -55,61 +55,74 @@ export const updateProfile = async (req, res, next) => {
     } = req.body;
 
     // Top-level allowable fields
-    if (name) user.name = name.trim();
+    if (name) user.name = String(name).trim();
     if (!user.profile) user.profile = {};
 
-    if (phone !== undefined) user.profile.phone = phone.trim();
-    if (bio !== undefined) user.profile.bio = bio.trim();
-    if (avatarUrl !== undefined) user.profile.avatarUrl = avatarUrl.trim();
-    if (department !== undefined) user.profile.department = department.trim();
+    if (phone !== undefined) user.profile.phone = String(phone || '').trim();
+    if (bio !== undefined) user.profile.bio = String(bio || '').trim();
+    if (avatarUrl !== undefined) user.profile.avatarUrl = String(avatarUrl || '').trim();
+    if (department !== undefined) user.profile.department = String(department || '').trim();
 
     // Role-specific subdocument updates
     if (user.role === ROLES.STUDENT && studentDetails) {
-      user.profile.studentDetails = {
-        ...user.profile.studentDetails,
-        ...(studentDetails.studentId !== undefined && { studentId: studentDetails.studentId.trim() }),
-        ...(studentDetails.department !== undefined && { department: studentDetails.department.trim() }),
-        ...(studentDetails.course !== undefined && { course: studentDetails.course.trim() }),
-        ...(studentDetails.graduationYear !== undefined && { graduationYear: Number(studentDetails.graduationYear) }),
-        ...(studentDetails.cgpa !== undefined && { cgpa: Number(studentDetails.cgpa) }),
-        ...(studentDetails.skills !== undefined && {
-          skills: studentDetails.skills.map((s) => s.trim()).filter(Boolean),
-        }),
-        ...(studentDetails.linkedinUrl !== undefined && { linkedinUrl: studentDetails.linkedinUrl.trim() }),
-        ...(studentDetails.githubUrl !== undefined && { githubUrl: studentDetails.githubUrl.trim() }),
-        ...(studentDetails.portfolioUrl !== undefined && { portfolioUrl: studentDetails.portfolioUrl.trim() }),
-      };
+      if (!user.profile.studentDetails) user.profile.studentDetails = {};
+      const sd = user.profile.studentDetails;
+      if (studentDetails.studentId !== undefined) sd.studentId = String(studentDetails.studentId || '').trim();
+      if (studentDetails.department !== undefined) sd.department = String(studentDetails.department || '').trim();
+      if (studentDetails.course !== undefined) sd.course = String(studentDetails.course || '').trim();
+      if (studentDetails.university !== undefined) sd.university = String(studentDetails.university || '').trim();
+      if (studentDetails.institution !== undefined) sd.institution = String(studentDetails.institution || '').trim();
+      if (studentDetails.graduationYear !== undefined && studentDetails.graduationYear !== '' && studentDetails.graduationYear !== null) {
+        const yr = Number(studentDetails.graduationYear);
+        if (!isNaN(yr) && yr >= 2000 && yr <= 2100) {
+          sd.graduationYear = yr;
+        }
+      }
+      if (studentDetails.cgpa !== undefined && studentDetails.cgpa !== '' && studentDetails.cgpa !== null) {
+        const gpa = Number(studentDetails.cgpa);
+        if (!isNaN(gpa) && gpa >= 0 && gpa <= 10) {
+          sd.cgpa = gpa;
+        }
+      }
+      if (Array.isArray(studentDetails.skills)) {
+        sd.skills = studentDetails.skills.map((s) => String(s || '').trim()).filter(Boolean);
+      }
+      if (studentDetails.linkedinUrl !== undefined) sd.linkedinUrl = String(studentDetails.linkedinUrl || '').trim();
+      if (studentDetails.githubUrl !== undefined) sd.githubUrl = String(studentDetails.githubUrl || '').trim();
+      if (studentDetails.portfolioUrl !== undefined) sd.portfolioUrl = String(studentDetails.portfolioUrl || '').trim();
     } else if (user.role === ROLES.COMPANY && companyDetails) {
-      user.profile.companyDetails = {
-        ...user.profile.companyDetails,
-        ...(companyDetails.companyName !== undefined && { companyName: companyDetails.companyName.trim() }),
-        ...(companyDetails.industry !== undefined && { industry: companyDetails.industry.trim() }),
-        ...(companyDetails.website !== undefined && { website: companyDetails.website.trim() }),
-        ...(companyDetails.description !== undefined && { description: companyDetails.description.trim() }),
-        ...(companyDetails.address !== undefined && { address: companyDetails.address.trim() }),
-        ...(companyDetails.contactEmail !== undefined && { contactEmail: companyDetails.contactEmail.trim() }),
-        ...(companyDetails.contactPhone !== undefined && { contactPhone: companyDetails.contactPhone.trim() }),
-      };
+      if (!user.profile.companyDetails) user.profile.companyDetails = {};
+      const cd = user.profile.companyDetails;
+      if (companyDetails.companyName !== undefined) cd.companyName = String(companyDetails.companyName || '').trim();
+      if (companyDetails.industry !== undefined) cd.industry = String(companyDetails.industry || '').trim();
+      if (companyDetails.website !== undefined) cd.website = String(companyDetails.website || '').trim();
+      if (companyDetails.description !== undefined) cd.description = String(companyDetails.description || '').trim();
+      if (companyDetails.address !== undefined) cd.address = String(companyDetails.address || '').trim();
+      if (companyDetails.contactEmail !== undefined) cd.contactEmail = String(companyDetails.contactEmail || '').trim();
+      if (companyDetails.contactPhone !== undefined) cd.contactPhone = String(companyDetails.contactPhone || '').trim();
     } else if (user.role === ROLES.MENTOR && mentorDetails) {
-      user.profile.mentorDetails = {
-        ...user.profile.mentorDetails,
-        ...(mentorDetails.companyName !== undefined && { companyName: mentorDetails.companyName.trim() }),
-        ...(mentorDetails.designation !== undefined && { designation: mentorDetails.designation.trim() }),
-        ...(mentorDetails.yearsOfExperience !== undefined && { yearsOfExperience: Number(mentorDetails.yearsOfExperience) }),
-        ...(mentorDetails.expertise !== undefined && {
-          expertise: mentorDetails.expertise.map((e) => e.trim()).filter(Boolean),
-        }),
-        ...(mentorDetails.linkedinUrl !== undefined && { linkedinUrl: mentorDetails.linkedinUrl.trim() }),
-      };
+      if (!user.profile.mentorDetails) user.profile.mentorDetails = {};
+      const md = user.profile.mentorDetails;
+      if (mentorDetails.companyName !== undefined) md.companyName = String(mentorDetails.companyName || '').trim();
+      if (mentorDetails.designation !== undefined) md.designation = String(mentorDetails.designation || '').trim();
+      if (mentorDetails.yearsOfExperience !== undefined && mentorDetails.yearsOfExperience !== '' && mentorDetails.yearsOfExperience !== null) {
+        const yoe = Number(mentorDetails.yearsOfExperience);
+        if (!isNaN(yoe) && yoe >= 0 && yoe <= 60) {
+          md.yearsOfExperience = yoe;
+        }
+      }
+      if (Array.isArray(mentorDetails.expertise)) {
+        md.expertise = mentorDetails.expertise.map((e) => String(e || '').trim()).filter(Boolean);
+      }
+      if (mentorDetails.linkedinUrl !== undefined) md.linkedinUrl = String(mentorDetails.linkedinUrl || '').trim();
     } else if (user.role === ROLES.COORDINATOR && coordinatorDetails) {
-      user.profile.coordinatorDetails = {
-        ...user.profile.coordinatorDetails,
-        ...(coordinatorDetails.institution !== undefined && { institution: coordinatorDetails.institution.trim() }),
-        ...(coordinatorDetails.facultyId !== undefined && { facultyId: coordinatorDetails.facultyId.trim() }),
-        ...(coordinatorDetails.department !== undefined && { department: coordinatorDetails.department.trim() }),
-        ...(coordinatorDetails.designation !== undefined && { designation: coordinatorDetails.designation.trim() }),
-        ...(coordinatorDetails.officeLocation !== undefined && { officeLocation: coordinatorDetails.officeLocation.trim() }),
-      };
+      if (!user.profile.coordinatorDetails) user.profile.coordinatorDetails = {};
+      const coord = user.profile.coordinatorDetails;
+      if (coordinatorDetails.institution !== undefined) coord.institution = String(coordinatorDetails.institution || '').trim();
+      if (coordinatorDetails.facultyId !== undefined) coord.facultyId = String(coordinatorDetails.facultyId || '').trim();
+      if (coordinatorDetails.department !== undefined) coord.department = String(coordinatorDetails.department || '').trim();
+      if (coordinatorDetails.designation !== undefined) coord.designation = String(coordinatorDetails.designation || '').trim();
+      if (coordinatorDetails.officeLocation !== undefined) coord.officeLocation = String(coordinatorDetails.officeLocation || '').trim();
     }
 
     await user.save();
@@ -219,10 +232,12 @@ export const downloadResume = async (req, res, next) => {
     const mimeType = mimeMap[ext] || 'application/octet-stream';
     res.setHeader('Content-Type', mimeType);
 
+    const downloadName = (req.user.role === ROLES.STUDENT ? req.user.profile?.studentDetails?.resumeFileName : null) || safeFilename;
+
     if (req.query.download === 'true' || req.query.dl === '1') {
-      res.download(filePath, safeFilename);
+      res.download(filePath, downloadName);
     } else {
-      res.setHeader('Content-Disposition', `inline; filename="${safeFilename}"`);
+      res.setHeader('Content-Disposition', `inline; filename="${downloadName}"`);
       const fileStream = fs.createReadStream(filePath);
       fileStream.pipe(res);
     }
@@ -547,6 +562,15 @@ export const deleteUser = async (req, res, next) => {
       const error = new Error('User not found.');
       error.statusCode = 404;
       error.code = 'USER_NOT_FOUND';
+      return next(error);
+    }
+
+    // Safety guard: cannot delete designated primary administrators (Padmavathi & Arshad)
+    const DESIGNATED_ADMIN_EMAILS = ['s.v.padmavathi2005@gmail.com', 'arshadtaiyab010@gmail.com'];
+    if (DESIGNATED_ADMIN_EMAILS.includes(targetUser.email.toLowerCase())) {
+      const error = new Error('Action prohibited: Designated primary administrators cannot be deleted.');
+      error.statusCode = 403;
+      error.code = 'DESIGNATED_ADMIN_PROTECTED';
       return next(error);
     }
 

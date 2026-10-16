@@ -1,6 +1,20 @@
 import mongoose from 'mongoose';
+import dns from 'node:dns';
 import { env } from './env.js';
 import { logger } from '../utils/logger.js';
+
+// Resolve MongoDB Atlas SRV connection queries reliably across network/ISP environments
+// where local/system DNS fails with querySrv ECONNREFUSED or ETIMEOUT
+try {
+  const customServers = process.env.DNS_SERVERS
+    ? process.env.DNS_SERVERS.split(',').map((s) => s.trim()).filter(Boolean)
+    : ['8.8.8.8', '1.1.1.1'];
+  if (customServers.length > 0) {
+    dns.setServers(customServers);
+  }
+} catch (dnsErr) {
+  logger.warn(`Could not set custom DNS servers for MongoDB SRV resolution: ${dnsErr.message}`);
+}
 
 let isConnected = false;
 

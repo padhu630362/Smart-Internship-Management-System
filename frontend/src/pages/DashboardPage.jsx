@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   GraduationCap,
@@ -44,12 +44,12 @@ import { SkeletonCard } from '../components/common/LoadingState';
 import ErrorState from '../components/common/ErrorState';
 
 export const DashboardPage = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, isLoading: authLoading, isAuthenticated } = useAuth();
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async (isRetry = false) => {
     try {
       setLoading(true);
       setError('');
@@ -59,17 +59,24 @@ export const DashboardPage = () => {
       }
     } catch (err) {
       console.error('Failed to load dashboard analytics:', err);
+      if (!isRetry) {
+        // Silently retry once after 600ms before displaying error state
+        setTimeout(() => {
+          fetchAnalytics(true);
+        }, 600);
+        return;
+      }
       setError('Unable to fetch live analytics from server. Please verify network connectivity.');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    if (user) {
+    if (!authLoading && isAuthenticated && user) {
       fetchAnalytics();
     }
-  }, [user]);
+  }, [authLoading, isAuthenticated, user, fetchAnalytics]);
 
   const roleTitleMap = {
     student: 'Student & Intern Workspace',
@@ -115,7 +122,7 @@ export const DashboardPage = () => {
       />
 
       {/* Loading & Error States */}
-      {loading ? (
+      {(authLoading || (loading && !analytics)) ? (
         <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <SkeletonCard />
@@ -128,11 +135,11 @@ export const DashboardPage = () => {
             <SkeletonCard />
           </div>
         </div>
-      ) : error ? (
+      ) : error && !analytics ? (
         <ErrorState
           title="Failed to Load Dashboard Analytics"
           message={error}
-          onRetry={fetchAnalytics}
+          onRetry={() => fetchAnalytics(true)}
         />
       ) : (
         <>

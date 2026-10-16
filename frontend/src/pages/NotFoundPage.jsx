@@ -13,7 +13,7 @@ export const NotFoundPage = () => {
         404 — Page Not Found
       </h1>
       <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md mb-8 leading-relaxed">
-        The route you requested does not exist or may have been relocated in this phase of SIMS.
+        The route you requested does not exist or may have been relocated in InternHub.
       </p>
       <Link to="/">
         <Button variant="primary" size="md" icon={Home}>

@@ -32,7 +32,12 @@ const userSchema = new mongoose.Schema(
     },
     passwordHash: {
       type: String,
-      required: [true, 'Password hash is required'],
+      required: [
+        function () {
+          return this.authProvider === 'local';
+        },
+        'Password hash is required for local accounts',
+      ],
       select: false, // Hidden by default from queries
     },
     name: {
@@ -72,6 +77,8 @@ const userSchema = new mongoose.Schema(
         studentId: { type: String, trim: true },
         department: { type: String, trim: true },
         course: { type: String, trim: true },
+        university: { type: String, trim: true },
+        institution: { type: String, trim: true },
         graduationYear: { type: Number, min: 2000, max: 2100 },
         cgpa: { type: Number, min: 0, max: 10 },
         skills: [{ type: String, trim: true }],
@@ -137,9 +144,44 @@ const userSchema = new mongoose.Schema(
       type: String,
       select: false,
     },
+    resetPasswordCode: {
+      type: String,
+      select: false,
+    },
     resetPasswordExpires: {
       type: Date,
       select: false,
+    },
+    resetPasswordAttempts: {
+      type: Number,
+      default: 0,
+      select: false,
+    },
+    resetPasswordCooldown: {
+      type: Date,
+      select: false,
+    },
+    // Two-Step Verification (2FA) fields
+    twoFactorCode: {
+      type: String,
+      select: false,
+    },
+    twoFactorExpires: {
+      type: Date,
+      select: false,
+    },
+    twoFactorAttempts: {
+      type: Number,
+      default: 0,
+      select: false,
+    },
+    twoFactorCooldown: {
+      type: Date,
+      select: false,
+    },
+    twoFactorEnabled: {
+      type: Boolean,
+      default: false,
     },
     passwordChangedAt: {
       type: Date,
@@ -151,6 +193,11 @@ const userSchema = new mongoose.Schema(
       transform: (doc, ret) => {
         delete ret.passwordHash;
         delete ret.resetPasswordToken;
+        delete ret.resetPasswordCode;
+        delete ret.resetPasswordAttempts;
+        delete ret.twoFactorCode;
+        delete ret.twoFactorAttempts;
+        delete ret.resetPasswordCooldown;
         delete ret.resetPasswordExpires;
         delete ret.__v;
         return ret;

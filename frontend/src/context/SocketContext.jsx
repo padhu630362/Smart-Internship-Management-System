@@ -132,9 +132,9 @@ export const SocketProvider = ({ children }) => {
       // Trigger native browser notification if granted
       if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
         try {
-          const title = notification.title || 'SIMS Job & Internship Alert';
+          const title = notification.title || 'InternHub Opportunity Alert';
           const options = {
-            body: notification.message || 'A new update is available in your Smart Internship portal.',
+            body: notification.message || 'A new update is available in your InternHub portal.',
             icon: '/favicon.ico',
             tag: notification._id,
           };

@@ -231,15 +231,26 @@ export const syncAllJobFeeds = async ({ notifyUsers = true } = {}) => {
 
   logger.info(`Fetched total of ${fetchedJobsings.length} job postings from external providers.`);
 
+  // Automatically expire opportunities older than 60 days
+  const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+  await ExternalJob.updateMany(
+    { publishedAt: { $lt: sixtyDaysAgo }, isActive: true },
+    { $set: { isActive: false } }
+  );
+
   let newlyCreated = [];
 
   for (const jobData of fetchedJobsings) {
     try {
-      // Deduplicate by externalId or canonicalUrl
+      // Deduplicate by externalId, canonicalUrl, or company + title combination
+      const titleRegex = new RegExp(`^${jobData.title.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+      const companyRegex = new RegExp(`^${jobData.company.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+
       const existing = await ExternalJob.findOne({
         $or: [
           { externalId: jobData.externalId },
           { canonicalUrl: jobData.canonicalUrl },
+          { title: titleRegex, company: companyRegex },
         ],
       });
 
@@ -247,9 +258,10 @@ export const syncAllJobFeeds = async ({ notifyUsers = true } = {}) => {
         const createdJob = await ExternalJob.create(jobData);
         newlyCreated.push(createdJob);
       } else {
-        // Refresh active flag if previously inactive
+        // Refresh active flag and canonical fields if previously inactive
         if (!existing.isActive) {
           existing.isActive = true;
+          existing.publishedAt = jobData.publishedAt || existing.publishedAt;
           await existing.save();
         }
       }

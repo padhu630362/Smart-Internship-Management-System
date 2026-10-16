@@ -39,7 +39,7 @@ export const PolicyModal = ({ isOpen, onClose, initialTab = 'privacy' }) => {
                 Legal, Privacy & Governance Center
               </h2>
               <p className="text-xs text-stone-500 dark:text-stone-400">
-                Official policies governing the Smart Internship Management System (SIMS)
+                Official policies governing the InternHub Platform
               </p>
             </div>
           </div>
@@ -81,10 +81,10 @@ export const PolicyModal = ({ isOpen, onClose, initialTab = 'privacy' }) => {
                 <Sparkles className="w-5 h-5 text-burgundy-600 dark:text-champagne-400 shrink-0 mt-0.5" />
                 <div>
                   <h4 className="font-bold text-stone-900 dark:text-white text-xs">
-                    FERPA & GDPR Aligned Student Privacy
+                    InternHub Student & User Privacy Standard
                   </h4>
                   <p className="text-[11px] text-stone-600 dark:text-stone-400 mt-1">
-                    Your educational records, uploaded resumes, and attendance timestamps are strictly protected. We never sell student data or use it for commercial profiling.
+                    Your personal information, uploaded resumes, authentication credentials, and internship application records are stored securely and never sold, shared with third-party advertisers, or used for commercial profiling.
                   </p>
                 </div>
               </div>
@@ -92,10 +92,10 @@ export const PolicyModal = ({ isOpen, onClose, initialTab = 'privacy' }) => {
               <section className="space-y-2">
                 <h3 className="font-bold text-sm text-stone-900 dark:text-white">1. Data Collected & Purpose</h3>
                 <p>
-                  SIMS collects only information necessary to facilitate academic internship allocations, credit verification, and candidate evaluation:
+                  InternHub collects only information necessary to facilitate internship allocations, credit verification, and candidate evaluation:
                 </p>
                 <ul className="list-disc pl-5 space-y-1 text-stone-600 dark:text-stone-400">
-                  <li><strong>Student Profiles:</strong> Full name, university email, academic department, CGPA, graduation year, and uploaded CV/resumes.</li>
+                  <li><strong>Student Profiles:</strong> Full name, verified email, academic department, CGPA, graduation year, and uploaded CV/resumes.</li>
                   <li><strong>Attendance Logs:</strong> Daily check-in/out timestamps, remote/on-site status, and accomplishment summaries.</li>
                   <li><strong>Employer Postings:</strong> Company details, contact representatives, and job descriptions.</li>
                   <li><strong>Evaluation Rubrics:</strong> Faculty mentor performance ratings, structured feedback, and completion certificate records.</li>
@@ -105,7 +105,7 @@ export const PolicyModal = ({ isOpen, onClose, initialTab = 'privacy' }) => {
               <section className="space-y-2">
                 <h3 className="font-bold text-sm text-stone-900 dark:text-white">2. AI Resume Screening & Matching Engine</h3>
                 <p>
-                  When students upload resumes or apply for opportunities, SIMS utilizes secure AI models to analyze keyword relevance against job descriptions.
+                  When students upload resumes or apply for opportunities, InternHub utilizes secure AI models to analyze keyword relevance against job descriptions.
                   Resume text sent for analysis is processed via transient, encrypted backend API calls and is never used to train public foundational models.
                 </p>
               </section>
@@ -121,7 +121,7 @@ export const PolicyModal = ({ isOpen, onClose, initialTab = 'privacy' }) => {
               <section className="space-y-2">
                 <h3 className="font-bold text-sm text-stone-900 dark:text-white">4. Data Retention & Deletion</h3>
                 <p>
-                  Academic records and completion certificate cryptographic hashes are retained for 5 years to support institutional transcript verifications.
+                  Academic records and completion certificate cryptographic hashes are retained to support transcript verifications.
                   Students can request account deactivation and resume removal through their profile settings at any time.
                 </p>
               </section>
@@ -133,8 +133,8 @@ export const PolicyModal = ({ isOpen, onClose, initialTab = 'privacy' }) => {
               <section className="space-y-2">
                 <h3 className="font-bold text-sm text-stone-900 dark:text-white">1. Acceptance of Terms</h3>
                 <p>
-                  By accessing the Smart Internship Management System (SIMS), you agree to comply with institutional academic regulations,
-                  student honor codes, and applicable employment nondiscrimination laws.
+                  By accessing InternHub, you agree to comply with institutional academic regulations,
+                  student honor codes, and applicable employment nondiscrimination guidelines.
                 </p>
               </section>
 
@@ -159,8 +159,8 @@ export const PolicyModal = ({ isOpen, onClose, initialTab = 'privacy' }) => {
               <section className="space-y-2">
                 <h3 className="font-bold text-sm text-stone-900 dark:text-white">3. Academic Credit & Certification</h3>
                 <p>
-                  Completion certificates issued by SIMS require meeting minimum attendance thresholds (standard 80%) and satisfactory faculty mentor approval.
-                  Falsification of attendance logs or deliverable submissions is subject to disciplinary action under the university honor code.
+                  Completion certificates issued by InternHub require meeting minimum attendance thresholds (standard 80%) and satisfactory faculty mentor approval.
+                  Falsification of attendance logs or deliverable submissions is subject to disciplinary action under institutional policies.
                 </p>
               </section>
 
@@ -215,7 +215,7 @@ export const PolicyModal = ({ isOpen, onClose, initialTab = 'privacy' }) => {
               <section className="space-y-2">
                 <h3 className="font-bold text-sm text-stone-900 dark:text-white">1. How We Use Cookies & Local Storage</h3>
                 <p>
-                  SIMS uses strictly necessary storage mechanisms required for platform operation:
+                  InternHub uses strictly necessary storage mechanisms required for platform operation:
                 </p>
                 <ul className="list-disc pl-5 space-y-1.5 text-stone-600 dark:text-stone-400">
                   <li><strong>Authentication Token:</strong> Stored in encrypted browser storage (<code className="font-mono">sims_auth_token</code>) to preserve your logged-in session.</li>
@@ -227,7 +227,7 @@ export const PolicyModal = ({ isOpen, onClose, initialTab = 'privacy' }) => {
               <section className="space-y-2">
                 <h3 className="font-bold text-sm text-stone-900 dark:text-white">2. No Third-Party Tracking</h3>
                 <p>
-                  SIMS contains zero marketing pixels, zero advertising trackers, and zero behavioral monitoring scripts. Your activity stays entirely within the institution's private database cluster.
+                  InternHub contains zero marketing pixels, zero advertising trackers, and zero behavioral monitoring scripts. Your activity stays entirely within our secure database cluster.
                 </p>
               </section>
             </div>

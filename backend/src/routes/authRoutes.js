@@ -2,9 +2,12 @@ import { Router } from 'express';
 import {
   register,
   login,
+  verifyTwoFactor,
+  resendTwoFactorCode,
   getMe,
   logout,
   forgotPassword,
+  verifyResetCode,
   resetPassword,
   googleLogin,
 } from '../controllers/authController.js';
@@ -13,6 +16,7 @@ import {
   validateRegister,
   validateLogin,
   validateForgotPassword,
+  validateVerifyResetCode,
   validateResetPassword,
 } from '../middlewares/validateAuth.js';
 import { authRateLimiter } from '../middlewares/rateLimiter.js';
@@ -23,8 +27,11 @@ const router = Router();
 // Public Authentication Endpoints
 router.post('/register', authRateLimiter, validateRegister, register);
 router.post('/login', authRateLimiter, validateLogin, login);
+router.post('/login-verify-2fa', authRateLimiter, verifyTwoFactor);
+router.post('/resend-2fa', authRateLimiter, resendTwoFactorCode);
 router.post('/google', authRateLimiter, googleLogin);
 router.post('/forgot-password', authRateLimiter, validateForgotPassword, forgotPassword);
+router.post('/verify-reset-code', authRateLimiter, validateVerifyResetCode, verifyResetCode);
 router.post('/reset-password', authRateLimiter, validateResetPassword, resetPassword);
 
 // Authenticated Endpoints

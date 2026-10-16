@@ -41,9 +41,7 @@ export const TopNavbar = ({ onToggleSidebar, healthStatus, onOpenLogin }) => {
 
           <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-medium">
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span>Smart Internship Management System</span>
-           
-           
+            <span className="font-semibold text-slate-700 dark:text-slate-300">InternHub</span>
           </div>
 
         </div>

@@ -4,7 +4,7 @@ import React from 'react';
  * Branded SIMS Logo:
  * Visual metaphor combining Academic Progression (Cap) and Industry Workflow (Brief/Network Node)
  */
-export const SimsLogo = ({ size = 'md', showText = true, className = '' }) => {
+export const SimsLogo = ({ size = 'md', showText = true, className = '', inverted = false }) => {
   const sizeMap = {
     sm: { icon: 'w-7 h-7', text: 'text-base', subtext: 'text-[9px]' },
     md: { icon: 'w-9 h-9', text: 'text-lg', subtext: 'text-[10px]' },
@@ -16,7 +16,7 @@ export const SimsLogo = ({ size = 'md', showText = true, className = '' }) => {
   return (
     <div className={`flex items-center gap-2.5 select-none ${className}`}>
       {/* Geometric Workflow Mark */}
-      <div className={`relative ${currentSize.icon} rounded-xl gradient-brand flex items-center justify-center shadow-sm shadow-brand-500/30 shrink-0`}>
+      <div className={`relative ${currentSize.icon} rounded-xl bg-gradient-to-br from-burgundy-700 via-burgundy-800 to-burgundy-950 flex items-center justify-center shadow-md shadow-black/20 shrink-0 border border-white/20`}>
         <svg
           viewBox="0 0 24 24"
           fill="none"
@@ -53,17 +53,19 @@ export const SimsLogo = ({ size = 'md', showText = true, className = '' }) => {
       {showText && (
         <div className="leading-tight">
           <div className="flex items-center gap-1.5">
-            <span className={`font-extrabold tracking-tight text-slate-900 dark:text-white ${currentSize.text}`}>
-              SIM
+            <span className={`font-black tracking-tight ${inverted ? 'text-white' : 'text-stone-900 dark:text-white'} ${currentSize.text}`}>
+              Intern<span className={inverted ? 'text-champagne-300' : 'text-burgundy-700 dark:text-champagne-400'}>Hub</span>
             </span>
           </div>
-          <p className={`text-slate-500 dark:text-slate-400 font-medium ${currentSize.subtext}`}>
-            Smart Internship Management
+          <p className={`${inverted ? 'text-stone-300' : 'text-stone-500 dark:text-stone-400'} font-medium ${currentSize.subtext}`}>
+            Internship Platform
           </p>
         </div>
       )}
     </div>
   );
 };
+
+export const InternHubLogo = SimsLogo;
 
 export default SimsLogo;

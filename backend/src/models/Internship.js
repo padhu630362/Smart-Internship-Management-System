@@ -165,6 +165,7 @@ const internshipSchema = new mongoose.Schema(
 // Compound indexes for search and filter performance
 internshipSchema.index({ status: 1, workMode: 1, createdAt: -1 });
 internshipSchema.index({ company: 1, status: 1 });
+internshipSchema.index({ company: 1, title: 1 });
 internshipSchema.index({ applicationDeadline: 1, status: 1 });
 
 export const Internship = mongoose.model('Internship', internshipSchema);

@@ -102,6 +102,7 @@ export const HomePage = () => {
       description:
         'Intelligent semantic parsing analyzes student CVs against job criteria with match percentage scores and keyword gap identification.',
       badge: 'Smart AI',
+      link: '/internships',
       colorClass: 'from-burgundy-900/10 to-champagne-500/10 dark:from-burgundy-900/30 dark:to-champagne-600/20',
       borderHover: 'hover:border-champagne-400 dark:hover:border-burgundy-600',
       iconBg: 'bg-burgundy-50 dark:bg-burgundy-950/70 text-burgundy-700 dark:text-champagne-300',
@@ -113,6 +114,7 @@ export const HomePage = () => {
       description:
         'End-to-end recruitment pipelines with applicant tracking, coordinator reviews, status updates, and transparent student allocations.',
       badge: 'Workflow',
+      link: '/internships',
       colorClass: 'from-champagne-500/10 to-burgundy-900/10 dark:from-champagne-600/20 dark:to-burgundy-900/30',
       borderHover: 'hover:border-burgundy-400 dark:hover:border-champagne-500',
       iconBg: 'bg-champagne-100 dark:bg-warmdark-800 text-burgundy-900 dark:text-champagne-200',
@@ -124,6 +126,7 @@ export const HomePage = () => {
       description:
         'Tamper-proof completion credentials with unique alphanumeric codes, dynamic QR verification, and public validation portals.',
       badge: 'Instant QR Verify',
+      link: '/verify-certificate',
       colorClass: 'from-burgundy-900/10 to-champagne-500/10 dark:from-burgundy-900/30 dark:to-champagne-600/20',
       borderHover: 'hover:border-champagne-400 dark:hover:border-burgundy-600',
       iconBg: 'bg-burgundy-50 dark:bg-burgundy-950/70 text-burgundy-700 dark:text-champagne-300',
@@ -135,6 +138,7 @@ export const HomePage = () => {
       description:
         'Structured daily check-in logs, work summary timestamps, progress percentages, and multi-tier mentor approval sign-offs.',
       badge: 'Daily Logs',
+      link: '/dashboard',
       colorClass: 'from-champagne-500/10 to-burgundy-900/10 dark:from-champagne-600/20 dark:to-burgundy-900/30',
       borderHover: 'hover:border-burgundy-400 dark:hover:border-champagne-500',
       iconBg: 'bg-champagne-100 dark:bg-warmdark-800 text-burgundy-900 dark:text-champagne-200',
@@ -146,6 +150,7 @@ export const HomePage = () => {
       description:
         'Built-in WebSocket chat for instant, secure communication between students, industry mentors, and university coordinators.',
       badge: 'Socket.IO',
+      link: '/chat',
       colorClass: 'from-burgundy-900/10 to-champagne-500/10 dark:from-burgundy-900/30 dark:to-champagne-600/20',
       borderHover: 'hover:border-champagne-400 dark:hover:border-burgundy-600',
       iconBg: 'bg-burgundy-50 dark:bg-burgundy-950/70 text-burgundy-700 dark:text-champagne-300',
@@ -157,6 +162,7 @@ export const HomePage = () => {
       description:
         'Strict role-based authorization (RBAC), sanitized CSV accreditation exports, and immutable administrative audit logs.',
       badge: 'Enterprise RBAC',
+      link: '/admin/login',
       colorClass: 'from-champagne-500/10 to-burgundy-900/10 dark:from-champagne-600/20 dark:to-burgundy-900/30',
       borderHover: 'hover:border-burgundy-400 dark:hover:border-champagne-500',
       iconBg: 'bg-champagne-100 dark:bg-warmdark-800 text-burgundy-900 dark:text-champagne-200',
@@ -193,7 +199,7 @@ export const HomePage = () => {
   const socialAccounts = [
     {
       name: 'LinkedIn',
-      handle: 'Smart Internship Management System',
+      handle: 'InternHub Platform',
       url: 'https://www.linkedin.com',
       hoverBorder: 'hover:border-[#0077b5]',
       hoverText: 'group-hover:text-[#0077b5]',
@@ -207,7 +213,7 @@ export const HomePage = () => {
     },
     {
       name: 'GitHub',
-      handle: 'padhu630362 / SIMS',
+      handle: 'padhu630362 / InternHub',
       url: 'https://github.com/padhu630362/Smart-Internship-Management-System',
       hoverBorder: 'hover:border-stone-800 dark:hover:border-stone-300',
       hoverText: 'group-hover:text-stone-900 dark:group-hover:text-white',
@@ -221,7 +227,7 @@ export const HomePage = () => {
     },
     {
       name: 'Twitter / X',
-      handle: '@SIMS_Governance',
+      handle: '@InternHub_Platform',
       url: 'https://twitter.com',
       hoverBorder: 'hover:border-sky-500',
       hoverText: 'group-hover:text-sky-500',
@@ -235,7 +241,7 @@ export const HomePage = () => {
     },
     {
       name: 'Instagram',
-      handle: '@sims.campus',
+      handle: '@internhub.campus',
       url: 'https://instagram.com',
       hoverBorder: 'hover:border-[#e1306c]',
       hoverText: 'group-hover:text-[#e1306c]',
@@ -249,7 +255,7 @@ export const HomePage = () => {
     },
     {
       name: 'Discord',
-      handle: 'SIMS Community Server',
+      handle: 'InternHub Community Server',
       url: 'https://discord.com',
       hoverBorder: 'hover:border-[#5865f2]',
       hoverText: 'group-hover:text-[#5865f2]',
@@ -276,7 +282,7 @@ export const HomePage = () => {
             {/* Pill Tag */}
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-champagne-100/90 dark:bg-burgundy-950/80 border border-champagne-300 dark:border-burgundy-800 text-xs font-semibold text-burgundy-900 dark:text-champagne-200 shadow-sm transition-transform duration-200 hover:scale-105">
               <Sparkles className="w-3.5 h-3.5 text-champagne-600 dark:text-champagne-400 animate-spin" style={{ animationDuration: '6s' }} />
-              <span>Smart Internship Management System</span>
+              <span>InternHub Platform</span>
             </div>
 
             {/* Headline */}
@@ -437,7 +443,8 @@ export const HomePage = () => {
               const isSelectedFeature = selectedFeature === feat.id;
 
               return (
-                <div
+                <Link
+                  to={feat.link}
                   key={feat.id}
                   onMouseEnter={() => setActiveFeatureIndex(idx)}
                   onMouseLeave={() => setActiveFeatureIndex(null)}
@@ -498,7 +505,7 @@ export const HomePage = () => {
                       />
                     </div>
                   </div>
-                </div>
+                </Link>
               );
             })}
         </div>
@@ -657,7 +664,7 @@ export const HomePage = () => {
             <form onSubmit={handleVerifySubmit} className="flex flex-col sm:flex-row items-stretch gap-2.5 w-full lg:w-auto">
               <input
                 type="text"
-                placeholder="e.g. SIMS-2026-A1B2C3"
+                placeholder="e.g. IH-2026-A1B2C3"
                 value={quickCertCode}
                 onChange={(e) => setQuickCertCode(e.target.value)}
                 className="p-3 rounded-2xl border border-champagne-300 dark:border-warmdark-700 bg-white dark:bg-warmdark-900 text-xs font-mono tracking-wider text-stone-900 dark:text-white min-w-[240px] focus:ring-2 focus:ring-burgundy-500 focus:outline-none"
@@ -694,40 +701,45 @@ export const HomePage = () => {
                 <div className="w-10 h-10 rounded-xl bg-burgundy-50 dark:bg-burgundy-950/60 text-burgundy-700 dark:text-champagne-300 flex items-center justify-center border border-burgundy-200 dark:border-burgundy-800">
                   <Mail className="w-5 h-5" />
                 </div>
-                <div className="text-xs font-bold text-stone-500 uppercase tracking-wider">Email Helpdesk</div>
+                <div className="text-xs font-bold text-stone-500 uppercase tracking-wider">System Administrator</div>
                 <div className="text-sm font-bold text-stone-900 dark:text-white">
-                  <a href="mailto:support@sims.edu" className="hover:text-burgundy-700 dark:hover:text-champagne-300 transition-colors">
-                    support@sims.edu
+                  Arshad:{' '}
+                  <a href="mailto:arshad@gmail.com" className="hover:text-burgundy-700 dark:hover:text-champagne-300 transition-colors">
+                    arshad@gmail.com
                   </a>
                 </div>
-                <div className="text-[11px] text-stone-500">Official inquiries & student help</div>
+                <div className="text-[11px] text-stone-500">Official administration & inquiries</div>
               </div>
 
               <div className="group p-5 rounded-2xl border border-champagne-200/90 dark:border-warmdark-800 bg-white dark:bg-[#1a1114] shadow-soft hover:shadow-card hover:border-champagne-400 transition-all duration-200 space-y-2">
-                <div className="w-10 h-10 rounded-xl bg-champagne-100 dark:bg-warmdark-800 text-burgundy-900 dark:text-champagne-300 flex items-center justify-center border border-champagne-300 dark:border-stone-700">
-                  <Phone className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-xl bg-burgundy-50 dark:bg-burgundy-950/60 text-burgundy-700 dark:text-champagne-300 flex items-center justify-center border border-burgundy-200 dark:border-burgundy-800">
+                  <Mail className="w-5 h-5" />
                 </div>
-                <div className="text-xs font-bold text-stone-500 uppercase tracking-wider">Helpline Hotline</div>
+                <div className="text-xs font-bold text-stone-500 uppercase tracking-wider">System Administrator</div>
                 <div className="text-sm font-bold text-stone-900 dark:text-white">
-                  <a href="tel:+918023456789" className="hover:text-burgundy-700 dark:hover:text-champagne-300 transition-colors">
-                    +91 (080) 2345-6789
+                  Padmavathi:{' '}
+                  <a href="mailto:padhu@gmail.com" className="hover:text-burgundy-700 dark:hover:text-champagne-300 transition-colors">
+                    padhu@gmail.com
                   </a>
                 </div>
-                <div className="text-[11px] text-stone-500">Mon - Sat: 9:00 AM - 6:00 PM IST</div>
+                <div className="text-[11px] text-stone-500">Official administration & inquiries</div>
               </div>
 
               <div className="group p-5 rounded-2xl border border-champagne-200/90 dark:border-warmdark-800 bg-white dark:bg-[#1a1114] shadow-soft hover:shadow-card hover:border-champagne-400 transition-all duration-200 space-y-2 sm:col-span-2">
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-burgundy-50 dark:bg-burgundy-950/60 text-burgundy-700 dark:text-champagne-300 flex items-center justify-center border border-burgundy-200 dark:border-burgundy-800 shrink-0">
-                    <MapPin className="w-5 h-5" />
+                  <div className="w-10 h-10 rounded-xl bg-champagne-100 dark:bg-warmdark-800 text-burgundy-900 dark:text-champagne-300 flex items-center justify-center border border-champagne-300 dark:border-stone-700 shrink-0">
+                    <Phone className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-stone-500 uppercase tracking-wider">Campus Directorate</div>
-                    <div className="text-sm font-bold text-stone-900 dark:text-white">
-                      Directorate of Technical Education & Higher Education Complex
+                    <div className="text-xs font-bold text-stone-500 uppercase tracking-wider">Direct Helpline</div>
+                    <div className="text-base font-bold text-stone-900 dark:text-white font-mono">
+                      Phone:{' '}
+                      <a href="tel:9030787884" className="hover:text-burgundy-700 dark:hover:text-champagne-300 transition-colors">
+                        9030787884
+                      </a>
                     </div>
                     <div className="text-xs text-stone-500 mt-0.5">
-                      Academic Administration Wing, Innovation & Skill Cell, Bengaluru, Karnataka
+                      Direct contact phone for support and institutional inquiries
                     </div>
                   </div>
                 </div>

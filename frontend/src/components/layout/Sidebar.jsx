@@ -2,7 +2,6 @@ import React, { useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
-  Map,
   GraduationCap,
   Building2,
   UserCheck,
@@ -75,7 +74,6 @@ export const Sidebar = ({ isOpen, onClose, healthStatus }) => {
         ]
       : []),
     { name: 'Verify Certificate', path: '/verify-certificate', icon: ShieldCheck },
-    { name: 'Implementation Roadmap', path: '/roadmap', icon: Map },
   ];
 
   const roleWorkspaces = [

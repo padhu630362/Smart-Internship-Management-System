@@ -452,27 +452,50 @@ export const getContacts = async (req, res, next) => {
     const userId = user.id;
     let query = { _id: { $ne: userId }, status: 'active' };
 
-    // If student, return mentors, coordinators, company contacts of applications/allocations
+    // Fetch staff (administrators & coordinators)
+    const staff = await User.find({
+      role: { $in: [ROLES.ADMIN, ROLES.COORDINATOR] },
+      status: 'active',
+    }).select('_id');
+    const staffIds = staff.map((s) => s._id.toString());
+
     if (user.role === ROLES.STUDENT) {
       const [allocations, applications] = await Promise.all([
         Allocation.find({ student: userId, status: 'active' }).select('company mentor'),
         Application.find({ student: userId }).select('company'),
       ]);
 
-      const allowedUserIds = new Set();
-      // Admins & Coordinators always reachable
-      const staff = await User.find({
-        role: { $in: [ROLES.ADMIN, ROLES.COORDINATOR] },
-        status: 'active',
-      }).select('_id');
-      staff.forEach((s) => allowedUserIds.add(s._id.toString()));
-
+      const allowedUserIds = new Set(staffIds);
       allocations.forEach((a) => {
         if (a.company) allowedUserIds.add(a.company.toString());
         if (a.mentor) allowedUserIds.add(a.mentor.toString());
       });
-
       applications.forEach((a) => {
+        if (a.company) allowedUserIds.add(a.company.toString());
+      });
+
+      query._id = { $in: Array.from(allowedUserIds) };
+    } else if (user.role === ROLES.COMPANY) {
+      const [allocations, applications] = await Promise.all([
+        Allocation.find({ company: userId, status: 'active' }).select('student mentor'),
+        Application.find({ company: userId }).select('student'),
+      ]);
+
+      const allowedUserIds = new Set(staffIds);
+      allocations.forEach((a) => {
+        if (a.student) allowedUserIds.add(a.student.toString());
+        if (a.mentor) allowedUserIds.add(a.mentor.toString());
+      });
+      applications.forEach((a) => {
+        if (a.student) allowedUserIds.add(a.student.toString());
+      });
+
+      query._id = { $in: Array.from(allowedUserIds) };
+    } else if (user.role === ROLES.MENTOR) {
+      const allocations = await Allocation.find({ mentor: userId, status: 'active' }).select('student company');
+      const allowedUserIds = new Set(staffIds);
+      allocations.forEach((a) => {
+        if (a.student) allowedUserIds.add(a.student.toString());
         if (a.company) allowedUserIds.add(a.company.toString());
       });
 

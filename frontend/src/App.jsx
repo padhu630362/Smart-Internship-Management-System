@@ -4,7 +4,6 @@ import { AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import AppLayout from './components/layout/AppLayout';
 import HomePage from './pages/HomePage';
-import RoadmapPage from './pages/RoadmapPage';
 import NotFoundPage from './pages/NotFoundPage';
 import LoginPage from './pages/LoginPage';
 import AdminLoginPage from './pages/AdminLoginPage';
@@ -54,7 +53,6 @@ export const App = () => {
           <Routes>
             {/* Public routes */}
             <Route path="/" element={<HomePage />} />
-            <Route path="/roadmap" element={<RoadmapPage />} />
             <Route path="/internships" element={<InternshipsDirectoryPage />} />
             <Route path="/external-jobs" element={<ExternalJobsPage />} />
             <Route path="/login" element={<LoginPage />} />

@@ -87,14 +87,44 @@ export const validateForgotPassword = (req, res, next) => {
 };
 
 /**
- * Validates reset password payload.
+ * Validates reset code verification request payload.
  */
-export const validateResetPassword = (req, res, next) => {
-  const { token, newPassword } = req.body;
+export const validateVerifyResetCode = (req, res, next) => {
+  const { email, code } = req.body;
   const errors = [];
 
-  if (!token || typeof token !== 'string') {
-    errors.push({ field: 'token', message: 'Reset token is required.' });
+  if (!email || typeof email !== 'string' || !EMAIL_REGEX.test(email.trim())) {
+    errors.push({ field: 'email', message: 'Valid email address is required.' });
+  }
+
+  if (!code || typeof code !== 'string' || !/^\d{6}$/.test(code.trim())) {
+    errors.push({ field: 'code', message: 'A 6-digit numeric verification code is required.' });
+  }
+
+  if (errors.length > 0) {
+    return next(new AppError('Verification code validation failed.', 400, 'VALIDATION_ERROR', errors));
+  }
+
+  next();
+};
+
+/**
+ * Validates reset password payload. Supports both token-based and (email + code)-based reset.
+ */
+export const validateResetPassword = (req, res, next) => {
+  const { token, email, code, newPassword } = req.body;
+  const errors = [];
+
+  if (!token && (!email || !code)) {
+    errors.push({ field: 'auth', message: 'Reset token or verification code with email is required.' });
+  }
+
+  if (email && (!EMAIL_REGEX.test(email.trim()))) {
+    errors.push({ field: 'email', message: 'Valid email is required.' });
+  }
+
+  if (code && !/^\d{6}$/.test(String(code).trim())) {
+    errors.push({ field: 'code', message: 'Verification code must be a 6-digit number.' });
   }
 
   if (!newPassword || typeof newPassword !== 'string' || !PASSWORD_REGEX.test(newPassword)) {
@@ -115,5 +145,6 @@ export default {
   validateRegister,
   validateLogin,
   validateForgotPassword,
+  validateVerifyResetCode,
   validateResetPassword,
 };

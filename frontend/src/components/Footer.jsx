@@ -128,17 +128,6 @@ export const Footer = () => {
                   ))}
                 </div>
               </div>
-
-              {/* Badges */}
-              <div className="flex flex-wrap items-center gap-2 pt-1">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-burgundy-50 dark:bg-burgundy-950/60 text-burgundy-800 dark:text-champagne-300 border border-burgundy-200 dark:border-burgundy-900/60 text-[10px] font-semibold">
-                  <Sparkles className="w-3 h-3 text-burgundy-600 dark:text-champagne-400" />
-                  <span>Burgundy + Champagne System</span>
-                </span>
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-champagne-100/70 dark:bg-warmdark-800 text-stone-700 dark:text-champagne-300 border border-champagne-300 dark:border-warmdark-700 text-[10px] font-mono font-medium">
-                  v1.2.0 Stable
-                </span>
-              </div>
             </div>
 
             {/* Column 2: Quick Access & Portals */}
@@ -227,43 +216,42 @@ export const Footer = () => {
                     Direct & Group Chat
                   </Link>
                 </li>
-                <li>
-                  <Link
-                    to="/roadmap"
-                    className="hover:text-burgundy-700 dark:hover:text-champagne-300 transition-colors"
-                  >
-                    Project Architecture
-                  </Link>
-                </li>
               </ul>
             </div>
 
-            {/* Column 4: Contact & University Helpdesk */}
+            {/* Column 4: Contact & Administration */}
             <div className="space-y-3">
               <h4 className="text-[11px] font-bold text-stone-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5 text-burgundy-600 dark:text-champagne-400" />
-                <span>Contact & Helpdesk</span>
+                <span>Contact & Administration</span>
               </h4>
-              <ul className="space-y-2 text-stone-600 dark:text-stone-400">
-                <li className="flex items-start gap-2">
-                  <MapPin className="w-3.5 h-3.5 text-stone-400 shrink-0 mt-0.5" />
-                  <span className="leading-tight">Academic Complex, Directorate of Technical Education</span>
+              <ul className="space-y-2 text-stone-600 dark:text-stone-400 text-xs">
+                <li className="flex items-center gap-2">
+                  <User className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                  <span>
+                    Arshad:{' '}
+                    <a href="mailto:arshad@gmail.com" className="hover:text-burgundy-700 dark:hover:text-champagne-300 font-medium">
+                      arshad@gmail.com
+                    </a>
+                  </span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <User className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                  <span>
+                    Padmavathi:{' '}
+                    <a href="mailto:padhu@gmail.com" className="hover:text-burgundy-700 dark:hover:text-champagne-300 font-medium">
+                      padhu@gmail.com
+                    </a>
+                  </span>
                 </li>
                 <li className="flex items-center gap-2">
                   <Phone className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                  <a href="tel:+918023456789" className="hover:text-burgundy-700 dark:hover:text-champagne-300">
-                    +91 (080) 2345-6789
-                  </a>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Mail className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                  <a href="mailto:support@sims.edu" className="hover:text-burgundy-700 dark:hover:text-champagne-300">
-                    support@sims.edu
-                  </a>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Clock className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                  <span>Mon - Sat: 9 AM - 6 PM IST</span>
+                  <span>
+                    Phone:{' '}
+                    <a href="tel:9030787884" className="hover:text-burgundy-700 dark:hover:text-champagne-300 font-medium">
+                      9030787884
+                    </a>
+                  </span>
                 </li>
               </ul>
             </div>
@@ -272,10 +260,10 @@ export const Footer = () => {
           {/* Bottom Bar: Copyright, Policies & Status */}
           <div className="border-t border-champagne-200/90 dark:border-warmdark-800 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px]">
             <div className="text-stone-500 flex items-center gap-1.5">
-              <span>© {new Date().getFullYear()} <strong>Smart Internship Management (SIM)</strong>.</span>
+              <span>© {new Date().getFullYear()} <strong>InternHub</strong>.</span>
               <span className="hidden sm:inline">Built with</span>
               <Heart className="w-3 h-3 text-burgundy-600 fill-burgundy-600 hidden sm:inline" />
-              <span className="hidden sm:inline">for Academic Excellence.</span>
+              <span className="hidden sm:inline">for Career & Academic Growth.</span>
             </div>
 
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-stone-500">

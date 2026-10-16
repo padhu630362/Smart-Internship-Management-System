@@ -26,7 +26,7 @@ export const LoginModal = ({ isOpen, onClose }) => {
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="SIM Stakeholder Access"
+      title="InternHub Stakeholder Access"
       description="Select your role to sign into your authenticated workspace"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -60,6 +60,7 @@ export const LoginModal = ({ isOpen, onClose }) => {
           placeholder="name@university.edu or name@company.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          autoComplete="off"
           required
         />
 
@@ -70,6 +71,7 @@ export const LoginModal = ({ isOpen, onClose }) => {
           placeholder="••••••••••••"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          autoComplete="new-password"
           required
         />
 

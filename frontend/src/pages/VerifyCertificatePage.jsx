@@ -93,7 +93,7 @@ export const VerifyCertificatePage = () => {
             Verify Internship Completion Credential
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 max-w-lg mx-auto">
-            Validate the authenticity of official completion certificates issued by the Smart Internship Management System and accredited partner organizations.
+            Validate the authenticity of official completion certificates issued by InternHub and accredited partner organizations.
           </p>
         </div>
 

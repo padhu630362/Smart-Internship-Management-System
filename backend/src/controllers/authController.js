@@ -1,10 +1,15 @@
 import { User, ROLES, ALLOWED_SELF_REGISTRATION_ROLES } from '../models/User.js';
-import { hashPassword, generateRandomToken, hashResetToken } from '../utils/security.js';
+import {
+  hashPassword,
+  generateRandomToken,
+  hashResetToken,
+  generateSixDigitCode,
+} from '../utils/security.js';
 import { signToken } from '../utils/jwt.js';
 import { AppError } from '../utils/AppError.js';
 import { env } from '../config/env.js';
 import { recordAuditLog } from '../services/auditService.js';
-import { getFirebaseAuth } from '../config/firebaseAdmin.js';
+import { sendPasswordResetCode, sendTwoFactorCode } from '../services/emailService.js';
 
 /**
  * Handle new user registration.
@@ -85,11 +90,58 @@ export const login = async (req, res, next) => {
       return next(new AppError('Invalid email or password.', 401, 'INVALID_CREDENTIALS'));
     }
 
-    // Generate JWT token
+    // Two-Step Verification (2FA) if explicitly enabled on account
+    if (user.twoFactorEnabled) {
+      const sixDigitCode = generateSixDigitCode();
+      const hashedCode = hashResetToken(sixDigitCode);
+
+      user.twoFactorCode = hashedCode;
+      user.twoFactorExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+      user.twoFactorAttempts = 0;
+      user.twoFactorCooldown = new Date(Date.now() + 60 * 1000); // 60 seconds cooldown
+      await user.save({ validateBeforeSave: false });
+
+      // Send code in real-time to personal email
+      const emailResult = await sendTwoFactorCode({
+        to: user.email,
+        name: user.name,
+        code: sixDigitCode,
+      });
+
+      // Record security audit log
+      await recordAuditLog({
+        action: '2FA_CODE_DISPATCHED',
+        req,
+        targetUser: user._id,
+        resourceType: 'Auth',
+        details: { email: user.email, provider: emailResult.provider },
+      });
+
+      return res.status(200).json({
+        success: true,
+        requiresTwoFactor: true,
+        email: user.email,
+        message: `A 6-digit verification code has been dispatched to ${user.email}. Please enter it to complete sign-in.`,
+      });
+    }
+
+    // Direct successful authentication
     const token = signToken({
       id: user._id.toString(),
       role: user.role,
       email: user.email,
+    });
+
+    user.lastLoginAt = new Date();
+    await user.save({ validateBeforeSave: false });
+
+    // Record security audit log
+    await recordAuditLog({
+      action: 'LOGIN_SUCCESS',
+      req,
+      targetUser: user._id,
+      resourceType: 'Auth',
+      details: { email: user.email, role: user.role },
     });
 
     // Remove passwordHash from response
@@ -102,6 +154,154 @@ export const login = async (req, res, next) => {
         user,
         token,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Verify 6-digit Two-Step Verification code and finalize login session.
+ */
+export const verifyTwoFactor = async (req, res, next) => {
+  try {
+    const { email, code } = req.body;
+    if (!email || !code) {
+      return next(new AppError('Email and 6-digit verification code are required.', 400, 'MISSING_FIELDS'));
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const rawCode = String(code).trim();
+
+    const user = await User.findOne({ email: normalizedEmail }).select(
+      '+twoFactorCode +twoFactorExpires +twoFactorAttempts'
+    );
+
+    if (!user || !user.twoFactorCode || !user.twoFactorExpires) {
+      return next(new AppError('No active two-step verification request found. Please sign in again.', 400, 'INVALID_2FA_SESSION'));
+    }
+
+    if (user.twoFactorExpires < new Date()) {
+      user.twoFactorCode = undefined;
+      user.twoFactorExpires = undefined;
+      await user.save({ validateBeforeSave: false });
+      return next(new AppError('Verification code has expired. Please request a new code.', 400, 'CODE_EXPIRED'));
+    }
+
+    if ((user.twoFactorAttempts || 0) >= 5) {
+      user.twoFactorCode = undefined;
+      user.twoFactorExpires = undefined;
+      await user.save({ validateBeforeSave: false });
+      return next(new AppError('Too many failed verification attempts. Please sign in again.', 429, 'MAX_ATTEMPTS_EXCEEDED'));
+    }
+
+    const hashedInputCode = hashResetToken(rawCode);
+    if (hashedInputCode !== user.twoFactorCode) {
+      user.twoFactorAttempts = (user.twoFactorAttempts || 0) + 1;
+      await user.save({ validateBeforeSave: false });
+      const remaining = Math.max(0, 5 - user.twoFactorAttempts);
+      return next(
+        new AppError(
+          `Invalid verification code. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`,
+          400,
+          'INVALID_CODE'
+        )
+      );
+    }
+
+    // Code verified successfully: clear 2FA state and update login timestamp
+    user.twoFactorCode = undefined;
+    user.twoFactorExpires = undefined;
+    user.twoFactorAttempts = 0;
+    user.lastLoginAt = new Date();
+    await user.save({ validateBeforeSave: false });
+
+    // Generate JWT token
+    const token = signToken({
+      id: user._id.toString(),
+      role: user.role,
+      email: user.email,
+    });
+
+    // Record security audit log
+    await recordAuditLog({
+      action: 'LOGIN_2FA_SUCCESS',
+      req,
+      targetUser: user._id,
+      resourceType: 'Auth',
+      details: { email: user.email, role: user.role },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Two-step verification successful. Welcome back!',
+      data: {
+        user,
+        token,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Resend 6-digit Two-Step Verification code.
+ */
+export const resendTwoFactorCode = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return next(new AppError('Email is required to resend verification code.', 400, 'MISSING_EMAIL'));
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail }).select('+twoFactorCooldown');
+
+    if (!user) {
+      return res.status(200).json({
+        success: true,
+        message: 'If the account exists, a new verification code has been dispatched.',
+      });
+    }
+
+    if (user.twoFactorCooldown && user.twoFactorCooldown > new Date()) {
+      const waitSeconds = Math.ceil((user.twoFactorCooldown.getTime() - Date.now()) / 1000);
+      return next(
+        new AppError(
+          `Please wait ${waitSeconds} seconds before requesting another verification code.`,
+          429,
+          'RATE_LIMITED'
+        )
+      );
+    }
+
+    const sixDigitCode = generateSixDigitCode();
+    const hashedCode = hashResetToken(sixDigitCode);
+
+    user.twoFactorCode = hashedCode;
+    user.twoFactorExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    user.twoFactorAttempts = 0;
+    user.twoFactorCooldown = new Date(Date.now() + 60 * 1000); // 60s cooldown
+    await user.save({ validateBeforeSave: false });
+
+    const emailResult = await sendTwoFactorCode({
+      to: user.email,
+      name: user.name,
+      code: sixDigitCode,
+    });
+
+    await recordAuditLog({
+      action: '2FA_CODE_RESENT',
+      req,
+      targetUser: user._id,
+      resourceType: 'Auth',
+      details: { email: user.email, provider: emailResult.provider },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `A new 6-digit verification code has been dispatched to ${user.email}.`,
     });
   } catch (error) {
     next(error);
@@ -132,29 +332,53 @@ export const logout = (req, res) => {
 };
 
 /**
- * Generate password reset token.
+ * Request password reset verification code (6-digit OTP).
  */
 export const forgotPassword = async (req, res, next) => {
   try {
     const { email } = req.body;
     const normalizedEmail = email.toLowerCase().trim();
 
-    const user = await User.findOne({ email: normalizedEmail });
+    const user = await User.findOne({ email: normalizedEmail }).select('+resetPasswordCooldown');
     if (!user) {
-      // Do not disclose whether email exists for anti-enumeration security
+      // Anti-enumeration safe response
       return res.status(200).json({
         success: true,
-        message: 'If the email exists in our records, a password reset link has been dispatched.',
+        message: 'If the email exists in our records, a 6-digit verification code has been dispatched.',
       });
     }
 
-    // Generate secure reset token
+    // Rate-limiting cooldown: prevent flooding (60 seconds)
+    if (user.resetPasswordCooldown && user.resetPasswordCooldown > new Date()) {
+      const waitSeconds = Math.ceil((user.resetPasswordCooldown.getTime() - Date.now()) / 1000);
+      return next(
+        new AppError(
+          `Please wait ${waitSeconds} seconds before requesting another verification code.`,
+          429,
+          'RATE_LIMITED'
+        )
+      );
+    }
+
+    // Generate secure 6-digit OTP and reset token
+    const sixDigitCode = generateSixDigitCode();
+    const hashedCode = hashResetToken(sixDigitCode);
     const resetToken = generateRandomToken(32);
     const hashedToken = hashResetToken(resetToken);
 
+    user.resetPasswordCode = hashedCode;
     user.resetPasswordToken = hashedToken;
-    user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    user.resetPasswordExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+    user.resetPasswordAttempts = 0;
+    user.resetPasswordCooldown = new Date(Date.now() + 60 * 1000); // 60 seconds cooldown
     await user.save({ validateBeforeSave: false });
+
+    // Send code via email service (nodemailer SMTP or fallback logger)
+    const emailResult = await sendPasswordResetCode({
+      to: user.email,
+      name: user.name,
+      code: sixDigitCode,
+    });
 
     // Record security audit log
     await recordAuditLog({
@@ -162,16 +386,16 @@ export const forgotPassword = async (req, res, next) => {
       req,
       targetUser: user._id,
       resourceType: 'Auth',
-      details: { email: user.email },
+      details: { email: user.email, provider: emailResult.provider },
     });
-
-    // In dev / test mode, return token for verification without requiring an external SMTP service
-    const isDev = env.NODE_ENV === 'development' || env.NODE_ENV === 'test';
 
     res.status(200).json({
       success: true,
-      message: 'If the email exists in our records, a password reset link has been dispatched.',
-      ...(isDev && { devResetToken: resetToken }),
+      message: 'If the email exists in our records, a 6-digit verification code has been dispatched to your email address.',
+      provider: emailResult.provider,
+      ...(process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development'
+        ? { devResetToken: resetToken, devVerificationCode: sixDigitCode, token: resetToken }
+        : {}),
     });
   } catch (error) {
     next(error);
@@ -179,33 +403,119 @@ export const forgotPassword = async (req, res, next) => {
 };
 
 /**
- * Reset password using verification token.
+ * Verify 6-digit password reset verification code.
+ */
+export const verifyResetCode = async (req, res, next) => {
+  try {
+    const { email, code } = req.body;
+    const normalizedEmail = email.toLowerCase().trim();
+    const rawCode = String(code).trim();
+
+    const user = await User.findOne({ email: normalizedEmail }).select(
+      '+resetPasswordCode +resetPasswordToken +resetPasswordExpires +resetPasswordAttempts'
+    );
+
+    if (!user || !user.resetPasswordCode || !user.resetPasswordExpires) {
+      return next(new AppError('Invalid or expired verification code request.', 400, 'INVALID_RESET_REQUEST'));
+    }
+
+    if (user.resetPasswordExpires < new Date()) {
+      return next(new AppError('Verification code has expired. Please request a new code.', 400, 'CODE_EXPIRED'));
+    }
+
+    if ((user.resetPasswordAttempts || 0) >= 5) {
+      user.resetPasswordCode = undefined;
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpires = undefined;
+      await user.save({ validateBeforeSave: false });
+      return next(
+        new AppError(
+          'Too many failed verification attempts. This code is now invalid. Please request a new code.',
+          429,
+          'MAX_ATTEMPTS_EXCEEDED'
+        )
+      );
+    }
+
+    const hashedInputCode = hashResetToken(rawCode);
+    if (hashedInputCode !== user.resetPasswordCode) {
+      user.resetPasswordAttempts = (user.resetPasswordAttempts || 0) + 1;
+      await user.save({ validateBeforeSave: false });
+      const remaining = Math.max(0, 5 - user.resetPasswordAttempts);
+      return next(
+        new AppError(
+          `Invalid verification code. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`,
+          400,
+          'INVALID_CODE'
+        )
+      );
+    }
+
+    // Success: code verified! Refresh resetToken for subsequent reset-password call
+    const resetToken = generateRandomToken(32);
+    user.resetPasswordToken = hashResetToken(resetToken);
+    user.resetPasswordAttempts = 0;
+    await user.save({ validateBeforeSave: false });
+
+    res.status(200).json({
+      success: true,
+      message: 'Verification code confirmed. You may now set your new password.',
+      data: {
+        resetToken,
+        email: normalizedEmail,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Reset password using verification token or verified 6-digit code.
  */
 export const resetPassword = async (req, res, next) => {
   try {
-    const { token, newPassword } = req.body;
-    const hashedToken = hashResetToken(token);
+    const { token, email, code, newPassword } = req.body;
 
-    const user = await User.findOne({
-      resetPasswordToken: hashedToken,
-      resetPasswordExpires: { $gt: new Date() },
-    }).select('+resetPasswordToken +resetPasswordExpires');
+    let user = null;
+
+    if (token) {
+      const hashedToken = hashResetToken(token);
+      user = await User.findOne({
+        resetPasswordToken: hashedToken,
+        resetPasswordExpires: { $gt: new Date() },
+      }).select('+resetPasswordToken +resetPasswordExpires');
+    } else if (email && code) {
+      const normalizedEmail = email.toLowerCase().trim();
+      const hashedCode = hashResetToken(String(code).trim());
+      user = await User.findOne({
+        email: normalizedEmail,
+        resetPasswordCode: hashedCode,
+        resetPasswordExpires: { $gt: new Date() },
+      }).select('+resetPasswordCode +resetPasswordExpires');
+    }
 
     if (!user) {
-      return next(new AppError('Password reset token is invalid or has expired.', 400, 'INVALID_RESET_TOKEN'));
+      return next(
+        new AppError('Password reset authorization is invalid or has expired.', 400, 'INVALID_RESET_AUTHORIZATION')
+      );
     }
 
     if (user.status === 'suspended' || user.status === 'inactive') {
-      return next(new AppError('Your account has been deactivated or suspended. Password cannot be reset.', 403, 'ACCOUNT_INACTIVE'));
+      return next(
+        new AppError('Your account has been deactivated or suspended. Password cannot be reset.', 403, 'ACCOUNT_INACTIVE')
+      );
     }
 
     // Set new password, update passwordChangedAt (revokes previous sessions)
     user.passwordHash = await hashPassword(newPassword);
     user.passwordChangedAt = new Date();
     user.resetPasswordToken = undefined;
+    user.resetPasswordCode = undefined;
     user.resetPasswordExpires = undefined;
+    user.resetPasswordAttempts = 0;
+    user.resetPasswordCooldown = undefined;
     await user.save();
-
 
     // Record security audit log
     await recordAuditLog({
@@ -218,7 +528,7 @@ export const resetPassword = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: 'Password has been reset successfully. You may now sign in.',
+      message: 'Password has been reset successfully. You may now sign in with your new credentials.',
     });
   } catch (error) {
     next(error);
@@ -372,6 +682,8 @@ export const googleLogin = async (req, res, next) => {
 export default {
   register,
   login,
+  verifyTwoFactor,
+  resendTwoFactorCode,
   getMe,
   logout,
   forgotPassword,

@@ -47,8 +47,8 @@ export const PoliciesPage = () => {
         description="Comprehensive compliance documentation, student privacy standards, and stakeholder obligations."
         breadcrumbs={[{ label: 'Home', path: '/' }, { label: 'Legal Policies' }]}
         badge={
-          <span className="px-3 py-1 rounded-full text-xs font-bold bg-champagne-100 text-burgundy-900 border border-champagne-300">
-            FERPA & GDPR ALIGNED
+          <span className="px-3 py-1 rounded-full text-xs font-bold bg-champagne-100 dark:bg-burgundy-950/60 text-burgundy-900 dark:text-champagne-300 border border-champagne-300 dark:border-burgundy-800">
+            SECURE PRIVACY STANDARD
           </span>
         }
       />
@@ -83,7 +83,7 @@ export const PoliciesPage = () => {
               <span>Effective Period</span>
             </div>
             <p className="text-[11px] text-stone-500">
-              Current Version 2.4. Effective across all universities and host partner networks for 2026.
+              Current Version 2.4. Effective across all host partner networks for 2026.
             </p>
           </div>
         </div>
@@ -94,10 +94,10 @@ export const PoliciesPage = () => {
             <div className="space-y-6">
               <div className="border-b border-champagne-200 dark:border-warmdark-700 pb-4">
                 <h2 className="text-xl font-black text-stone-900 dark:text-white">
-                  Student & Institutional Privacy Policy
+                  Student & User Privacy Policy
                 </h2>
                 <p className="text-xs text-stone-500 mt-1">
-                  How SIMS safeguards educational credentials, resumes, and internship records.
+                  How InternHub safeguards personal credentials, resumes, and internship records.
                 </p>
               </div>
 
@@ -246,7 +246,7 @@ export const PoliciesPage = () => {
               <section className="space-y-2">
                 <h3 className="font-bold text-sm text-stone-900 dark:text-white">1. Necessary Storage Only</h3>
                 <p>
-                  SIMS does not use any third-party marketing, analytics, or behavioral cookies. We use only strictly necessary local storage:
+                  InternHub does not use any third-party marketing, analytics, or behavioral cookies. We use only strictly necessary local storage:
                 </p>
                 <ul className="list-disc pl-5 space-y-1.5 text-stone-600 dark:text-stone-400">
                   <li><code className="font-mono text-burgundy-700 dark:text-champagne-300">sims_auth_token</code>: Authenticated session token.</li>

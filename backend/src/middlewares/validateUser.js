@@ -36,19 +36,25 @@ export const validateUpdateProfile = (req, res, next) => {
     }
 
     if (studentDetails) {
-      if (studentDetails.graduationYear && (studentDetails.graduationYear < 2000 || studentDetails.graduationYear > 2100)) {
-        const error = new Error('Graduation year must be between 2000 and 2100.');
-        error.statusCode = 400;
-        error.code = 'VALIDATION_ERROR';
-        return next(error);
+      if (studentDetails.graduationYear !== undefined && studentDetails.graduationYear !== '' && studentDetails.graduationYear !== null) {
+        const yr = Number(studentDetails.graduationYear);
+        if (isNaN(yr) || yr < 2000 || yr > 2100) {
+          const error = new Error('Graduation year must be between 2000 and 2100.');
+          error.statusCode = 400;
+          error.code = 'VALIDATION_ERROR';
+          return next(error);
+        }
       }
-      if (studentDetails.cgpa !== undefined && (studentDetails.cgpa < 0 || studentDetails.cgpa > 10)) {
-        const error = new Error('CGPA must be between 0.0 and 10.0.');
-        error.statusCode = 400;
-        error.code = 'VALIDATION_ERROR';
-        return next(error);
+      if (studentDetails.cgpa !== undefined && studentDetails.cgpa !== '' && studentDetails.cgpa !== null) {
+        const gpa = Number(studentDetails.cgpa);
+        if (isNaN(gpa) || gpa < 0 || gpa > 10) {
+          const error = new Error('CGPA must be between 0.0 and 10.0.');
+          error.statusCode = 400;
+          error.code = 'VALIDATION_ERROR';
+          return next(error);
+        }
       }
-      if (studentDetails.skills && !Array.isArray(studentDetails.skills)) {
+      if (studentDetails.skills !== undefined && !Array.isArray(studentDetails.skills)) {
         const error = new Error('Skills must be provided as an array.');
         error.statusCode = 400;
         error.code = 'VALIDATION_ERROR';
@@ -163,12 +169,18 @@ export const validateAdminUpdateUser = async (req, res, next) => {
       return next(error);
     }
 
-    // Protection for the last active administrator:
-    // If the target user is currently an active admin, and the update would demote their role
-    // or deactivate their status, verify that another active admin exists.
     const isCurrentlyActiveAdmin = targetUser.role === ROLES.ADMIN && targetUser.status === USER_STATUSES.ACTIVE;
     const willDemoteRole = role && role !== ROLES.ADMIN;
     const willDeactivateStatus = status && status !== USER_STATUSES.ACTIVE;
+
+    // Protection for designated administrators (Padmavathi & Arshad) and the last active administrator:
+    const DESIGNATED_ADMIN_EMAILS = ['s.v.padmavathi2005@gmail.com', 'arshadtaiyab010@gmail.com'];
+    if (DESIGNATED_ADMIN_EMAILS.includes(targetUser.email.toLowerCase()) && (willDemoteRole || willDeactivateStatus)) {
+      const error = new Error('Action prohibited: Designated primary administrators cannot be demoted or deactivated.');
+      error.statusCode = 403;
+      error.code = 'DESIGNATED_ADMIN_PROTECTED';
+      return next(error);
+    }
 
     if (isCurrentlyActiveAdmin && (willDemoteRole || willDeactivateStatus)) {
       const canDemote = await User.canDemoteOrDeactivate(targetUserId);

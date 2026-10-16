@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   User as UserIcon,
   Mail,
@@ -10,6 +10,7 @@ import {
   Upload,
   Trash2,
   Download,
+  Eye,
   Save,
   CheckCircle,
   AlertCircle,
@@ -29,13 +30,14 @@ import StatusBadge from '../components/common/StatusBadge';
 import LoadingState from '../components/common/LoadingState';
 
 export const ProfilePage = () => {
-  const { user: authUser, updateUserState, token } = useAuth();
+  const { user: authUser, updateUserState, reloadUser, token } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingResume, setUploadingResume] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const fileInputRef = useRef(null);
 
   // Form State
   const [profile, setProfile] = useState({
@@ -142,7 +144,7 @@ export const ProfilePage = () => {
         });
       }
     } catch (err) {
-      setErrorMessage(err.response?.data?.error?.message || 'Failed to load profile.');
+      setErrorMessage(err.message || err.response?.data?.error?.message || 'Failed to load profile.');
     } finally {
       setLoading(false);
     }
@@ -163,30 +165,65 @@ export const ProfilePage = () => {
       };
 
       if (authUser?.role === 'student') {
-        payload.studentDetails = {
-          ...profile.studentDetails,
-          graduationYear: profile.studentDetails.graduationYear ? Number(profile.studentDetails.graduationYear) : undefined,
-          cgpa: profile.studentDetails.cgpa ? Number(profile.studentDetails.cgpa) : undefined,
+        const studentDetailsClean = {
+          studentId: profile.studentDetails?.studentId || '',
+          department: profile.studentDetails?.department || '',
+          course: profile.studentDetails?.course || '',
+          skills: Array.isArray(profile.studentDetails?.skills) ? profile.studentDetails.skills : [],
+          linkedinUrl: profile.studentDetails?.linkedinUrl || '',
+          githubUrl: profile.studentDetails?.githubUrl || '',
+          portfolioUrl: profile.studentDetails?.portfolioUrl || '',
         };
+        const gradYear = profile.studentDetails?.graduationYear ? Number(profile.studentDetails.graduationYear) : null;
+        if (gradYear && !isNaN(gradYear) && gradYear >= 2000 && gradYear <= 2100) {
+          studentDetailsClean.graduationYear = gradYear;
+        }
+        const cgpaVal = profile.studentDetails?.cgpa !== '' && profile.studentDetails?.cgpa !== null && profile.studentDetails?.cgpa !== undefined ? Number(profile.studentDetails.cgpa) : null;
+        if (cgpaVal !== null && !isNaN(cgpaVal) && cgpaVal >= 0 && cgpaVal <= 10) {
+          studentDetailsClean.cgpa = cgpaVal;
+        }
+        payload.studentDetails = studentDetailsClean;
       } else if (authUser?.role === 'company') {
-        payload.companyDetails = profile.companyDetails;
+        payload.companyDetails = {
+          companyName: profile.companyDetails?.companyName || '',
+          industry: profile.companyDetails?.industry || '',
+          website: profile.companyDetails?.website || '',
+          description: profile.companyDetails?.description || '',
+          address: profile.companyDetails?.address || '',
+          contactEmail: profile.companyDetails?.contactEmail || '',
+          contactPhone: profile.companyDetails?.contactPhone || '',
+        };
       } else if (authUser?.role === 'mentor') {
+        const yoe = profile.mentorDetails?.yearsOfExperience ? Number(profile.mentorDetails.yearsOfExperience) : null;
         payload.mentorDetails = {
-          ...profile.mentorDetails,
-          yearsOfExperience: profile.mentorDetails.yearsOfExperience ? Number(profile.mentorDetails.yearsOfExperience) : undefined,
+          companyName: profile.mentorDetails?.companyName || '',
+          designation: profile.mentorDetails?.designation || '',
+          expertise: Array.isArray(profile.mentorDetails?.expertise) ? profile.mentorDetails.expertise : [],
+          linkedinUrl: profile.mentorDetails?.linkedinUrl || '',
+          ...(yoe !== null && !isNaN(yoe) && yoe >= 0 && { yearsOfExperience: yoe }),
         };
       } else if (authUser?.role === 'coordinator') {
-        payload.coordinatorDetails = profile.coordinatorDetails;
+        payload.coordinatorDetails = {
+          institution: profile.coordinatorDetails?.institution || '',
+          facultyId: profile.coordinatorDetails?.facultyId || '',
+          department: profile.coordinatorDetails?.department || '',
+          designation: profile.coordinatorDetails?.designation || '',
+          officeLocation: profile.coordinatorDetails?.officeLocation || '',
+        };
       }
 
       const res = await userService.updateProfile(payload);
       if (res?.data?.user) {
-        updateUserState(res.data.user);
+        if (typeof updateUserState === 'function') {
+          updateUserState(res.data.user);
+        } else if (typeof reloadUser === 'function') {
+          reloadUser();
+        }
         setSuccessMessage('Profile saved successfully!');
         setTimeout(() => setSuccessMessage(''), 4000);
       }
     } catch (err) {
-      setErrorMessage(err.response?.data?.error?.message || 'Failed to update profile.');
+      setErrorMessage(err.message || err.response?.data?.error?.message || 'Failed to update profile.');
     } finally {
       setSaving(false);
     }
@@ -278,7 +315,7 @@ export const ProfilePage = () => {
         setTimeout(() => setSuccessMessage(''), 4000);
       }
     } catch (err) {
-      setErrorMessage(err.response?.data?.error?.message || 'Failed to upload resume file.');
+      setErrorMessage(err.message || err.response?.data?.error?.message || 'Failed to upload resume file.');
     } finally {
       setUploadingResume(false);
       e.target.value = '';
@@ -303,7 +340,7 @@ export const ProfilePage = () => {
       setSuccessMessage('Resume removed.');
       setTimeout(() => setSuccessMessage(''), 4000);
     } catch (err) {
-      setErrorMessage(err.response?.data?.error?.message || 'Failed to delete resume.');
+      setErrorMessage(err.message || err.response?.data?.error?.message || 'Failed to delete resume.');
     } finally {
       setUploadingResume(false);
     }
@@ -384,7 +421,7 @@ export const ProfilePage = () => {
         {/* Core Personal Details */}
         <Card
           title="Account & Contact Information"
-          subtitle="Basic identity and contact information visible across SIMS"
+          subtitle="Basic identity and contact information visible across InternHub"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
@@ -583,6 +620,16 @@ export const ProfilePage = () => {
               title="Official Student Resume Document"
               subtitle="Verified documents are shared with internship recruiters upon application submission"
             >
+              {/* Hidden file input controlled via fileInputRef */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.doc,.docx"
+                onChange={handleResumeFileChange}
+                disabled={uploadingResume}
+                className="hidden"
+              />
+
               {profile.studentDetails.resumeUrl ? (
                 <div className="p-4 rounded-xl border border-brand-200 dark:border-brand-800/80 bg-brand-50/50 dark:bg-brand-950/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
@@ -603,10 +650,27 @@ export const ProfilePage = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                    <a
+                      href={`${profile.studentDetails.resumeUrl}${profile.studentDetails.resumeUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(token || localStorage.getItem('sims_auth_token') || '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 sm:flex-none"
+                    >
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        icon={Eye}
+                        className="w-full"
+                      >
+                        View
+                      </Button>
+                    </a>
+
                     <a
                       href={`${profile.studentDetails.resumeUrl}${profile.studentDetails.resumeUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(token || localStorage.getItem('sims_auth_token') || '')}&download=true`}
-                      download
+                      download={profile.studentDetails.resumeFileName || 'Resume.pdf'}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex-1 sm:flex-none"
@@ -622,26 +686,17 @@ export const ProfilePage = () => {
                       </Button>
                     </a>
 
-                    <label className="flex-1 sm:flex-none">
-                      <input
-                        type="file"
-                        accept=".pdf,.doc,.docx"
-                        onChange={handleResumeFileChange}
-                        disabled={uploadingResume}
-                        className="hidden"
-                      />
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        icon={Upload}
-                        loading={uploadingResume}
-                        className="w-full cursor-pointer"
-                        as="span"
-                      >
-                        Replace
-                      </Button>
-                    </label>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      icon={Upload}
+                      loading={uploadingResume}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex-1 sm:flex-none"
+                    >
+                      Replace
+                    </Button>
 
                     <Button
                       type="button"
@@ -665,26 +720,17 @@ export const ProfilePage = () => {
                   <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mt-1 mb-4">
                     Supported formats: PDF, DOC, DOCX. Maximum allowed file size: 5MB.
                   </p>
-                  <label>
-                    <input
-                      type="file"
-                      accept=".pdf,.doc,.docx"
-                      onChange={handleResumeFileChange}
-                      disabled={uploadingResume}
-                      className="hidden"
-                    />
-                    <Button
-                      type="button"
-                      variant="primary"
-                      size="sm"
-                      icon={Upload}
-                      loading={uploadingResume}
-                      className="cursor-pointer shadow-sm"
-                      as="span"
-                    >
-                      Select File to Upload
-                    </Button>
-                  </label>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    icon={Upload}
+                    loading={uploadingResume}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="cursor-pointer shadow-sm"
+                  >
+                    Select File to Upload
+                  </Button>
                 </div>
               )}
             </Card>

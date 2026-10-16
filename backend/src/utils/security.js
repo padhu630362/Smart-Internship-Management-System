@@ -69,9 +69,18 @@ export const hashResetToken = (token) => {
   return crypto.createHash('sha256').update(token).digest('hex');
 };
 
+/**
+ * Generates a cryptographically secure 6-digit numeric verification code.
+ * @returns {string} 6-digit string (100000 - 999999)
+ */
+export const generateSixDigitCode = () => {
+  return crypto.randomInt(100000, 1000000).toString();
+};
+
 export default {
   hashPassword,
   verifyPassword,
   generateRandomToken,
   hashResetToken,
+  generateSixDigitCode,
 };
