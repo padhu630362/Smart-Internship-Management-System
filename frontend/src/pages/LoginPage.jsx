@@ -7,9 +7,6 @@ import {
   AlertCircle,
   CheckCircle2,
   ArrowLeft,
-  GraduationCap,
-  Building2,
-  Users,
   ShieldCheck,
   RefreshCw,
   ArrowRight,
@@ -35,7 +32,6 @@ export const LoginPage = () => {
   const [password, setPassword] = useState('');
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState('student');
   const userInteractedRef = useRef(false);
 
   // Two-Step Verification state for Login
@@ -77,22 +73,16 @@ export const LoginPage = () => {
     };
   }, []);
 
-  // Automatically redirect already authenticated users to their role dashboard
+  // Automatically redirect already authenticated users to their verified dashboard
   useEffect(() => {
     if (isAuthenticated && user) {
       const targetRoute =
-        from && from !== '/login' && from !== '/register' && from !== '/'
+        from && from !== '/login' && from !== '/register' && from !== '/' && from !== '/admin/login'
           ? from
           : getRoleDashboardRoute(user.role);
       navigate(targetRoute, { replace: true });
     }
   }, [isAuthenticated, user, navigate, from]);
-
-  // Role tab switch - does NOT insert any hardcoded credentials into form fields
-  const handleTabChange = (role) => {
-    setActiveTab(role);
-    setFormError('');
-  };
 
   // Two-factor cooldown countdown timer
   useEffect(() => {
@@ -125,12 +115,12 @@ export const LoginPage = () => {
         return;
       }
       const targetRoute =
-        from && from !== '/login' && from !== '/register' && from !== '/'
+        from && from !== '/login' && from !== '/register' && from !== '/' && from !== '/admin/login'
           ? from
           : getRoleDashboardRoute(res?.user?.role);
       navigate(targetRoute, { replace: true });
     } catch (err) {
-      setFormError(err.response?.data?.message || err.message || 'Invalid email or password.');
+      setFormError(err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Invalid email or password.');
     } finally {
       setSubmitting(false);
     }
@@ -149,12 +139,12 @@ export const LoginPage = () => {
     try {
       const res = await completeTwoFactor({ email: twoFactorEmail, code: twoFactorCode.trim() });
       const targetRoute =
-        from && from !== '/login' && from !== '/register' && from !== '/'
+        from && from !== '/login' && from !== '/register' && from !== '/' && from !== '/admin/login'
           ? from
           : getRoleDashboardRoute(res?.user?.role);
       navigate(targetRoute, { replace: true });
     } catch (err) {
-      setFormError(err.response?.data?.message || err.message || 'Invalid or expired verification code.');
+      setFormError(err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Invalid or expired verification code.');
     } finally {
       setSubmitting(false);
     }
@@ -365,51 +355,6 @@ export const LoginPage = () => {
                 </div>
               ) : (
                 <>
-                  {/* Stakeholder Account Type Selection */}
-                  <div className="space-y-1.5 mb-4">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 block">
-                      Account Type:
-                    </span>
-                    <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-champagne-100/70 dark:bg-warmdark-800 text-xs font-semibold">
-                      <button
-                        type="button"
-                        onClick={() => handleTabChange('student')}
-                        className={`py-1.5 px-2 rounded-lg flex items-center justify-center gap-1.5 transition-all ${
-                          activeTab === 'student'
-                            ? 'bg-white dark:bg-[#25171c] text-burgundy-800 dark:text-champagne-300 shadow-xs'
-                            : 'text-stone-600 dark:text-stone-400 hover:text-stone-900'
-                        }`}
-                      >
-                        <GraduationCap className="w-3.5 h-3.5" />
-                        <span>Student</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleTabChange('company')}
-                        className={`py-1.5 px-2 rounded-lg flex items-center justify-center gap-1.5 transition-all ${
-                          activeTab === 'company'
-                            ? 'bg-white dark:bg-[#25171c] text-burgundy-800 dark:text-champagne-300 shadow-xs'
-                            : 'text-stone-600 dark:text-stone-400 hover:text-stone-900'
-                        }`}
-                      >
-                        <Building2 className="w-3.5 h-3.5" />
-                        <span>Employer</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleTabChange('mentor')}
-                        className={`py-1.5 px-2 rounded-lg flex items-center justify-center gap-1.5 transition-all ${
-                          activeTab === 'mentor'
-                            ? 'bg-white dark:bg-[#25171c] text-burgundy-800 dark:text-champagne-300 shadow-xs'
-                            : 'text-stone-600 dark:text-stone-400 hover:text-stone-900'
-                        }`}
-                      >
-                        <Users className="w-3.5 h-3.5" />
-                        <span>Mentor</span>
-                      </button>
-                    </div>
-                  </div>
-
                   {/* Login Form */}
                   <form onSubmit={handleLoginSubmit} autoComplete="off" className="space-y-3.5">
                     {/* Hidden decoy fields to divert aggressive browser credential autofill */}
@@ -513,7 +458,7 @@ export const LoginPage = () => {
                   to="/register"
                   className="font-bold text-burgundy-700 dark:text-champagne-400 hover:underline"
                 >
-                  Register as Student or Company
+                  Sign Up
                 </Link>
               </div>
             </CardContent>

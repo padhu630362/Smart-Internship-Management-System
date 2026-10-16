@@ -22,6 +22,7 @@ import {
   ArrowUpRight,
   Heart,
   User,
+  UserPlus,
 } from 'lucide-react';
 import SimsLogo from './common/SimsLogo';
 import PolicyModal from './common/PolicyModal';
@@ -142,16 +143,7 @@ export const Footer = () => {
                     className="group inline-flex items-center gap-1.5 hover:text-burgundy-700 dark:hover:text-champagne-300 transition-colors"
                   >
                     <User className="w-3.5 h-3.5 text-stone-400 group-hover:text-burgundy-600 dark:group-hover:text-champagne-400" />
-                    <span>User Login (Students)</span>
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to="/admin/login"
-                    className="group inline-flex items-center gap-1.5 hover:text-burgundy-700 dark:hover:text-champagne-300 transition-colors font-semibold"
-                  >
-                    <ShieldCheck className="w-3.5 h-3.5 text-champagne-600" />
-                    <span className="text-burgundy-800 dark:text-champagne-300">Admin Login Portal</span>
+                    <span>Login</span>
                   </Link>
                 </li>
                 <li>
@@ -159,8 +151,8 @@ export const Footer = () => {
                     to="/register"
                     className="group inline-flex items-center gap-1.5 hover:text-burgundy-700 dark:hover:text-champagne-300 transition-colors"
                   >
-                    <GraduationCap className="w-3.5 h-3.5 text-stone-400 group-hover:text-burgundy-600 dark:group-hover:text-champagne-400" />
-                    <span>Student Registration</span>
+                    <UserPlus className="w-3.5 h-3.5 text-stone-400 group-hover:text-burgundy-600 dark:group-hover:text-champagne-400" />
+                    <span>Sign Up</span>
                   </Link>
                 </li>
                 <li>

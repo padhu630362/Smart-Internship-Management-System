@@ -265,6 +265,22 @@ describe('Phase 3: User Profiles and User Management Tests', () => {
     assert.equal(res.body.data.user.role, ROLES.COORDINATOR);
   });
 
+  it('TC-ADMIN-03B: Should reject admin creating duplicate user with existing email (409 Conflict)', async () => {
+    const res = await request(app)
+      .post('/api/users')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        name: 'Duplicate Coordinator',
+        email: `  ${coordinatorEmail.toUpperCase()}  `,
+        password: defaultPassword,
+        role: ROLES.COORDINATOR,
+        status: USER_STATUSES.ACTIVE,
+      });
+
+    assert.equal(res.status, 409);
+    assert.equal(res.body.success, false);
+  });
+
   it('TC-ADMIN-04: Should allow admin to update a user status and role', async () => {
     const res = await request(app)
       .patch(`/api/users/${studentUser._id}/status`)

@@ -6,6 +6,7 @@ import {
   X,
   LayoutDashboard,
   User,
+  UserPlus,
   ArrowRight,
   Sparkles,
 } from 'lucide-react';
@@ -112,7 +113,7 @@ export const PublicNavbar = () => {
           </div>
         </nav>
 
-        {/* 3. Right Column: Theme Toggle, User Login & Admin Login (Proportionally balanced) */}
+        {/* 3. Right Column: Theme Toggle, Login & Sign Up */}
         <div className="flex-1 flex items-center justify-end gap-2.5 sm:gap-3">
           <ThemeToggle />
 
@@ -127,27 +128,26 @@ export const PublicNavbar = () => {
             </Link>
           ) : (
             <div className="flex items-center gap-2.5">
-              {/* User Login Button with Dynamic Hover Color Shift */}
+              {/* Login Button */}
               <Link
                 to="/login"
-                id="public-user-login-btn"
+                id="public-login-btn"
                 className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-stone-800 dark:text-stone-200 bg-white dark:bg-warmdark-850 border border-stone-300/80 dark:border-stone-700 hover:border-burgundy-600 dark:hover:border-champagne-400 hover:text-white hover:bg-gradient-to-r hover:from-burgundy-700 hover:to-burgundy-850 hover:shadow-md transition-all duration-300 shadow-2xs hover:scale-105"
-                title="Sign in as Student, Employer, or Mentor"
+                title="Sign in to your InternHub account"
               >
                 <User className="w-4 h-4 text-burgundy-600 dark:text-champagne-400 group-hover:text-white" />
-                <span>User Login</span>
+                <span>Login</span>
               </Link>
 
-              {/* Admin Login Button with Distinct Institutional Shield Styling */}
+              {/* Sign Up Button */}
               <Link
-                to="/admin/login"
-                id="public-admin-login-btn"
-                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-champagne-200 bg-gradient-to-r from-burgundy-950 via-[#3a131e] to-burgundy-950 hover:from-burgundy-800 hover:to-burgundy-900 border border-champagne-400/40 shadow-sm shadow-burgundy-950/40 hover:shadow-lg hover:border-champagne-300 transition-all duration-300 hover:scale-105"
-                title="Institutional Administrator and Coordinator Gateway"
+                to="/register"
+                id="public-signup-btn"
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-burgundy-700 to-burgundy-900 hover:from-burgundy-600 hover:to-burgundy-800 shadow-sm shadow-burgundy-950/30 transition-all duration-200 hover:scale-105"
+                title="Create a new InternHub account"
               >
-                <ShieldCheck className="w-4 h-4 text-champagne-300" />
-                <span className="hidden sm:inline">Admin Login</span>
-                <span className="sm:hidden">Admin</span>
+                <UserPlus className="w-4 h-4 text-champagne-300" />
+                <span>Sign Up</span>
               </Link>
             </div>
           )}
@@ -197,16 +197,7 @@ export const PublicNavbar = () => {
                   className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold border border-stone-300 dark:border-stone-700 text-stone-800 dark:text-stone-200 bg-champagne-50/50 dark:bg-warmdark-800 hover:bg-champagne-100 transition-colors"
                 >
                   <User className="w-4 h-4 text-burgundy-600 dark:text-champagne-400" />
-                  <span>User Login (Students & Mentors)</span>
-                </Link>
-
-                <Link
-                  to="/admin/login"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold text-champagne-200 bg-gradient-to-r from-burgundy-900 to-burgundy-950 border border-champagne-400/40 hover:from-burgundy-800 transition-colors"
-                >
-                  <ShieldCheck className="w-4 h-4 text-champagne-300" />
-                  <span>Admin & Coordinator Portal</span>
+                  <span>Login</span>
                 </Link>
 
                 <Link
@@ -214,8 +205,8 @@ export const PublicNavbar = () => {
                   onClick={() => setMobileMenuOpen(false)}
                   className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-burgundy-700 to-burgundy-850 hover:bg-burgundy-800 transition-colors shadow-sm"
                 >
-                  <span>Create Free Account</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <UserPlus className="w-4 h-4 text-champagne-300" />
+                  <span>Sign Up</span>
                 </Link>
               </>
             ) : (

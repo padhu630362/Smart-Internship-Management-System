@@ -8,6 +8,15 @@ const __dirname = path.dirname(__filename);
 // Load .env from backend directory if present
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
+// Automatically detect test runs so automated tests never pollute the live database
+const isTestRun =
+  process.env.NODE_ENV === 'test' ||
+  (process.argv && process.argv.some((arg) => typeof arg === 'string' && (arg.includes('--test') || arg.includes('tests/') || arg.includes('tests\\'))));
+
+if (isTestRun && process.env.NODE_ENV !== 'production') {
+  process.env.NODE_ENV = 'test';
+}
+
 function resolveMongoUri() {
   const baseUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/smart_internship_db';
   if (process.env.NODE_ENV === 'test') {

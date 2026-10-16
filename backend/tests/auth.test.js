@@ -120,6 +120,21 @@ describe('Phase 2: Authentication and RBAC Integration Tests', () => {
     assert.equal(res.body.error.code, 'DUPLICATE_EMAIL');
   });
 
+  it('TC-AUTH-05B: Should reject duplicate email registration even with uppercase and leading/trailing whitespace (409 Conflict)', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({
+        name: 'Case Variant Student',
+        email: `  ${testStudentEmail.toUpperCase()}  `,
+        password: testPassword,
+        role: ROLES.STUDENT,
+      });
+
+    assert.equal(res.status, 409);
+    assert.equal(res.body.success, false);
+    assert.equal(res.body.error.code, 'DUPLICATE_EMAIL');
+  });
+
   it('TC-AUTH-06: Should reject registration with weak password (400 Bad Request)', async () => {
     const res = await request(app)
       .post('/api/auth/register')

@@ -5,9 +5,18 @@ import { setAuthToken } from '../api/client';
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem('sims_auth_user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      return null;
+    }
+  });
   const [token, setToken] = useState(() => localStorage.getItem('sims_auth_token'));
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => {
+    return Boolean(localStorage.getItem('sims_auth_token') && !localStorage.getItem('sims_auth_user'));
+  });
   const [error, setError] = useState(null);
 
   // Restore authenticated session on initial load
@@ -15,6 +24,7 @@ export const AuthProvider = ({ children }) => {
     const savedToken = localStorage.getItem('sims_auth_token');
     if (!savedToken) {
       setAuthToken(null);
+      localStorage.removeItem('sims_auth_user');
       setUser(null);
       setIsLoading(false);
       return;
@@ -25,15 +35,22 @@ export const AuthProvider = ({ children }) => {
       const response = await authService.getMe();
       if (response?.data?.user) {
         setUser(response.data.user);
+        try {
+          localStorage.setItem('sims_auth_user', JSON.stringify(response.data.user));
+        } catch {
+          // Ignore storage quota error
+        }
         setToken(savedToken);
       } else {
         setAuthToken(null);
+        localStorage.removeItem('sims_auth_user');
         setUser(null);
         setToken(null);
       }
     } catch {
       // Stale or invalid token
       setAuthToken(null);
+      localStorage.removeItem('sims_auth_user');
       setUser(null);
       setToken(null);
     } finally {
@@ -47,6 +64,7 @@ export const AuthProvider = ({ children }) => {
     // Listen for automatic token expiration from axios interceptor
     const handleExpired = () => {
       setAuthToken(null);
+      localStorage.removeItem('sims_auth_user');
       setUser(null);
       setToken(null);
       setError('Your session has expired. Please sign in again.');
@@ -72,6 +90,11 @@ export const AuthProvider = ({ children }) => {
 
       setAuthToken(authToken);
       setUser(authUser);
+      try {
+        localStorage.setItem('sims_auth_user', JSON.stringify(authUser));
+      } catch {
+        // Ignore storage write error
+      }
       setToken(authToken);
       return { success: true, user: authUser };
     } catch (err) {
@@ -91,6 +114,11 @@ export const AuthProvider = ({ children }) => {
 
       setAuthToken(authToken);
       setUser(authUser);
+      try {
+        localStorage.setItem('sims_auth_user', JSON.stringify(authUser));
+      } catch {
+        // Ignore storage write error
+      }
       setToken(authToken);
       return { success: true, user: authUser };
     } catch (err) {
@@ -110,6 +138,11 @@ export const AuthProvider = ({ children }) => {
 
       setAuthToken(authToken);
       setUser(authUser);
+      try {
+        localStorage.setItem('sims_auth_user', JSON.stringify(authUser));
+      } catch {
+        // Ignore storage write error
+      }
       setToken(authToken);
       return { success: true, user: authUser };
     } catch (err) {
@@ -129,6 +162,11 @@ export const AuthProvider = ({ children }) => {
 
       setAuthToken(authToken);
       setUser(authUser);
+      try {
+        localStorage.setItem('sims_auth_user', JSON.stringify(authUser));
+      } catch {
+        // Ignore storage write error
+      }
       setToken(authToken);
       return { success: true, user: authUser };
     } catch (err) {
@@ -144,6 +182,7 @@ export const AuthProvider = ({ children }) => {
       await authService.logout();
     } finally {
       setAuthToken(null);
+      localStorage.removeItem('sims_auth_user');
       setUser(null);
       setToken(null);
       setError(null);
@@ -154,7 +193,15 @@ export const AuthProvider = ({ children }) => {
 
   const updateUserState = (updatedUser) => {
     if (!updatedUser) return;
-    setUser((prev) => (prev ? { ...prev, ...updatedUser } : updatedUser));
+    setUser((prev) => {
+      const nextUser = prev ? { ...prev, ...updatedUser } : updatedUser;
+      try {
+        localStorage.setItem('sims_auth_user', JSON.stringify(nextUser));
+      } catch {
+        // Ignore storage write error
+      }
+      return nextUser;
+    });
   };
 
   return (

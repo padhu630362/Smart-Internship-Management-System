@@ -190,7 +190,17 @@ export const RegisterPage = () => {
               {formError && (
                 <div className="mb-3.5 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-xs text-rose-700 dark:text-rose-400 flex items-start gap-2.5 animate-in fade-in">
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span className="font-semibold">{formError}</span>
+                  <div className="flex-1">
+                    <span className="font-semibold">{formError}</span>
+                    {formError.toLowerCase().includes('already exists') && (
+                      <div className="mt-1 text-xs text-rose-600 dark:text-rose-300">
+                        <span>Already registered? </span>
+                        <Link to="/login" className="underline font-bold hover:text-rose-800 dark:hover:text-rose-100">
+                          Sign In here
+                        </Link>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 

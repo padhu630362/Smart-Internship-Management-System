@@ -162,7 +162,7 @@ export const HomePage = () => {
       description:
         'Strict role-based authorization (RBAC), sanitized CSV accreditation exports, and immutable administrative audit logs.',
       badge: 'Enterprise RBAC',
-      link: '/admin/login',
+      link: '/login',
       colorClass: 'from-champagne-500/10 to-burgundy-900/10 dark:from-champagne-600/20 dark:to-burgundy-900/30',
       borderHover: 'hover:border-burgundy-400 dark:hover:border-champagne-500',
       iconBg: 'bg-champagne-100 dark:bg-warmdark-800 text-burgundy-900 dark:text-champagne-200',
@@ -321,37 +321,27 @@ export const HomePage = () => {
                 </>
               ) : (
                 <>
-                  {/* User Login CTA */}
-                  <Link to="/login" id="hero-user-login-cta">
+                  {/* Login CTA */}
+                  <Link to="/login" id="hero-login-cta">
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl text-sm font-bold text-stone-800 dark:text-stone-100 bg-white/95 dark:bg-warmdark-800 border border-stone-300 dark:border-stone-700 hover:border-burgundy-600 dark:hover:border-champagne-400 hover:bg-champagne-50/70 dark:hover:bg-warmdark-750 shadow-sm hover:shadow-md hover:scale-105 transition-all duration-200"
+                    >
+                      <User className="w-4 h-4 text-burgundy-600 dark:text-champagne-400" />
+                      <span>Login</span>
+                      <ArrowRight className="w-4 h-4 text-stone-400" />
+                    </button>
+                  </Link>
+
+                  {/* Sign Up CTA */}
+                  <Link to="/register" id="hero-signup-cta">
                     <button
                       type="button"
                       className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-burgundy-700 via-burgundy-800 to-burgundy-900 hover:from-burgundy-600 hover:to-burgundy-800 shadow-md shadow-burgundy-950/20 hover:shadow-lg hover:scale-105 transition-all duration-200"
                     >
-                      <User className="w-4 h-4 text-champagne-300" />
-                      <span>User Login</span>
+                      <UserPlus className="w-4 h-4 text-champagne-300" />
+                      <span>Sign Up</span>
                       <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </Link>
-
-                  {/* Admin Login CTA */}
-                  <Link to="/admin/login" id="hero-admin-login-cta">
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl text-sm font-bold text-champagne-200 bg-gradient-to-r from-burgundy-950 via-[#3a131e] to-burgundy-950 hover:from-burgundy-900 hover:to-burgundy-850 border border-champagne-400/50 shadow-md shadow-burgundy-950/40 hover:shadow-lg hover:scale-105 transition-all duration-200"
-                    >
-                      <ShieldCheck className="w-4 h-4 text-champagne-300" />
-                      <span>Admin Portal</span>
-                    </button>
-                  </Link>
-
-                  {/* Register Free */}
-                  <Link to="/register">
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-2 px-5 py-3.5 rounded-2xl text-sm font-bold text-stone-700 dark:text-stone-200 bg-white/90 dark:bg-warmdark-800 border border-stone-300 dark:border-stone-700 hover:border-burgundy-600 hover:bg-champagne-50/70 transition-all duration-200 hover:scale-105"
-                    >
-                      <UserPlus className="w-4 h-4 text-burgundy-600 dark:text-champagne-400" />
-                      <span>Create Account</span>
                     </button>
                   </Link>
                 </>

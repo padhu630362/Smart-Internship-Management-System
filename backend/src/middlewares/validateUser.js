@@ -100,12 +100,14 @@ export const validateAdminCreateUser = (req, res, next) => {
     return next(error);
   }
 
-  if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
+  const normalizedEmail = typeof email === 'string' ? email.trim() : '';
+  if (!normalizedEmail || !/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
     const error = new Error('A valid email address is required.');
     error.statusCode = 400;
     error.code = 'VALIDATION_ERROR';
     return next(error);
   }
+  req.body.email = normalizedEmail;
 
   if (!password || password.length < 8) {
     const error = new Error('Password must be at least 8 characters long.');
@@ -153,11 +155,15 @@ export const validateAdminUpdateUser = async (req, res, next) => {
     return next(error);
   }
 
-  if (email && !/^\S+@\S+\.\S+$/.test(email)) {
-    const error = new Error('Invalid email address format.');
-    error.statusCode = 400;
-    error.code = 'VALIDATION_ERROR';
-    return next(error);
+  if (email !== undefined) {
+    const normalizedEmail = typeof email === 'string' ? email.trim() : '';
+    if (!normalizedEmail || !/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+      const error = new Error('Invalid email address format.');
+      error.statusCode = 400;
+      error.code = 'VALIDATION_ERROR';
+      return next(error);
+    }
+    req.body.email = normalizedEmail;
   }
 
   try {

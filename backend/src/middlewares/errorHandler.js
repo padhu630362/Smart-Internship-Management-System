@@ -38,8 +38,11 @@ export const errorHandler = (err, req, res, next) => {
   // Handle MongoDB duplicate key error (code 11000)
   if (err.code === 11000) {
     const duplicateFields = Object.keys(err.keyValue || {});
-    const message = `Duplicate value entered for field(s): ${duplicateFields.join(', ')}.`;
-    error = new AppError(message, 409, 'DUPLICATE_KEY_ERROR');
+    const isEmail = duplicateFields.includes('email');
+    const message = isEmail
+      ? 'An account with this email address already exists.'
+      : `Duplicate value entered for field(s): ${duplicateFields.join(', ')}.`;
+    error = new AppError(message, 409, isEmail ? 'DUPLICATE_EMAIL' : 'DUPLICATE_KEY_ERROR');
   }
 
   // Handle JSON parse syntax errors in body

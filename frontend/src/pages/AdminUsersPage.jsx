@@ -160,7 +160,7 @@ export const AdminUsersPage = () => {
       setIsEditOpen(false);
       fetchUsers();
     } catch (err) {
-      setErrorMessage(err.response?.data?.error?.message || 'Failed to update user.');
+      setErrorMessage(err.response?.data?.error?.message || err.message || 'Failed to update user.');
     } finally {
       setActionLoading(false);
     }
@@ -175,7 +175,7 @@ export const AdminUsersPage = () => {
       setTimeout(() => setSuccessMessage(''), 4000);
       fetchUsers();
     } catch (err) {
-      setErrorMessage(err.response?.data?.error?.message || 'Failed to update user status.');
+      setErrorMessage(err.response?.data?.error?.message || err.message || 'Failed to update user status.');
     }
   };
 
@@ -198,7 +198,7 @@ export const AdminUsersPage = () => {
       });
       fetchUsers(1);
     } catch (err) {
-      setErrorMessage(err.response?.data?.error?.message || 'Failed to create user.');
+      setErrorMessage(err.response?.data?.error?.message || err.message || 'Failed to create user.');
     } finally {
       setActionLoading(false);
     }

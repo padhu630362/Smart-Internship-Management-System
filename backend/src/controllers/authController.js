@@ -640,19 +640,30 @@ export const googleLogin = async (req, res, next) => {
       const passwordHash = await hashPassword(randomPassword);
       const chosenRole = ALLOWED_SELF_REGISTRATION_ROLES.includes(role) ? role : ROLES.STUDENT;
 
-      user = await User.create({
-        name: googlePayload.name || email.split('@')[0],
-        email,
-        passwordHash,
-        role: chosenRole,
-        googleId: googlePayload.sub,
-        authProvider: 'google',
-        status: 'active',
-        profile: {
-          avatarUrl: googlePayload.picture || '',
-        },
-        lastLoginAt: new Date(),
-      });
+      try {
+        user = await User.create({
+          name: googlePayload.name || email.split('@')[0],
+          email,
+          passwordHash,
+          role: chosenRole,
+          googleId: googlePayload.sub,
+          authProvider: 'google',
+          status: 'active',
+          profile: {
+            avatarUrl: googlePayload.picture || '',
+          },
+          lastLoginAt: new Date(),
+        });
+      } catch (createErr) {
+        // Concurrency guard: If a simultaneous request created the account concurrently
+        if (createErr.code === 11000) {
+          user = await User.findOne({ email });
+          if (!user) throw createErr;
+          isNewUser = false;
+        } else {
+          throw createErr;
+        }
+      }
     }
 
     // Issue JWT token

@@ -400,7 +400,8 @@ export const createUser = async (req, res, next) => {
   try {
     const { name, email, password, role, status, profile } = req.body;
 
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    const normalizedEmail = email ? String(email).toLowerCase().trim() : '';
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       const error = new Error('An account with this email address already exists.');
       error.statusCode = 409;
@@ -412,7 +413,7 @@ export const createUser = async (req, res, next) => {
 
     const newUser = await User.create({
       name: name.trim(),
-      email: email.toLowerCase().trim(),
+      email: normalizedEmail,
       passwordHash,
       role,
       status: status || USER_STATUSES.ACTIVE,
@@ -442,15 +443,16 @@ export const updateUser = async (req, res, next) => {
     const previousStatus = targetUser.status;
 
     if (name) targetUser.name = name.trim();
-    if (email && email.toLowerCase() !== targetUser.email) {
-      const emailTaken = await User.findOne({ email: email.toLowerCase(), _id: { $ne: targetUser._id } });
+    const normalizedEmail = email ? String(email).toLowerCase().trim() : undefined;
+    if (normalizedEmail && normalizedEmail !== targetUser.email) {
+      const emailTaken = await User.findOne({ email: normalizedEmail, _id: { $ne: targetUser._id } });
       if (emailTaken) {
         const error = new Error('Email address is already in use by another account.');
         error.statusCode = 409;
         error.code = 'EMAIL_ALREADY_EXISTS';
         return next(error);
       }
-      targetUser.email = email.toLowerCase().trim();
+      targetUser.email = normalizedEmail;
     }
 
     if (role) targetUser.role = role;
