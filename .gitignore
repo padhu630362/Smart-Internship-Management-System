@@ -164,3 +164,6 @@ uploads/
 storage/
 private/
 
+# Local technical documentation (kept locally, excluded from repository)
+PROJECT_DOCUMENTATION.md
+
