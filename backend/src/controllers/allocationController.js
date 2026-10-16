@@ -53,6 +53,7 @@ export const createAllocation = async (req, res, next) => {
       title: 'Internship Allocation Confirmed',
       message: `Congratulations! You have been placed into "${internship.title}".`,
       link: '/allocations',
+      eventKey: `allocation_student:${allocation._id}`,
       metadata: {
         allocationId: allocation._id,
         internshipId: internship._id,
@@ -68,6 +69,7 @@ export const createAllocation = async (req, res, next) => {
         title: 'New Intern Assigned',
         message: `${student.name} has been assigned to your mentorship for "${internship.title}".`,
         link: '/allocations',
+        eventKey: `allocation_mentor:${allocation._id}`,
         metadata: {
           allocationId: allocation._id,
           studentId: student._id,

@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { Evaluation } from '../models/Evaluation.js';
 import { Allocation } from '../models/Allocation.js';
 import { Notification, NOTIFICATION_TYPES } from '../models/Notification.js';
+import { createAndDispatchNotification } from '../services/notificationService.js';
 import { emitNotificationToUser } from '../socket.js';
 import { ROLES } from '../models/User.js';
 import { issueCertificate } from '../services/certificateService.js';
@@ -49,26 +50,21 @@ export const createEvaluation = async (req, res, next) => {
       .populate('allocation', 'startDate endDate status');
 
     // Notify the student about the evaluation
-    try {
-      const typeLabel = evaluationType === 'mid_term' ? 'Mid-term' : 'Final';
-      const notification = await Notification.create({
-        recipient: allocation.student._id,
-        sender: evaluatorId,
-        type: NOTIFICATION_TYPES.TASK_FEEDBACK,
-        title: `Internship ${typeLabel} Evaluation Submitted`,
-        message: `Your ${typeLabel.toLowerCase()} evaluation for ${allocation.internship.title} has been submitted by ${req.user.name}.`,
-        link: '/evaluations',
-        metadata: {
-          evaluationId: newEvaluation._id,
-          allocationId: allocation._id,
-          overallRating: populatedEvaluation.ratings?.overallRating,
-        },
-      });
-
-      emitNotificationToUser(allocation.student._id, notification);
-    } catch (notifErr) {
-      console.warn('Could not dispatch evaluation notification:', notifErr.message);
-    }
+    const typeLabel = evaluationType === 'mid_term' ? 'Mid-term' : 'Final';
+    createAndDispatchNotification({
+      recipientId: allocation.student._id,
+      senderId: evaluatorId,
+      type: NOTIFICATION_TYPES.TASK_FEEDBACK,
+      title: `Internship ${typeLabel} Evaluation Submitted`,
+      message: `Your ${typeLabel.toLowerCase()} evaluation for "${allocation.internship?.title || 'internship'}" has been submitted by ${req.user.name}.`,
+      link: '/evaluations',
+      eventKey: `eval_submitted:${newEvaluation._id}`,
+      metadata: {
+        evaluationId: newEvaluation._id,
+        allocationId: allocation._id,
+        overallRating: populatedEvaluation.ratings?.overallRating,
+      },
+    }).catch(() => {});
 
     // Auto-issue completion certificate if final evaluation is passed
     let issuedCertificate = null;
@@ -86,20 +82,20 @@ export const createEvaluation = async (req, res, next) => {
         });
 
         // Dispatch completion certificate notification
-        const certNotif = await Notification.create({
-          recipient: allocation.student._id,
-          sender: evaluatorId,
-          type: NOTIFICATION_TYPES.CERTIFICATE_ISSUED || 'certificate_issued',
+        createAndDispatchNotification({
+          recipientId: allocation.student._id,
+          senderId: evaluatorId,
+          type: NOTIFICATION_TYPES.CERTIFICATE_ISSUED,
           title: 'Completion Certificate Issued!',
           message: `Congratulations! Your official completion certificate for "${allocation.internship?.title || 'Internship'}" is ready to view and download.`,
           link: '/certificates',
+          eventKey: `cert_issued:${issuedCertificate._id}`,
           metadata: {
             certificateId: issuedCertificate._id,
             certificateNumber: issuedCertificate.certificateNumber,
             verificationCode: issuedCertificate.verificationCode,
           },
-        });
-        emitNotificationToUser(allocation.student._id, certNotif);
+        }).catch(() => {});
       } catch (certErr) {
         console.warn('Could not auto-issue certificate:', certErr.message);
       }

@@ -10,6 +10,10 @@ import { AppError } from '../utils/AppError.js';
 import { env } from '../config/env.js';
 import { getFirebaseAuth } from '../config/firebaseAdmin.js';
 import { sendPasswordResetCode, sendTwoFactorCode } from '../services/emailService.js';
+import {
+  createAndDispatchBulkNotifications,
+  NOTIFICATION_TYPES,
+} from '../services/notificationService.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -45,6 +49,32 @@ export const register = async (req, res, next) => {
       role: user.role,
       email: user.email,
     });
+
+    // Notify administrators and coordinators of new registration
+    User.find({ role: { $in: [ROLES.ADMIN, ROLES.COORDINATOR] }, status: 'active' })
+      .select('_id')
+      .lean()
+      .then((admins) => {
+        if (admins && admins.length > 0) {
+          createAndDispatchBulkNotifications(
+            admins.map((a) => a._id),
+            {
+              senderId: user._id,
+              type: NOTIFICATION_TYPES.USER_REGISTERED,
+              title: 'New User Registered',
+              message: `${user.name} (${user.email}) registered as ${user.role.toUpperCase()}.`,
+              link: '/users',
+              eventKeyPrefix: `user_registered:${user._id}`,
+              metadata: {
+                registeredUserId: user._id,
+                email: user.email,
+                role: user.role,
+              },
+            }
+          );
+        }
+      })
+      .catch(() => {});
 
     res.status(201).json({
       success: true,

@@ -237,6 +237,52 @@ export const getCompanyInternships = async (req, res, next) => {
 /**
  * Creates a new internship opportunity.
  */
+/**
+ * Dispatches skill-matched and deduplicated notifications when an internship is published.
+ */
+const notifyStudentsForPublishedInternship = async (opportunity, senderId) => {
+  try {
+    const students = await User.find({ role: ROLES.STUDENT, status: 'active' })
+      .select('_id profile.studentDetails.skills')
+      .lean();
+
+    if (!students || students.length === 0) return;
+
+    const reqSkills = (opportunity.requiredSkills || []).map((s) => s.toLowerCase().trim()).filter(Boolean);
+
+    let matchingStudents = students;
+    if (reqSkills.length > 0) {
+      const filtered = students.filter((st) => {
+        const studentSkills = (st.profile?.studentDetails?.skills || []).map((s) => s.toLowerCase().trim());
+        return studentSkills.some((s) => reqSkills.includes(s));
+      });
+      // Prioritize skill-matching students if any exist; otherwise fallback to active students
+      if (filtered.length > 0) {
+        matchingStudents = filtered;
+      }
+    }
+
+    await createAndDispatchBulkNotifications(
+      matchingStudents.map((s) => s._id),
+      {
+        senderId,
+        type: NOTIFICATION_TYPES.OPPORTUNITY_PUBLISHED,
+        title: 'New Internship Opportunity',
+        message: `"${opportunity.title}" at ${opportunity.companyName} is now accepting applications.`,
+        link: '/internships',
+        eventKeyPrefix: `internship_published:${opportunity._id}`,
+        metadata: {
+          internshipId: opportunity._id,
+          companyName: opportunity.companyName,
+          title: opportunity.title,
+        },
+      }
+    );
+  } catch (err) {
+    // Non-blocking notification dispatch failure
+  }
+};
+
 export const createInternship = async (req, res, next) => {
   try {
     const {
@@ -327,25 +373,7 @@ export const createInternship = async (req, res, next) => {
     });
 
     if (newOpportunity.status === INTERNSHIP_STATUSES.PUBLISHED) {
-      User.find({ role: ROLES.STUDENT, status: 'active' })
-        .select('_id')
-        .lean()
-        .then((students) => {
-          if (students && students.length > 0) {
-            createAndDispatchBulkNotifications(
-              students.map((s) => s._id),
-              {
-                senderId: user.id,
-                type: NOTIFICATION_TYPES.OPPORTUNITY_PUBLISHED,
-                title: 'New Internship Opportunity',
-                message: `"${newOpportunity.title}" at ${newOpportunity.companyName} is now accepting applications.`,
-                link: '/opportunities',
-                metadata: { internshipId: newOpportunity._id },
-              }
-            );
-          }
-        })
-        .catch(() => {});
+      notifyStudentsForPublishedInternship(newOpportunity, user.id);
     }
 
     res.status(201).json({
@@ -458,25 +486,7 @@ export const updateInternshipStatus = async (req, res, next) => {
     await opportunity.save();
 
     if (status === INTERNSHIP_STATUSES.PUBLISHED && !wasPublished) {
-      User.find({ role: ROLES.STUDENT, status: 'active' })
-        .select('_id')
-        .lean()
-        .then((students) => {
-          if (students && students.length > 0) {
-            createAndDispatchBulkNotifications(
-              students.map((s) => s._id),
-              {
-                senderId: req.user.id,
-                type: NOTIFICATION_TYPES.OPPORTUNITY_PUBLISHED,
-                title: 'New Internship Opportunity',
-                message: `"${opportunity.title}" at ${opportunity.companyName} is now accepting applications.`,
-                link: '/opportunities',
-                metadata: { internshipId: opportunity._id },
-              }
-            );
-          }
-        })
-        .catch(() => {});
+      notifyStudentsForPublishedInternship(opportunity, req.user.id);
     }
 
     res.status(200).json({

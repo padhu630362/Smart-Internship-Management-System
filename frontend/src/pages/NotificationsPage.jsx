@@ -52,14 +52,19 @@ export const NotificationsPage = () => {
       if (link.includes('application')) return '/my-applications';
       if (link.includes('task')) return '/my-tasks';
       if (link.includes('attendance')) return '/my-attendance';
-      if (link.includes('opportunit') || link.includes('external-jobs')) return '/external-jobs';
-      if (link.includes('internship')) return '/internships';
+      if (link.includes('external-jobs')) return '/external-jobs';
+      if (link.includes('internship') || link.includes('opportunit')) return '/internships';
+      if (link.includes('certificate')) return '/certificates';
+      if (link.includes('evaluation')) return '/evaluations';
     } else {
       if (link.includes('application')) return '/manage/applications';
       if (link.includes('task')) return '/manage/tasks';
       if (link.includes('attendance')) return '/manage/attendance';
       if (link.includes('allocation')) return '/manage/allocations';
-      if (link.includes('internship')) return '/manage/internships';
+      if (link.includes('internship') || link.includes('opportunit')) return '/manage/internships';
+      if (link.includes('user')) return '/users';
+      if (link.includes('certificate')) return '/certificates';
+      if (link.includes('evaluation')) return '/evaluations';
     }
     return link;
   };
@@ -94,6 +99,10 @@ export const NotificationsPage = () => {
         return <Clock className="w-5 h-5 text-emerald-500" />;
       case NOTIFICATION_TYPES.INTERN_ALLOCATED:
         return <UserCheck className="w-5 h-5 text-purple-500" />;
+      case NOTIFICATION_TYPES.USER_REGISTERED:
+        return <UserCheck className="w-5 h-5 text-indigo-500" />;
+      case NOTIFICATION_TYPES.CERTIFICATE_ISSUED:
+        return <ShieldCheck className="w-5 h-5 text-emerald-500" />;
       case NOTIFICATION_TYPES.TASK_ASSIGNED:
       case NOTIFICATION_TYPES.TASK_DEADLINE:
         return <Calendar className="w-5 h-5 text-rose-500" />;

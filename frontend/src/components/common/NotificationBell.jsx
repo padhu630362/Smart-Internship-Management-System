@@ -15,6 +15,7 @@ import {
   Megaphone,
   Radio,
   Sparkles,
+  ShieldCheck,
   X,
 } from 'lucide-react';
 import { useSocket } from '../../context/SocketContext';
@@ -71,13 +72,18 @@ export const NotificationBell = () => {
       if (link.includes('application')) return '/my-applications';
       if (link.includes('task')) return '/my-tasks';
       if (link.includes('attendance')) return '/my-attendance';
-      if (link.includes('opportunit')) return '/internships';
+      if (link.includes('internship') || link.includes('opportunit')) return '/internships';
+      if (link.includes('certificate')) return '/certificates';
+      if (link.includes('evaluation')) return '/evaluations';
     } else {
       if (link.includes('application')) return '/manage/applications';
       if (link.includes('task')) return '/manage/tasks';
       if (link.includes('attendance')) return '/manage/attendance';
       if (link.includes('allocation')) return '/manage/allocations';
-      if (link.includes('opportunit')) return '/manage/internships';
+      if (link.includes('internship') || link.includes('opportunit')) return '/manage/internships';
+      if (link.includes('user')) return '/users';
+      if (link.includes('certificate')) return '/certificates';
+      if (link.includes('evaluation')) return '/evaluations';
     }
     return link;
   };
@@ -117,6 +123,10 @@ export const NotificationBell = () => {
         return <Clock className="w-4 h-4 text-emerald-500" />;
       case NOTIFICATION_TYPES.INTERN_ALLOCATED:
         return <UserCheck className="w-4 h-4 text-purple-500" />;
+      case NOTIFICATION_TYPES.USER_REGISTERED:
+        return <UserCheck className="w-4 h-4 text-indigo-500" />;
+      case NOTIFICATION_TYPES.CERTIFICATE_ISSUED:
+        return <ShieldCheck className="w-4 h-4 text-emerald-500" />;
       case NOTIFICATION_TYPES.TASK_ASSIGNED:
       case NOTIFICATION_TYPES.TASK_DEADLINE:
         return <Calendar className="w-4 h-4 text-rose-500" />;

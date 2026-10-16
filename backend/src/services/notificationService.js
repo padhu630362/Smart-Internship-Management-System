@@ -4,6 +4,7 @@ import { logger } from '../utils/logger.js';
 
 /**
  * Persist and dispatch real-time notification to a single user.
+ * Supports idempotency via eventKey to prevent duplicate notifications.
  */
 export const createAndDispatchNotification = async ({
   recipientId,
@@ -13,6 +14,7 @@ export const createAndDispatchNotification = async ({
   message,
   link = null,
   metadata = {},
+  eventKey = null,
 }) => {
   try {
     if (!recipientId) {
@@ -25,7 +27,24 @@ export const createAndDispatchNotification = async ({
       return null;
     }
 
-    const notification = await Notification.create({
+    const sanitizedEventKey = eventKey ? String(eventKey).trim() : null;
+
+    // Idempotency check: if an identical event was already processed for this recipient, return it
+    if (sanitizedEventKey) {
+      const existing = await Notification.findOne({
+        recipient: recipientId,
+        eventKey: sanitizedEventKey,
+      })
+        .populate('sender', 'name email role')
+        .lean();
+
+      if (existing) {
+        logger.info(`Notification with eventKey "${sanitizedEventKey}" already exists for user ${recipientId}. Skipping duplicate.`);
+        return existing;
+      }
+    }
+
+    const docData = {
       recipient: recipientId,
       sender: senderId || null,
       type,
@@ -33,7 +52,28 @@ export const createAndDispatchNotification = async ({
       message: message.trim(),
       link: link || null,
       metadata: metadata || {},
-    });
+    };
+
+    if (sanitizedEventKey) {
+      docData.eventKey = sanitizedEventKey;
+    }
+
+    let notification;
+    try {
+      notification = await Notification.create(docData);
+    } catch (createErr) {
+      // Handle race condition on unique compound index { recipient: 1, eventKey: 1 }
+      if (createErr.code === 11000 && sanitizedEventKey) {
+        logger.info(`Concurrent duplicate notification prevented by unique index: ${sanitizedEventKey}`);
+        return await Notification.findOne({
+          recipient: recipientId,
+          eventKey: sanitizedEventKey,
+        })
+          .populate('sender', 'name email role')
+          .lean();
+      }
+      throw createErr;
+    }
 
     const populated = await Notification.findById(notification._id)
       .populate('sender', 'name email role')
@@ -51,11 +91,12 @@ export const createAndDispatchNotification = async ({
 };
 
 /**
- * Persist and dispatch notifications to multiple recipients (e.g., announcements).
+ * Persist and dispatch notifications to multiple recipients (e.g., announcements, job broadcasts).
+ * Supports idempotency via eventKeyPrefix to prevent duplicate notifications.
  */
 export const createAndDispatchBulkNotifications = async (
   recipientIds = [],
-  { senderId = null, type, title, message, link = null, metadata = {} }
+  { senderId = null, type, title, message, link = null, metadata = {}, eventKeyPrefix = null }
 ) => {
   try {
     const validRecipients = [...new Set(recipientIds.map((id) => id?.toString()))].filter(
@@ -66,17 +107,54 @@ export const createAndDispatchBulkNotifications = async (
       return [];
     }
 
-    const docsToInsert = validRecipients.map((recId) => ({
-      recipient: recId,
-      sender: senderId || null,
-      type,
-      title: title.trim(),
-      message: message.trim(),
-      link: link || null,
-      metadata: metadata || {},
-    }));
+    let targetRecipients = validRecipients;
 
-    const insertedDocs = await Notification.insertMany(docsToInsert);
+    // Deduplicate against existing notifications if an eventKeyPrefix is provided
+    if (eventKeyPrefix) {
+      const sanitizedPrefix = String(eventKeyPrefix).trim();
+      const existingKeys = targetRecipients.map((recId) => `${sanitizedPrefix}:${recId}`);
+      
+      const alreadyNotified = await Notification.find({
+        recipient: { $in: targetRecipients },
+        eventKey: { $in: existingKeys },
+      }).select('recipient').lean();
+
+      const notifiedSet = new Set(alreadyNotified.map((n) => n.recipient.toString()));
+      targetRecipients = targetRecipients.filter((recId) => !notifiedSet.has(recId));
+
+      if (targetRecipients.length === 0) {
+        logger.info(`Bulk notification for prefix "${sanitizedPrefix}" already delivered to all intended recipients.`);
+        return [];
+      }
+    }
+
+    const docsToInsert = targetRecipients.map((recId) => {
+      const doc = {
+        recipient: recId,
+        sender: senderId || null,
+        type,
+        title: title.trim(),
+        message: message.trim(),
+        link: link || null,
+        metadata: metadata || {},
+      };
+      if (eventKeyPrefix) {
+        doc.eventKey = `${String(eventKeyPrefix).trim()}:${recId}`;
+      }
+      return doc;
+    });
+
+    let insertedDocs = [];
+    try {
+      insertedDocs = await Notification.insertMany(docsToInsert, { ordered: false });
+    } catch (insertErr) {
+      // In case of partial duplicates with ordered: false, retrieve inserted ones
+      if (insertErr.insertedDocs && insertErr.insertedDocs.length > 0) {
+        insertedDocs = insertErr.insertedDocs;
+      } else {
+        logger.warn('Bulk notification insert encountered duplicate keys:', insertErr.message);
+      }
+    }
 
     // Emit real-time event to each recipient's private room
     for (const doc of insertedDocs) {

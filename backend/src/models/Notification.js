@@ -13,10 +13,17 @@ export const NOTIFICATION_TYPES = {
   SYSTEM_ANNOUNCEMENT: 'system_announcement',
   CERTIFICATE_ISSUED: 'certificate_issued',
   JOB_ALERT: 'job_alert',
+  USER_REGISTERED: 'user_registered',
 };
 
 const notificationSchema = new mongoose.Schema(
   {
+    eventKey: {
+      type: String,
+      trim: true,
+      default: null,
+      index: true,
+    },
     recipient: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -83,6 +90,15 @@ notificationSchema.virtual('senderId').get(function () {
 // Compound indexes for performant notification lookups & sorting
 notificationSchema.index({ recipient: 1, isRead: 1, createdAt: -1 });
 notificationSchema.index({ recipient: 1, createdAt: -1 });
+
+// Idempotency: prevent duplicate notification records for identical business events
+notificationSchema.index(
+  { recipient: 1, eventKey: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { eventKey: { $type: 'string' } },
+  }
+);
 
 // TTL index: self-pruning after 90 days (7,776,000 seconds)
 notificationSchema.index(

@@ -51,6 +51,7 @@ export const createTask = async (req, res, next) => {
       title: 'New Task Assigned',
       message: `You have been assigned: "${task.title}". Priority: ${priority}.`,
       link: '/tasks',
+      eventKey: `task_assigned:${task._id}`,
       metadata: {
         taskId: task._id,
         allocationId: allocation._id,
@@ -222,6 +223,7 @@ export const submitTaskProgress = async (req, res, next) => {
         title: 'Task Deliverable Submitted',
         message: `${req.user.name} submitted deliverables for task: "${task.title}".`,
         link: '/tasks',
+        eventKey: `task_submitted:${task._id}:${task.progressPercentage}`,
         metadata: {
           taskId: task._id,
           progressPercentage: task.progressPercentage,
@@ -279,6 +281,7 @@ export const reviewTask = async (req, res, next) => {
         title: 'Task Review Completed',
         message: `Your task "${task.title}" has been reviewed and marked as "${status}".`,
         link: '/tasks',
+        eventKey: `task_reviewed:${task._id}:${status}`,
         metadata: {
           taskId: task._id,
           status,

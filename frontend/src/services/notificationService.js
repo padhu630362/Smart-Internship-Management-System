@@ -13,6 +13,7 @@ export const NOTIFICATION_TYPES = {
   SYSTEM_ANNOUNCEMENT: 'system_announcement',
   CERTIFICATE_ISSUED: 'certificate_issued',
   JOB_ALERT: 'job_alert',
+  USER_REGISTERED: 'user_registered',
 };
 
 export const notificationService = {

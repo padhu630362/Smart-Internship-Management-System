@@ -99,6 +99,7 @@ export const submitApplication = async (req, res, next) => {
       title: 'New Application Received',
       message: `${user.name} submitted an application for "${internship.title}".`,
       link: '/applications',
+      eventKey: `app_submitted:${newApplication._id}`,
       metadata: {
         applicationId: newApplication._id,
         internshipId: internship._id,
@@ -413,6 +414,7 @@ export const updateApplicationStatus = async (req, res, next) => {
       title: 'Application Status Updated',
       message: `Your application for "${internshipTitle}" has been updated to "${statusLabel}".`,
       link: '/applications',
+      eventKey: `app_status:${application._id}:${targetStatus}`,
       metadata: {
         applicationId: application._id,
         newStatus: targetStatus,

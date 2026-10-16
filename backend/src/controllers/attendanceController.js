@@ -239,6 +239,7 @@ export const reviewAttendanceRecord = async (req, res, next) => {
       title: 'Attendance Record Reviewed',
       message: `Your attendance record for ${formattedDate} was marked as '${reviewStatus}'.`,
       link: '/attendance',
+      eventKey: `attendance_reviewed:${attendance._id}:${reviewStatus}`,
       metadata: {
         attendanceId: attendance._id,
         reviewStatus,
