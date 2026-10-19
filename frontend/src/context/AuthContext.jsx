@@ -74,6 +74,36 @@ export const AuthProvider = ({ children }) => {
     return () => window.removeEventListener('sims-session-expired', handleExpired);
   }, [loadUser]);
 
+  // Set automatic client-side logout timer based on token expiration
+  useEffect(() => {
+    if (!token) return;
+
+    try {
+      const parts = token.split('.');
+      if (parts.length === 3) {
+        let base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+        while (base64.length % 4) {
+          base64 += '=';
+        }
+        const payload = JSON.parse(atob(base64));
+        if (payload?.exp) {
+          const expiresAtMs = payload.exp * 1000;
+          const delay = expiresAtMs - Date.now();
+          if (delay <= 0) {
+            window.dispatchEvent(new Event('sims-session-expired'));
+            return;
+          }
+          const timer = setTimeout(() => {
+            window.dispatchEvent(new Event('sims-session-expired'));
+          }, delay);
+          return () => clearTimeout(timer);
+        }
+      }
+    } catch {
+      // Ignore parse errors for mock or non-standard tokens
+    }
+  }, [token]);
+
   const login = async ({ email, password }) => {
     setIsLoading(true);
     setError(null);

@@ -24,14 +24,14 @@ const base64UrlDecode = (str) => {
 };
 
 /**
- * Parses duration string (e.g. "7d", "24h", "60m") into seconds.
+ * Parses duration string (e.g. "7d", "24h", "60m", "5m") into seconds.
  */
-const parseExpiresIn = (duration) => {
+export const parseExpiresIn = (duration) => {
   if (typeof duration === 'number') return duration;
-  if (!duration || typeof duration !== 'string') return 7 * 24 * 3600; // default 7 days
+  if (!duration || typeof duration !== 'string') return 5 * 60; // default 5 minutes
 
   const match = duration.match(/^(\d+)([smhd])$/);
-  if (!match) return 7 * 24 * 3600;
+  if (!match) return 5 * 60;
 
   const value = parseInt(match[1], 10);
   const unit = match[2];
@@ -41,7 +41,7 @@ const parseExpiresIn = (duration) => {
     case 'm': return value * 60;
     case 'h': return value * 3600;
     case 'd': return value * 86400;
-    default: return 7 * 86400;
+    default: return 5 * 60;
   }
 };
 

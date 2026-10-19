@@ -66,6 +66,7 @@ export const ChatPage = () => {
   const [filterType, setFilterType] = useState('all'); // 'all' | 'direct' | 'company' | 'group'
   const [typingUsers, setTypingUsers] = useState(new Map()); // userId -> name
   const [errorBanner, setErrorBanner] = useState('');
+  const [simulatingReply, setSimulatingReply] = useState(false);
 
   // Modals state
   const [showNewChatModal, setShowNewChatModal] = useState(false);
@@ -244,36 +245,60 @@ export const ChatPage = () => {
     }
   }, [urlConversationId, conversations, loadingConversations, activeConversation, selectConversation]);
 
+  // Automatically ensure active conversation room is joined whenever connected or active conversation changes
+  useEffect(() => {
+    if (isConnected && activeConversation?._id) {
+      joinConversation(activeConversation._id.toString());
+    }
+  }, [isConnected, activeConversation?._id, joinConversation]);
+
   // Real-time Socket Event Listeners
   useEffect(() => {
     if (!socket) return;
 
     // Receive message in current conversation
     const handleChatMessage = ({ conversationId, message }) => {
-      if (activeConversation?._id === conversationId) {
+      const activeId = (activeConversation?._id || '').toString();
+      const incId = (conversationId || '').toString();
+      if (activeId && incId && activeId === incId) {
         setMessages((prev) => {
-          if (prev.some((m) => m._id === message._id)) return prev;
+          const msgId = (message._id || message.id || '').toString();
+          if (prev.some((m) => (m._id || m.id || '').toString() === msgId)) return prev;
           return [...prev, message];
         });
         setTimeout(() => scrollToBottom(true), 50);
-        markAsRead(conversationId);
+        markAsRead(activeId);
       }
     };
 
     // Receive message notification across all conversations
     const handleNewMessageAlert = ({ conversationId, message }) => {
+      const activeId = (activeConversation?._id || '').toString();
+      const incId = (conversationId || '').toString();
+      const isCurrent = Boolean(activeId && incId && activeId === incId);
+
+      // Fallback: If this message belongs to the open chat, append it immediately
+      if (isCurrent && message) {
+        setMessages((prev) => {
+          const msgId = (message._id || message.id || '').toString();
+          if (prev.some((m) => (m._id || m.id || '').toString() === msgId)) return prev;
+          return [...prev, message];
+        });
+        setTimeout(() => scrollToBottom(true), 50);
+      }
+
       setConversations((prev) => {
-        const index = prev.findIndex((c) => c._id === conversationId);
+        const index = prev.findIndex((c) => (c._id || '').toString() === incId);
         if (index === -1) {
-          // If conversation wasn't in list yet, refresh full list
           fetchConversations();
           return prev;
         }
 
         const updated = [...prev];
         const existing = updated[index];
-        const isCurrent = activeConversation?._id === conversationId;
-        const isSender = message.sender?._id === currentUserId || message.sender === currentUserId;
+        const senderId = (message.sender?._id || message.sender)?.toString();
+        const myId = (currentUserId || user?.id || user?._id || '').toString();
+        const isSender = Boolean(myId && senderId && myId === senderId);
 
         updated[index] = {
           ...existing,
@@ -282,7 +307,6 @@ export const ChatPage = () => {
           unreadCount: isCurrent || isSender ? 0 : (existing.unreadCount || 0) + 1,
         };
 
-        // Move to top of list
         const [moved] = updated.splice(index, 1);
         return [moved, ...updated];
       });
@@ -290,22 +314,27 @@ export const ChatPage = () => {
 
     // Conversation metadata updated (name, participants)
     const handleConversationUpdated = ({ conversationId, conversation }) => {
+      const activeId = (activeConversation?._id || '').toString();
+      const incId = (conversationId || '').toString();
       setConversations((prev) =>
-        prev.map((c) => (c._id === conversationId ? { ...c, ...conversation } : c))
+        prev.map((c) => ((c._id || '').toString() === incId ? { ...c, ...conversation } : c))
       );
-      if (activeConversation?._id === conversationId) {
+      if (activeId && incId && activeId === incId) {
         setActiveConversation((prev) => ({ ...prev, ...conversation }));
       }
     };
 
     // Read update from peer
-    const handleReadUpdate = ({ conversationId, userId, readAt }) => {
-      if (activeConversation?._id === conversationId) {
+    const handleReadUpdate = ({ conversationId, userId }) => {
+      const activeId = (activeConversation?._id || '').toString();
+      const incId = (conversationId || '').toString();
+      if (activeId && incId && activeId === incId) {
         setMessages((prev) =>
           prev.map((m) => {
-            const readByList = m.readBy || [];
-            if (!readByList.includes(userId)) {
-              return { ...m, readBy: [...readByList, userId] };
+            const readByList = (m.readBy || []).map((id) => (id._id || id).toString());
+            const uidStr = (userId || '').toString();
+            if (uidStr && !readByList.includes(uidStr)) {
+              return { ...m, readBy: [...(m.readBy || []), userId] };
             }
             return m;
           })
@@ -315,7 +344,12 @@ export const ChatPage = () => {
 
     // Typing status
     const handleTyping = ({ conversationId, userId, userName, isTyping }) => {
-      if (activeConversation?._id === conversationId && userId !== currentUserId) {
+      const activeId = (activeConversation?._id || '').toString();
+      const incId = (conversationId || '').toString();
+      const uidStr = (userId || '').toString();
+      const myIdStr = (currentUserId || '').toString();
+
+      if (activeId && incId && activeId === incId && uidStr !== myIdStr) {
         setTypingUsers((prev) => {
           const next = new Map(prev);
           if (isTyping) {
@@ -348,6 +382,7 @@ export const ChatPage = () => {
     scrollToBottom,
     markAsRead,
     fetchConversations,
+    user,
   ]);
 
   // Handle typing debounce
@@ -403,6 +438,20 @@ export const ChatPage = () => {
       setMessageInput(trimmed);
     } finally {
       setSending(false);
+    }
+  };
+
+  // Simulate colleague live reply for real-time testing
+  const handleSimulateReply = async () => {
+    if (!activeConversation || simulatingReply) return;
+    try {
+      setSimulatingReply(true);
+      await chatService.simulateReply(activeConversation._id);
+    } catch (err) {
+      console.error('Failed to simulate reply:', err);
+      setErrorBanner('Failed to trigger simulated reply: ' + (err?.response?.data?.error?.message || err?.message));
+    } finally {
+      setTimeout(() => setSimulatingReply(false), 2000);
     }
   };
 
@@ -638,7 +687,7 @@ export const ChatPage = () => {
 
   const activeDetails = getConversationDetails(activeConversation);
 
-  // Render a sleek, compact WhatsApp-style Member / Contact Row
+  // Render a sleek, professional Corporate Workplace Member / Contact Row
   const renderMemberRow = (member) => {
     const isOnline = isUserOnline(member._id);
     const companyName =
@@ -666,8 +715,8 @@ export const ChatPage = () => {
         onClick={() => handleStartOrOpenChat(member)}
         className={`w-full px-3.5 py-3 flex items-center gap-3 text-left transition-colors cursor-pointer border-b border-slate-100 dark:border-slate-800/40 group relative ${
           isChatActive
-            ? 'bg-slate-100/90 dark:bg-[#202c33] border-l-4 border-emerald-500'
-            : 'hover:bg-slate-50 dark:hover:bg-[#202c33]/70'
+            ? 'bg-brand-50/80 dark:bg-brand-950/40 border-l-4 border-brand-600 dark:border-brand-500'
+            : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'
         }`}
       >
         {/* Avatar with Status indicator */}
@@ -679,7 +728,7 @@ export const ChatPage = () => {
           showStatus={true}
         />
 
-        {/* Member Details in WhatsApp Compact Layout */}
+        {/* Member Details in Corporate Layout */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-1 mb-0.5">
             <div className="flex items-center gap-1.5 min-w-0">
@@ -687,9 +736,9 @@ export const ChatPage = () => {
                 {member.name}
               </span>
               <span
-                className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md shrink-0 ${
+                className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-sm shrink-0 ${
                   member.role === 'company'
-                    ? 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/40'
+                    ? 'bg-brand-50 dark:bg-brand-950/80 text-brand-700 dark:text-brand-300 border border-brand-200/60 dark:border-brand-800/40'
                     : member.role === 'mentor'
                     ? 'bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/40'
                     : member.role === 'coordinator'
@@ -697,7 +746,7 @@ export const ChatPage = () => {
                     : 'bg-rose-50 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-200/60 dark:border-rose-800/40'
                 }`}
               >
-                {member.role === 'company' ? 'Company' : member.role}
+                {member.role === 'company' ? 'Enterprise' : member.role}
               </span>
             </div>
 
@@ -729,9 +778,9 @@ export const ChatPage = () => {
 
             {/* Quick action text on hover */}
             <div className="shrink-0 flex items-center gap-1">
-              <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+              <span className="text-[11px] text-brand-600 dark:text-brand-400 font-semibold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
                 <MessageSquare className="w-3.5 h-3.5" />
-                Chat
+                Message
               </span>
             </div>
           </div>
@@ -740,7 +789,7 @@ export const ChatPage = () => {
     );
   };
 
-  // Render a Conversation Row in the left sidebar (WhatsApp style)
+  // Render a Conversation Row in the left sidebar (Corporate Workspace style)
   const renderConversationItem = (conv) => {
     const isSelected = activeConversation?._id === conv._id;
     const details = getConversationDetails(conv);
@@ -753,13 +802,13 @@ export const ChatPage = () => {
         onClick={() => selectConversation(conv)}
         className={`w-full px-3.5 py-3 flex items-center gap-3 text-left transition-colors cursor-pointer border-b border-slate-100 dark:border-slate-800/40 relative ${
           isSelected
-            ? 'bg-slate-100/90 dark:bg-[#202c33] border-l-4 border-emerald-500'
-            : 'hover:bg-slate-50 dark:hover:bg-[#202c33]/70'
+            ? 'bg-brand-50/80 dark:bg-brand-950/40 border-l-4 border-brand-600 dark:border-brand-500'
+            : 'hover:bg-slate-50 dark:hover:bg-slate-850'
         }`}
       >
         {/* Avatar with Status indicator */}
         {conv.type === CONVERSATION_TYPES.GROUP ? (
-          <div className="w-10 h-10 rounded-full bg-linear-to-tr from-brand-600 to-indigo-500 text-white flex items-center justify-center font-semibold text-xs shadow-xs shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-linear-to-tr from-brand-600 to-indigo-600 text-white flex items-center justify-center font-semibold text-xs shadow-xs shrink-0">
             <Users className="w-5 h-5" />
           </div>
         ) : (
@@ -799,7 +848,7 @@ export const ChatPage = () => {
             >
               {conv.lastMessage?.content ? (
                 <>
-                  <CheckCheck className={`w-3.5 h-3.5 shrink-0 ${hasUnread ? 'text-slate-400' : 'text-emerald-500'}`} />
+                  <CheckCheck className={`w-3.5 h-3.5 shrink-0 ${hasUnread ? 'text-slate-400' : 'text-brand-500'}`} />
                   <span className="truncate">{conv.lastMessage.content}</span>
                 </>
               ) : (
@@ -808,7 +857,7 @@ export const ChatPage = () => {
             </p>
 
             {hasUnread && (
-              <span className="shrink-0 px-1.5 py-0.5 text-[11px] font-bold rounded-full bg-emerald-500 text-white min-w-5 text-center leading-tight">
+              <span className="shrink-0 px-2 py-0.5 text-[10px] font-bold rounded-full bg-brand-600 text-white min-w-5 text-center leading-tight">
                 {conv.unreadCount}
               </span>
             )}
@@ -819,7 +868,7 @@ export const ChatPage = () => {
   };
 
   return (
-    <div className="h-full w-full flex flex-col bg-slate-50 dark:bg-[#0b141a] overflow-hidden select-none">
+    <div className="h-full w-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden select-none">
       {/* Top Banner if Socket Disconnected */}
       {!isConnected && (
         <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-xs text-amber-700 dark:text-amber-300 flex items-center justify-between shrink-0">
@@ -838,14 +887,14 @@ export const ChatPage = () => {
 
       {/* Main Chat Layout Container */}
       <div className="flex-1 min-h-0 flex overflow-hidden">
-        {/* Left Sidebar: Conversations & Contacts Directory (WhatsApp Layout) */}
+        {/* Left Sidebar: Conversations & Contacts Directory (Corporate Workplace Layout) */}
         <div
-          className={`w-full md:w-80 lg:w-96 flex flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111b21] shrink-0 h-full overflow-hidden transition-all duration-300 ${
+          className={`w-full md:w-80 lg:w-96 flex flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0 h-full overflow-hidden transition-all duration-300 ${
             mobileShowChat ? 'hidden md:flex' : 'flex'
           }`}
         >
-          {/* Sidebar Header (WhatsApp Web style) */}
-          <div className="p-3.5 border-b border-slate-200 dark:border-slate-800 bg-[#f0f2f5] dark:bg-[#202c33] shrink-0">
+          {/* Sidebar Header (Corporate Workspace style) */}
+          <div className="p-3.5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2.5">
                 <UserAvatar
@@ -857,10 +906,10 @@ export const ChatPage = () => {
                 />
                 <div>
                   <h1 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
-                    Chats
+                    Workspace Chat
                   </h1>
                   <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                    {conversations.length} active chats • {companyMembers.length} members
+                    {conversations.length} active chats • {companyMembers.length} team members
                   </p>
                 </div>
               </div>
@@ -874,8 +923,8 @@ export const ChatPage = () => {
                     fetchContacts();
                     setShowNewChatModal(true);
                   }}
-                  className="p-2 rounded-full text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors"
-                  title="New Direct Chat"
+                  className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  title="New Direct Message"
                 >
                   <Plus className="w-4 h-4" />
                 </button>
@@ -887,8 +936,8 @@ export const ChatPage = () => {
                       fetchContacts();
                       setShowNewGroupModal(true);
                     }}
-                    className="p-2 rounded-full text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors"
-                    title="Create Group Conversation"
+                    className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    title="Create Channel / Group"
                   >
                     <Users className="w-4 h-4" />
                   </button>
@@ -896,15 +945,15 @@ export const ChatPage = () => {
               </div>
             </div>
 
-            {/* WhatsApp Search Input */}
+            {/* Corporate Search Input */}
             <div className="relative mb-2.5">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search or start new chat"
+                placeholder="Search conversations, colleagues, or teams..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-8 py-2 text-xs rounded-lg bg-white dark:bg-[#111b21] border border-transparent focus:border-emerald-500 dark:focus:border-emerald-500 text-slate-900 dark:text-white placeholder-slate-400 transition-all outline-hidden shadow-xs"
+                className="w-full pl-9 pr-8 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/80 focus:border-brand-500 dark:focus:border-brand-500 text-slate-900 dark:text-white placeholder-slate-400 transition-all outline-hidden shadow-2xs"
               />
               {searchQuery && (
                 <button
@@ -917,22 +966,22 @@ export const ChatPage = () => {
               )}
             </div>
 
-            {/* WhatsApp Filter Chips */}
+            {/* Corporate Filter Chips */}
             <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
               {[
                 { id: 'all', label: 'All' },
-                { id: 'direct', label: 'Direct' },
-                { id: 'company', label: `Company & Mentors (${companyMembers.length})` },
-                { id: 'group', label: 'Groups' },
+                { id: 'direct', label: 'Direct Messages' },
+                { id: 'company', label: `Colleagues & Mentors (${companyMembers.length})` },
+                { id: 'group', label: 'Channels' },
               ].map((tab) => (
                 <button
                   key={tab.id}
                   type="button"
                   onClick={() => setFilterType(tab.id)}
-                  className={`px-3 py-1 text-[11px] font-semibold rounded-full whitespace-nowrap transition-colors ${
+                  className={`px-3 py-1 text-[11px] rounded-lg whitespace-nowrap transition-colors ${
                     filterType === tab.id
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'bg-white/80 dark:bg-[#111b21] text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-[#2a3942]'
+                      ? 'bg-brand-600 text-white font-semibold shadow-2xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-700 font-medium'
                   }`}
                 >
                   {tab.label}
@@ -941,17 +990,17 @@ export const ChatPage = () => {
             </div>
           </div>
 
-          {/* Conversation List / Member Directory (WhatsApp Rows) */}
+          {/* Conversation List / Member Directory (Corporate Rows) */}
           <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/40">
             {loadingConversations && loadingContacts ? (
               <div className="p-8 text-center text-slate-400 text-xs flex flex-col items-center gap-2">
-                <Loader2 className="w-5 h-5 animate-spin text-emerald-500" />
+                <Loader2 className="w-5 h-5 animate-spin text-brand-500" />
                 <span>Loading conversations and directory...</span>
               </div>
             ) : filterType === 'company' ? (
-              /* DEDICATED COMPANY MEMBERS & MENTORS (WhatsApp Rows) */
+              /* DEDICATED COMPANY MEMBERS & MENTORS (Corporate Directory) */
               <div>
-                <div className="px-3.5 py-2 bg-slate-50 dark:bg-[#182229] border-b border-slate-100 dark:border-slate-800/60 flex items-center justify-between">
+                <div className="px-3.5 py-2 bg-slate-50 dark:bg-slate-850/80 border-b border-slate-100 dark:border-slate-800/60 flex items-center justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     Company Members & Mentors ({filteredCompanyMembers.length})
                   </span>
@@ -975,7 +1024,7 @@ export const ChatPage = () => {
                 {/* Active Direct Chats */}
                 {filteredConversations.length > 0 && (
                   <div>
-                    <div className="px-3.5 py-2 bg-slate-50 dark:bg-[#182229] border-b border-slate-100 dark:border-slate-800/60 flex items-center justify-between">
+                    <div className="px-3.5 py-2 bg-slate-50 dark:bg-slate-850/80 border-b border-slate-100 dark:border-slate-800/60 flex items-center justify-between">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                         Active Chats ({filteredConversations.length})
                       </span>
@@ -986,7 +1035,7 @@ export const ChatPage = () => {
 
                 {/* Company Members Directory */}
                 <div>
-                  <div className="px-3.5 py-2 bg-slate-50 dark:bg-[#182229] border-b border-slate-100 dark:border-slate-800/60 flex items-center justify-between">
+                  <div className="px-3.5 py-2 bg-slate-50 dark:bg-slate-850/80 border-b border-slate-100 dark:border-slate-800/60 flex items-center justify-between">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                       Company Members & Mentors ({filteredCompanyMembers.length})
                     </span>
@@ -1005,7 +1054,7 @@ export const ChatPage = () => {
                 </div>
               </div>
             ) : filterType === 'all' ? (
-              /* ALL CONVERSATIONS LIST (WhatsApp Web style) */
+              /* ALL CONVERSATIONS LIST (Corporate Messenger) */
               filteredConversations.length === 0 ? (
                 <div className="p-8 text-center text-slate-400 text-xs flex flex-col items-center gap-3">
                   <MessageSquare className="w-8 h-8 stroke-1 text-slate-300 dark:text-slate-600" />
@@ -1024,11 +1073,11 @@ export const ChatPage = () => {
 
                   {/* Quick Shortcut to Company Directory */}
                   {companyMembers.length > 0 && (
-                    <div className="p-3 bg-slate-50 dark:bg-[#182229] text-center border-t border-slate-100 dark:border-slate-800/40">
+                    <div className="p-3 bg-slate-50 dark:bg-slate-850/80 text-center border-t border-slate-100 dark:border-slate-800/40">
                       <button
                         type="button"
                         onClick={() => setFilterType('company')}
-                        className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 inline-flex items-center gap-1"
+                        className="text-[11px] font-bold text-brand-600 hover:text-brand-700 dark:text-brand-400 inline-flex items-center gap-1"
                       >
                         <Briefcase className="w-3 h-3" />
                         <span>View Company Members Directory ({companyMembers.length})</span>
@@ -1063,22 +1112,22 @@ export const ChatPage = () => {
           </div>
         </div>
 
-        {/* Right Area: Active Message Conversation Stream (WhatsApp Styled) */}
+        {/* Right Area: Active Message Conversation Stream (Corporate Workplace Styled) */}
         <div
-          className={`flex-1 min-w-0 min-h-0 flex flex-col bg-[#efeae2]/30 dark:bg-[#0b141a] h-full overflow-hidden relative transition-all duration-300 ${
+          className={`flex-1 min-w-0 min-h-0 flex flex-col bg-slate-50/70 dark:bg-slate-950 h-full overflow-hidden relative transition-all duration-300 ${
             !mobileShowChat ? 'hidden md:flex' : 'flex'
           }`}
         >
           {activeConversation ? (
             <>
-              {/* WhatsApp Chat Header */}
-              <div className="px-4 py-2.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-[#f0f2f5] dark:bg-[#202c33] shadow-xs shrink-0 select-none">
+              {/* Corporate Chat Header */}
+              <div className="px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900 shadow-2xs shrink-0 select-none">
                 <div className="flex items-center gap-3 min-w-0">
                   <button
                     type="button"
                     onClick={() => setMobileShowChat(false)}
-                    className="md:hidden p-1.5 -ml-1 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
-                    title="Back to list"
+                    className="md:hidden p-1.5 -ml-1 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    title="Back to conversations"
                   >
                     <ArrowLeft className="w-5 h-5" />
                   </button>
@@ -1086,12 +1135,12 @@ export const ChatPage = () => {
                   {/* Clickable Header to Open Contact Info Drawer */}
                   <div
                     onClick={() => setShowContactDetails((prev) => !prev)}
-                    className="flex items-center gap-3 cursor-pointer min-w-0 hover:opacity-90 transition-opacity"
-                    title="Click to view Contact Info"
+                    className="flex items-center gap-3 cursor-pointer min-w-0 group hover:opacity-95 transition-opacity"
+                    title="Click to view Contact & Member Profile"
                   >
                     <div className="relative">
                       {activeConversation.type === CONVERSATION_TYPES.GROUP ? (
-                        <div className="w-10 h-10 rounded-full bg-linear-to-tr from-brand-600 to-indigo-500 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                        <div className="w-10 h-10 rounded-xl bg-linear-to-tr from-brand-600 to-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-xs shrink-0">
                           <Users className="w-5 h-5" />
                         </div>
                       ) : (
@@ -1106,37 +1155,87 @@ export const ChatPage = () => {
                     </div>
 
                     <div className="min-w-0">
-                      <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 truncate">
-                        <span className="truncate">{activeDetails.title}</span>
-                        {activeConversation.type === CONVERSATION_TYPES.GROUP && (
-                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-sm bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                            Group
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                          {activeDetails.title}
+                        </h2>
+                        {activeConversation.type === CONVERSATION_TYPES.GROUP ? (
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-brand-50 dark:bg-brand-950/80 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-800">
+                            Channel
                           </span>
+                        ) : activeDetails.partner?.role ? (
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                            {activeDetails.partner.role}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                        {typingUsers.size > 0 ? (
+                          <span className="text-brand-600 dark:text-brand-400 font-medium italic">
+                            {Array.from(typingUsers.values()).join(', ')} typing...
+                          </span>
+                        ) : (
+                          <>
+                            <span className="flex items-center gap-1 font-medium">
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  activeDetails.isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300 dark:bg-slate-600'
+                                }`}
+                              />
+                              <span>{activeDetails.isOnline ? 'Active Now' : 'Offline'}</span>
+                            </span>
+                            {activeDetails.subtitle && activeDetails.subtitle !== 'Offline' && activeDetails.subtitle !== 'Online' && (
+                              <>
+                                <span>•</span>
+                                <span className="truncate">{activeDetails.subtitle}</span>
+                              </>
+                            )}
+                          </>
                         )}
-                      </h2>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                        {typingUsers.size > 0
-                          ? `${Array.from(typingUsers.values()).join(', ')} typing...`
-                          : activeDetails.subtitle}
-                      </p>
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Right Controls in Header */}
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* Test Live Exchange Button */}
+                  {activeConversation.type === CONVERSATION_TYPES.DIRECT && (
+                    <button
+                      type="button"
+                      disabled={simulatingReply}
+                      onClick={handleSimulateReply}
+                      className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 border border-brand-200 dark:border-brand-800 bg-brand-50/70 hover:bg-brand-100 dark:bg-brand-950/60 dark:hover:bg-brand-900 text-brand-700 dark:text-brand-300 shadow-2xs cursor-pointer"
+                      title="Trigger simulated live reply from colleague with real-time typing indicator & audio chime"
+                    >
+                      {simulatingReply ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-600" />
+                          <span className="hidden sm:inline">Waiting for reply...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400" />
+                          <span className="hidden sm:inline">Live Test Exchange</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+
                   {/* Contact Info toggle */}
                   <button
                     type="button"
                     onClick={() => setShowContactDetails((prev) => !prev)}
-                    className={`p-2 rounded-full transition-colors ${
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 border cursor-pointer ${
                       showContactDetails
-                        ? 'bg-emerald-500 text-white'
-                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-700/60'
+                        ? 'bg-brand-50 dark:bg-brand-950/60 border-brand-300 dark:border-brand-700 text-brand-700 dark:text-brand-300'
+                        : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-750'
                     }`}
-                    title={showContactDetails ? 'Close Info' : 'View Contact Info'}
+                    title={showContactDetails ? 'Hide Profile' : 'View Profile & Details'}
                   >
-                    <Info className="w-4 h-4" />
+                    <Info className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Member Details</span>
                   </button>
 
                   {activeConversation.type === CONVERSATION_TYPES.GROUP && (
@@ -1147,9 +1246,9 @@ export const ChatPage = () => {
                         setEditGroupDesc(activeConversation.description || '');
                         setShowGroupInfoModal(true);
                       }}
-                      className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors border border-slate-200 dark:border-slate-700"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-850"
                     >
-                      <Users className="w-3.5 h-3.5 text-emerald-500" />
+                      <Users className="w-3.5 h-3.5 text-brand-600" />
                       <span className="hidden sm:inline">Manage</span>
                     </button>
                   )}
@@ -1172,80 +1271,152 @@ export const ChatPage = () => {
                 </div>
               )}
 
-              {/* WhatsApp Message Stream */}
+              {/* Corporate Message Stream */}
               <div
                 ref={messagesContainerRef}
-                className="flex-1 min-h-0 overflow-y-auto p-4 space-y-2.5 bg-[#efeae2]/30 dark:bg-[#0b141a]"
+                className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4 bg-slate-50/70 dark:bg-slate-950 w-full"
               >
                 {loadingMessages ? (
                   <div className="h-full flex items-center justify-center text-slate-400 text-xs">
-                    <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
+                    <Loader2 className="w-6 h-6 animate-spin text-brand-500" />
                   </div>
                 ) : messages.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs p-6 text-center">
-                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 dark:bg-emerald-400/10 flex items-center justify-center text-emerald-500 mb-3">
+                    <div className="w-12 h-12 rounded-2xl bg-brand-500/10 dark:bg-brand-400/10 flex items-center justify-center text-brand-500 mb-3">
                       <Sparkles className="w-6 h-6" />
                     </div>
                     <p className="font-semibold text-slate-700 dark:text-slate-300 text-sm">
                       No messages yet
                     </p>
                     <p className="text-slate-500 max-w-xs mt-1">
-                      Say hello to start the conversation! All messages are authenticated and persisted.
+                      Start the discussion! All messages are authenticated and securely logged for institutional audit.
                     </p>
                   </div>
                 ) : (
                   messages.map((msg, index) => {
-                    const isSender =
-                      msg.sender?._id === currentUserId ||
-                      msg.sender === currentUserId;
-                    const senderName = msg.sender?.name || 'User';
+                    const senderId = (msg.sender?._id || msg.sender?.id || msg.sender || '').toString();
+                    const myId = (currentUserId || user?.id || user?._id || '').toString();
+                    const isSender = Boolean(myId && senderId && myId === senderId);
+
+                    const senderObj =
+                      typeof msg.sender === 'object' && msg.sender !== null
+                        ? msg.sender
+                        : (activeConversation?.participants || []).find(
+                            (p) => (p._id || p.id || p).toString() === senderId
+                          ) || null;
+
+                    const senderName = isSender
+                      ? (user?.name || 'You')
+                      : (senderObj?.name || (activeConversation?.type === CONVERSATION_TYPES.DIRECT ? activeDetails.title : 'Colleague'));
+
+                    const senderRole = isSender
+                      ? (user?.role || '')
+                      : (senderObj?.role || (activeConversation?.type === CONVERSATION_TYPES.DIRECT ? (activeDetails.partner?.role || '') : ''));
+
                     const isReadByOthers = (msg.readBy || []).some(
-                      (id) => (id._id || id).toString() !== currentUserId
+                      (id) => (id._id || id).toString() !== myId
                     );
 
                     return (
                       <div
                         key={msg._id || index}
-                        className={`flex flex-col ${isSender ? 'items-end' : 'items-start'}`}
+                        className={`w-full flex items-start gap-2.5 sm:gap-3.5 group ${
+                          isSender ? 'justify-end' : 'justify-start'
+                        }`}
                       >
-                        {/* Group Sender Name */}
-                        {activeConversation.type === CONVERSATION_TYPES.GROUP && !isSender && (
-                          <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 ml-2 mb-1">
-                            {senderName} {msg.sender?.role ? `(${msg.sender.role})` : ''}
-                          </span>
+                        {/* Colleague Avatar (Left side) */}
+                        {!isSender && (
+                          <div className="shrink-0 mt-0.5">
+                            <UserAvatar
+                              sender={senderObj || activeDetails.partner}
+                              name={senderName}
+                              size="sm"
+                              isOnline={activeDetails.isOnline}
+                              showStatus={false}
+                            />
+                          </div>
                         )}
 
-                        {/* WhatsApp Message Bubble */}
+                        {/* Message Card Container: Sender on Right (ml-auto), Receiver on Left (mr-auto) */}
                         <div
-                          className={`max-w-[85%] sm:max-w-[70%] px-3.5 py-2 rounded-2xl shadow-xs transition-all relative ${
-                            isSender
-                              ? 'bg-[#d9fdd3] dark:bg-[#005c4b] text-[#111b21] dark:text-[#e9edef] rounded-tr-xs'
-                              : 'bg-white dark:bg-[#202c33] text-[#111b21] dark:text-[#e9edef] rounded-tl-xs border border-slate-200/50 dark:border-slate-800/50'
+                          className={`flex flex-col max-w-[85%] sm:max-w-[72%] space-y-1 ${
+                            isSender ? 'items-end ml-auto' : 'items-start mr-auto'
                           }`}
                         >
-                          <p className="text-xs sm:text-[13px] leading-relaxed wrap-break-word whitespace-pre-wrap select-text">
-                            {msg.content}
-                          </p>
-
-                          <div
-                            className={`flex items-center justify-end gap-1 mt-1 text-[10px] ${
-                              isSender
-                                ? 'text-slate-500 dark:text-emerald-100/70'
-                                : 'text-slate-400 dark:text-slate-400'
-                            }`}
-                          >
-                            <span>{formatMessageTime(msg.createdAt)}</span>
-                            {isSender && (
-                              <span>
-                                {isReadByOthers ? (
-                                  <CheckCheck className="w-3.5 h-3.5 text-sky-500" title="Read" />
-                                ) : (
-                                  <Check className="w-3.5 h-3.5 text-slate-400" title="Sent" />
+                          {/* Sender Info Bar */}
+                          <div className="flex items-center gap-1.5 flex-wrap text-xs px-1">
+                            {!isSender ? (
+                              <>
+                                <span className="font-bold text-slate-900 dark:text-slate-100">
+                                  {senderName}
+                                </span>
+                                {senderRole && (
+                                  <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-sm bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300/60 dark:border-slate-700/60 leading-none">
+                                    {senderRole}
+                                  </span>
                                 )}
-                              </span>
+                                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium ml-1">
+                                  {formatMessageTime(msg.createdAt)}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium mr-1">
+                                  {formatMessageTime(msg.createdAt)}
+                                </span>
+                                <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-sm bg-brand-50 dark:bg-brand-950/80 text-brand-700 dark:text-brand-300 border border-brand-200/80 dark:border-brand-800/80 leading-none">
+                                  You
+                                </span>
+                                {user?.role && (
+                                  <span className="text-[10px] uppercase font-semibold text-slate-400 dark:text-slate-500">
+                                    • {user.role}
+                                  </span>
+                                )}
+                              </>
                             )}
                           </div>
+
+                          {/* Message Bubble: Brand Blue on Right, White Card on Left */}
+                          <div
+                            className={`px-4 py-2.5 rounded-2xl shadow-xs transition-all relative text-xs sm:text-[13px] leading-relaxed wrap-break-word whitespace-pre-wrap select-text ${
+                              isSender
+                                ? 'bg-brand-600 dark:bg-brand-600 text-white rounded-tr-xs'
+                                : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-tl-xs border border-slate-200/90 dark:border-slate-700/80'
+                            }`}
+                          >
+                            <p>{msg.content}</p>
+                          </div>
+
+                          {/* Status / Receipt under sent message */}
+                          {isSender && (
+                            <div className="flex items-center gap-1 text-[10px] text-slate-400 dark:text-slate-500 pr-1">
+                              {isReadByOthers ? (
+                                <span className="inline-flex items-center gap-1 text-sky-600 dark:text-sky-400 font-medium">
+                                  <CheckCheck className="w-3.5 h-3.5" />
+                                  <span>Read</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-slate-400">
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span>Delivered</span>
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
+
+                        {/* Your Avatar (Right side) */}
+                        {isSender && (
+                          <div className="shrink-0 mt-0.5">
+                            <UserAvatar
+                              user={user}
+                              name={user?.name}
+                              size="sm"
+                              isOnline={isConnected}
+                              showStatus={false}
+                            />
+                          </div>
+                        )}
                       </div>
                     );
                   })
@@ -1255,9 +1426,9 @@ export const ChatPage = () => {
                 {typingUsers.size > 0 && (
                   <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 italic animate-pulse">
                     <span className="flex gap-1">
-                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" />
-                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce delay-150" />
-                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce delay-300" />
+                      <span className="w-1.5 h-1.5 bg-brand-600 rounded-full animate-bounce" />
+                      <span className="w-1.5 h-1.5 bg-brand-600 rounded-full animate-bounce delay-150" />
+                      <span className="w-1.5 h-1.5 bg-brand-600 rounded-full animate-bounce delay-300" />
                     </span>
                     <span>
                       {Array.from(typingUsers.values()).join(', ')} {typingUsers.size === 1 ? 'is' : 'are'} typing...
@@ -1268,13 +1439,13 @@ export const ChatPage = () => {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* WhatsApp Message Input Footer */}
-              <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-[#f0f2f5] dark:bg-[#202c33] shrink-0">
-                <form onSubmit={handleSendMessage} className="flex items-end gap-2">
-                  <div className="flex-1 relative">
+              {/* Corporate Message Input Composer (Slack/Teams style) */}
+              <div className="p-3.5 sm:p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
+                <form onSubmit={handleSendMessage} className="space-y-2">
+                  <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-850 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 focus-within:bg-white dark:focus-within:bg-slate-900 transition-all shadow-2xs p-3">
                     <textarea
                       ref={messageInputRef}
-                      rows={1}
+                      rows={2}
                       value={messageInput}
                       onChange={handleInputChange}
                       onKeyDown={(e) => {
@@ -1283,42 +1454,57 @@ export const ChatPage = () => {
                           handleSendMessage(e);
                         }
                       }}
-                      placeholder="Type a safe message... (Press Enter to send)"
+                      placeholder={`Message ${activeDetails.title || 'conversation'}... (Enter to send, Shift + Enter for new line)`}
                       maxLength={2000}
-                      className="w-full px-4 py-2.5 text-xs sm:text-sm rounded-2xl bg-white dark:bg-[#2a3942] border border-transparent focus:border-emerald-500 dark:focus:border-emerald-500 text-slate-900 dark:text-white placeholder-slate-400 resize-none outline-hidden max-h-32 min-h-[42px] shadow-xs"
+                      className="w-full text-xs sm:text-sm bg-transparent border-none text-slate-900 dark:text-white placeholder-slate-400 resize-none outline-hidden max-h-36 min-h-[46px] leading-relaxed"
                     />
-                    <div className="absolute right-3 bottom-2 text-[10px] text-slate-400">
-                      {messageInput.length > 1800 ? `${messageInput.length}/2000` : ''}
+
+                    {/* Composer Toolbar */}
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                      <div className="flex items-center gap-2 text-[11px] text-slate-400 dark:text-slate-500">
+                        <span className="hidden sm:inline">Press <kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-2xs">Enter ↵</kbd> to send</span>
+                        <span className="hidden sm:inline">•</span>
+                        <span><kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-2xs">Shift + Enter</kbd> for new line</span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {messageInput.length > 1500 && (
+                          <span className="text-[10px] text-slate-400">
+                            {messageInput.length}/2000
+                          </span>
+                        )}
+
+                        <button
+                          type="submit"
+                          id="btn-send-message"
+                          disabled={!messageInput.trim() || sending}
+                          className="px-4 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-500 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold transition-all shadow-xs flex items-center gap-1.5 shrink-0"
+                          title="Send Message"
+                        >
+                          {sending ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Send className="w-3.5 h-3.5" />
+                          )}
+                          <span>Send</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
-
-                  <button
-                    type="submit"
-                    id="btn-send-message"
-                    disabled={!messageInput.trim() || sending}
-                    className="w-10 h-10 rounded-full bg-emerald-600 hover:bg-emerald-500 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-all shadow-md shrink-0 flex items-center justify-center"
-                    title="Send Message"
-                  >
-                    {sending ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Send className="w-4 h-4" />
-                    )}
-                  </button>
                 </form>
               </div>
             </>
           ) : (
-            /* Empty State when no conversation is selected (WhatsApp Web style) */
-            <div className="h-full flex flex-col items-center justify-center p-8 text-center text-slate-400 bg-slate-50/60 dark:bg-[#111b21]">
-              <div className="w-16 h-16 rounded-3xl bg-emerald-500/10 dark:bg-emerald-400/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-4 shadow-sm">
+            /* Empty State when no conversation is selected (Corporate Messenger style) */
+            <div className="h-full flex flex-col items-center justify-center p-8 text-center text-slate-400 bg-slate-50/60 dark:bg-slate-950">
+              <div className="w-16 h-16 rounded-3xl bg-brand-500/10 dark:bg-brand-400/10 flex items-center justify-center text-brand-600 dark:text-brand-400 mb-4 shadow-sm">
                 <MessageSquare className="w-8 h-8" />
               </div>
               <h2 className="text-base font-bold text-slate-800 dark:text-slate-200 mb-1">
-                WhatsApp-Style Institutional Chat
+                Corporate Workspace Messenger
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mb-6">
-                Send and receive authenticated messages with company partners, mentors, coordinators, and students.
+                Communicate directly with colleagues, supervisors, mentors, and cohort teams in real time.
               </p>
               <div className="flex gap-2">
                 <Button
@@ -1341,7 +1527,7 @@ export const ChatPage = () => {
                     size="sm"
                   >
                     <Users className="w-4 h-4 mr-1.5" />
-                    Create Group
+                    Create Channel
                   </Button>
                 )}
               </div>
@@ -1349,13 +1535,13 @@ export const ChatPage = () => {
           )}
         </div>
 
-        {/* WhatsApp-Style Contact Info Drawer (Right Panel) */}
+        {/* Corporate Workspace Contact Info Drawer (Right Panel) */}
         {showContactDetails && activeConversation && (
-          <div className="w-full sm:w-80 lg:w-88 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111b21] flex flex-col shrink-0 h-full overflow-hidden shadow-lg transition-all z-20 absolute sm:relative inset-y-0 right-0">
+          <div className="w-full sm:w-80 lg:w-88 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0 h-full overflow-hidden shadow-lg transition-all z-20 absolute sm:relative inset-y-0 right-0">
             {/* Drawer Header */}
-            <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-[#f0f2f5] dark:bg-[#202c33] shrink-0">
+            <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-850 shrink-0">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                {activeConversation.type === CONVERSATION_TYPES.GROUP ? 'Group Info' : 'Contact Info'}
+                {activeConversation.type === CONVERSATION_TYPES.GROUP ? 'Channel Details' : 'Member Profile'}
               </h3>
               <button
                 type="button"
@@ -1372,7 +1558,7 @@ export const ChatPage = () => {
               {/* Profile Card */}
               <div className="flex flex-col items-center text-center pb-4 border-b border-slate-100 dark:border-slate-800">
                 {activeConversation.type === CONVERSATION_TYPES.GROUP ? (
-                  <div className="w-20 h-20 rounded-full bg-linear-to-tr from-brand-600 to-indigo-500 text-white flex items-center justify-center font-bold text-2xl shadow-md">
+                  <div className="w-20 h-20 rounded-2xl bg-linear-to-tr from-brand-600 to-indigo-600 text-white flex items-center justify-center font-bold text-2xl shadow-md">
                     <Users className="w-10 h-10" />
                   </div>
                 ) : (
@@ -1390,13 +1576,13 @@ export const ChatPage = () => {
                 </h4>
 
                 {activeConversation.type === CONVERSATION_TYPES.GROUP ? (
-                  <span className="mt-1 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider rounded-full bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                    Cohort Group • {activeConversation.participants?.length || 0} Members
+                  <span className="mt-1 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider rounded-full bg-brand-50 dark:bg-brand-950/80 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-800">
+                    Cohort Channel • {activeConversation.participants?.length || 0} Members
                   </span>
                 ) : activeDetails.partner?.role ? (
-                  <span className="mt-1 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider rounded-full bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                  <span className="mt-1 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider rounded-full bg-brand-50 dark:bg-brand-950/80 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-800">
                     {activeDetails.partner.role === 'company'
-                      ? 'Company Partner'
+                      ? 'Enterprise Partner'
                       : activeDetails.partner.role}
                   </span>
                 ) : null}
@@ -1419,7 +1605,7 @@ export const ChatPage = () => {
                   <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                     About / Bio
                   </label>
-                  <p className="text-xs text-slate-700 dark:text-slate-300 italic bg-slate-50 dark:bg-[#202c33] p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                  <p className="text-xs text-slate-700 dark:text-slate-300 italic bg-slate-50 dark:bg-slate-850/80 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800">
                     &ldquo;
                     {activeDetails.partner?.profile?.bio ||
                       activeDetails.partner?.profile?.companyDetails?.description ||
@@ -1437,13 +1623,13 @@ export const ChatPage = () => {
                   <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                     Organization & Department
                   </label>
-                  <div className="bg-slate-50 dark:bg-[#202c33] p-3 rounded-xl border border-slate-100 dark:border-slate-800 space-y-2 text-xs">
+                  <div className="bg-slate-50 dark:bg-slate-850/80 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 space-y-2 text-xs">
                     <div className="flex items-center gap-2 text-slate-800 dark:text-slate-200 font-semibold">
-                      <Building2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <Building2 className="w-4 h-4 text-brand-600 dark:text-brand-400 shrink-0" />
                       <span className="truncate">
                         {activeDetails.partner?.profile?.companyDetails?.companyName ||
                           activeDetails.partner?.profile?.department ||
-                          'Company Partner'}
+                          'Enterprise Partner'}
                       </span>
                     </div>
 
@@ -1468,14 +1654,14 @@ export const ChatPage = () => {
                   <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                     Contact Details
                   </label>
-                  <div className="bg-slate-50 dark:bg-[#202c33] p-3 rounded-xl border border-slate-100 dark:border-slate-800 space-y-2.5 text-xs">
+                  <div className="bg-slate-50 dark:bg-slate-850/80 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 space-y-2.5 text-xs">
                     {/* Email */}
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
                         <Mail className="w-4 h-4 text-slate-400 shrink-0" />
                         <a
                           href={`mailto:${activeDetails.partner.email}`}
-                          className="text-emerald-600 dark:text-emerald-400 hover:underline truncate"
+                          className="text-brand-600 dark:text-brand-400 hover:underline truncate"
                         >
                           {activeDetails.partner.email}
                         </a>
@@ -1491,7 +1677,7 @@ export const ChatPage = () => {
                         title="Copy email"
                       >
                         {copiedField === 'email' ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-500" />
+                          <Check className="w-3.5 h-3.5 text-brand-500" />
                         ) : (
                           <Copy className="w-3.5 h-3.5" />
                         )}
@@ -1529,7 +1715,7 @@ export const ChatPage = () => {
                           title="Copy phone"
                         >
                           {copiedField === 'phone' ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-500" />
+                            <Check className="w-3.5 h-3.5 text-brand-500" />
                           ) : (
                             <Copy className="w-3.5 h-3.5" />
                           )}
@@ -1545,10 +1731,10 @@ export const ChatPage = () => {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                      Group Participants ({activeConversation.participants?.length || 0})
+                      Channel Participants ({activeConversation.participants?.length || 0})
                     </label>
                   </div>
-                  <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-[#202c33]">
+                  <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50 dark:bg-slate-850/80">
                     {(activeConversation.participants || []).map((p) => {
                       const pId = (p._id || p).toString();
                       const pOnline = isUserOnline(pId);
@@ -1580,8 +1766,8 @@ export const ChatPage = () => {
               )}
 
               {/* Security / Verification Badge */}
-              <div className="p-3 bg-emerald-50/60 dark:bg-emerald-950/20 rounded-xl border border-emerald-100 dark:border-emerald-900/40 text-[11px] text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
-                <Lock className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700 text-[11px] text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                <Lock className="w-3.5 h-3.5 shrink-0 text-brand-600 dark:text-brand-400" />
                 <span>Institutional verified contact. Encrypted transmission.</span>
               </div>
             </div>

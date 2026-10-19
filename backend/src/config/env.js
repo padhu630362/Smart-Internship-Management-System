@@ -44,7 +44,7 @@ export const env = {
   CLIENT_URL: process.env.CLIENT_URL || process.env.CORS_ORIGIN || 'http://localhost:5173',
   ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS || '',
   JWT_SECRET: process.env.JWT_SECRET || 'dev_insecure_jwt_secret_must_change_in_production',
-  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
+  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '5m',
   GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
   FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID || 'sims-d9539',

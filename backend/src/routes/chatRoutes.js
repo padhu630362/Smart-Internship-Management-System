@@ -16,6 +16,7 @@ import {
   updateGroupMembers,
   getContacts,
   getOnlineUsers,
+  simulatePartnerReply,
 } from '../controllers/chatController.js';
 
 const router = Router();
@@ -36,6 +37,13 @@ router.post(
   chatRateLimiter,
   validateSendMessage,
   sendMessage
+);
+
+// Real-time live exchange simulation endpoint
+router.post(
+  '/conversations/:id/simulate-reply',
+  requireConversationMember,
+  simulatePartnerReply
 );
 
 // Read receipts

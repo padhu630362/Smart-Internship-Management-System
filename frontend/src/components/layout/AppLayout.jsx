@@ -46,7 +46,7 @@ export const AppLayout = ({ children, healthStatus, onOpenLogin }) => {
   // If this is the Chat view, render a dedicated full-height workspace without outer page scroll or footer
   if (isChat) {
     return (
-      <div className="h-screen w-screen overflow-hidden bg-slate-50 dark:bg-[#0b141a] text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-200">
+      <div className="h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-200">
         {/* Workspace Sidebar */}
         <Sidebar
           isOpen={sidebarOpen}

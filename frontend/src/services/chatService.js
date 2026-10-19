@@ -52,6 +52,16 @@ export const chatService = {
   },
 
   /**
+   * Simulate a live real-time response from the conversation partner
+   * @param {string} id - Conversation ID
+   * @param {string} [customMessage] - Optional custom message
+   */
+  async simulateReply(id, customMessage) {
+    const response = await apiClient.post(`/api/chat/conversations/${id}/simulate-reply`, { customMessage });
+    return response.data;
+  },
+
+  /**
    * Mark a conversation as read
    */
   async markConversationRead(id) {

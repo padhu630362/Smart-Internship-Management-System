@@ -135,6 +135,11 @@ export const SocketProvider = ({ children }) => {
     newSocket.on('connect', () => {
       setIsConnected(true);
 
+      // Automatically join active conversation room if already open
+      if (activeChatConvRef.current) {
+        newSocket.emit('conversation:join', { conversationId: activeChatConvRef.current });
+      }
+
       // Query currently online users list on connection
       newSocket.emit('users:get_online', (res) => {
         if (res?.onlineUserIds && Array.isArray(res.onlineUserIds)) {
@@ -280,16 +285,24 @@ export const SocketProvider = ({ children }) => {
 
   // Chat Socket Helpers
   const joinConversation = useCallback((conversationId, callback) => {
-    if (socketRef.current && socketRef.current.connected && conversationId) {
-      socketRef.current.emit('conversation:join', { conversationId }, (res) => {
+    if (!conversationId) return;
+    const cid = conversationId.toString();
+    activeChatConvRef.current = cid;
+    if (socketRef.current && socketRef.current.connected) {
+      socketRef.current.emit('conversation:join', { conversationId: cid }, (res) => {
         if (typeof callback === 'function') callback(res);
       });
     }
   }, []);
 
   const leaveConversation = useCallback((conversationId) => {
-    if (socketRef.current && socketRef.current.connected && conversationId) {
-      socketRef.current.emit('conversation:leave', { conversationId });
+    if (!conversationId) return;
+    const cid = conversationId.toString();
+    if (activeChatConvRef.current === cid) {
+      activeChatConvRef.current = null;
+    }
+    if (socketRef.current && socketRef.current.connected) {
+      socketRef.current.emit('conversation:leave', { conversationId: cid });
     }
   }, []);
 

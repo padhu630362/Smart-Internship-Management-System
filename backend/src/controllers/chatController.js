@@ -324,6 +324,124 @@ export const sendMessage = async (req, res, next) => {
 };
 
 /**
+ * Simulate a real-time reply from the other participant in a conversation.
+ * Emits live typing indicator, socket message, audio trigger, and in-app notification.
+ */
+export const simulatePartnerReply = async (req, res, next) => {
+  try {
+    const conversation = req.conversation;
+    const currentUserId = req.user.id.toString();
+
+    // Identify the colleague/partner
+    const partnerId = conversation.participants.find(
+      (p) => (p._id || p).toString() !== currentUserId
+    );
+
+    if (!partnerId) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'No other participant found in this conversation.' },
+      });
+    }
+
+    const partner = await User.findById(partnerId._id || partnerId).select(
+      'name email role profile'
+    );
+    if (!partner) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'Conversation partner account not found.' },
+      });
+    }
+
+    const sampleReplies = [
+      `Hi ${req.user.name}, received your message. Real-time chat & notifications are working seamlessly!`,
+      `Hello ${req.user.name}! I am reviewing your updates right now. Everything is approved.`,
+      `Confirmed! Live socket delivery is active. Let me know if you need any additional assistance.`,
+      `Thanks for the update, ${req.user.name}. The institutional dashboard and reports have been synced.`,
+    ];
+
+    const replyText =
+      req.body?.customMessage?.trim() ||
+      sampleReplies[Math.floor(Math.random() * sampleReplies.length)];
+
+    // 1. Emit live typing indicator for partner
+    const { getIO, emitChatMessage } = await import('../socket.js');
+    const io = getIO();
+    if (io) {
+      io.to(`conversation:${conversation._id}`).emit('chat:typing', {
+        conversationId: conversation._id.toString(),
+        userId: partner._id.toString(),
+        userName: partner.name,
+        isTyping: true,
+      });
+    }
+
+    // 2. Wait 1200ms for realistic live typing indicator, then broadcast real message
+    setTimeout(async () => {
+      try {
+        if (io) {
+          io.to(`conversation:${conversation._id}`).emit('chat:typing', {
+            conversationId: conversation._id.toString(),
+            userId: partner._id.toString(),
+            userName: partner.name,
+            isTyping: false,
+          });
+        }
+
+        const now = new Date();
+        const newMessage = await Message.create({
+          conversation: conversation._id,
+          sender: partner._id,
+          content: replyText,
+          readBy: [partner._id],
+        });
+
+        const populatedMessage = await Message.findById(newMessage._id)
+          .populate('sender', 'name email role profile')
+          .lean();
+
+        await Conversation.findByIdAndUpdate(conversation._id, {
+          $set: {
+            lastMessage: newMessage._id,
+            lastMessageAt: now,
+          },
+        });
+
+        emitChatMessage(conversation._id, populatedMessage, conversation.participants);
+
+        // Dispatch real-time in-app notification to the current user
+        createAndDispatchNotification({
+          recipientId: currentUserId,
+          senderId: partner._id,
+          type: NOTIFICATION_TYPES.NEW_MESSAGE,
+          title: `New message from ${partner.name}`,
+          message: replyText.length > 80 ? `${replyText.substring(0, 77)}...` : replyText,
+          link: `/chat?conversationId=${conversation._id}`,
+          eventKey: `MSG:${newMessage._id}:${currentUserId}`,
+          metadata: {
+            conversationId: conversation._id,
+            messageId: newMessage._id,
+          },
+        }).catch((err) =>
+          logger.warn(`Failed to dispatch simulated message notification: ${err.message}`)
+        );
+      } catch (innerErr) {
+        logger.error(`Error in simulated message broadcast: ${innerErr.message}`);
+      }
+    }, 1200);
+
+    res.status(200).json({
+      success: true,
+      message: `Simulated live message exchange initiated from ${partner.name}.`,
+      data: { partner: { id: partner._id, name: partner.name, role: partner.role } },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * Mark conversation as read for current user
  */
 export const markConversationRead = async (req, res, next) => {

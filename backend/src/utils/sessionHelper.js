@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { Session } from '../models/Session.js';
-import { signToken } from './jwt.js';
+import { env } from '../config/env.js';
+import { signToken, parseExpiresIn } from './jwt.js';
 
 /**
  * Hash a JWT token using SHA-256 for safe database indexing without exposing raw tokens.
@@ -90,7 +91,7 @@ export const issueUserSession = async ({ user, req, expiresIn }) => {
   const uaString = req?.headers?.['user-agent'] || 'Browser Client';
   const { deviceType, browser, os } = parseUserAgent(uaString);
   const ip = extractClientIp(req);
-  const ttlSeconds = 7 * 86400; // 7 days default
+  const ttlSeconds = parseExpiresIn(expiresIn || env.JWT_EXPIRES_IN || '5m');
   const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
 
   const session = await Session.create({
@@ -113,13 +114,14 @@ export const issueUserSession = async ({ user, req, expiresIn }) => {
 /**
  * Create a new managed active session in MongoDB.
  */
-export const createSessionRecord = async ({ user, token, req, ttlSeconds = 7 * 86400 }) => {
+export const createSessionRecord = async ({ user, token, req, ttlSeconds }) => {
   const sessionId = crypto.randomUUID();
   const tokenHash = hashToken(token);
   const uaString = req?.headers?.['user-agent'] || 'Browser Client';
   const { deviceType, browser, os } = parseUserAgent(uaString);
   const ip = extractClientIp(req);
-  const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
+  const sessionTtl = ttlSeconds !== undefined ? ttlSeconds : parseExpiresIn(env.JWT_EXPIRES_IN || '5m');
+  const expiresAt = new Date(Date.now() + sessionTtl * 1000);
 
   const session = await Session.create({
     user: user._id || user.id,
