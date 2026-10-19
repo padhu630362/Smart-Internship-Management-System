@@ -69,14 +69,14 @@ export const createAndDispatchNotification = async ({
           recipient: recipientId,
           eventKey: sanitizedEventKey,
         })
-          .populate('sender', 'name email role')
+          .populate('sender', 'name email role profile.avatarUrl')
           .lean();
       }
       throw createErr;
     }
 
     const populated = await Notification.findById(notification._id)
-      .populate('sender', 'name email role')
+      .populate('sender', 'name email role profile.avatarUrl')
       .lean();
 
     // Deliver via Socket.IO to private user room

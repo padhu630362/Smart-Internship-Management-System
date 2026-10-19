@@ -1,7 +1,8 @@
 import PDFDocument from 'pdfkit';
 import crypto from 'crypto';
-import { Certificate, CERTIFICATE_STATUSES } from '../models/Certificate.js';
+import { Certificate, CERTIFICATE_STATUSES, EMAIL_DELIVERY_STATUSES } from '../models/Certificate.js';
 import { logger } from '../utils/logger.js';
+import { sendCertificateEmail } from './emailService.js';
 
 /**
  * Generates a unique, tamper-evident verification code.
@@ -11,89 +12,14 @@ export const generateVerificationCode = () => {
 };
 
 /**
- * Issues a new Certificate record in MongoDB if not already created for this allocation.
+ * Renders the certificate visual elements into a PDFKit document.
+ * Shared between streaming responses and binary buffer creation.
  */
-export const issueCertificate = async ({
-  allocation,
-  internship,
-  student,
-  company,
-  mentor,
-  evaluation,
-  finalRating = 4.5,
-  recommendation = 'Recommended',
-}) => {
-  try {
-    // Check if certificate already exists for this student and internship
-    const existing = await Certificate.findOne({
-      student: student._id || student,
-      internship: internship._id || internship,
-    });
-
-    if (existing) {
-      return existing;
-    }
-
-    const verificationCode = generateVerificationCode();
-    const certificateNumber = `CERT-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
-
-    let grade = 'Distinction';
-    if (finalRating >= 4.5) grade = 'Distinction';
-    else if (finalRating >= 3.8) grade = 'First Class with Honors';
-    else if (finalRating >= 3.0) grade = 'First Class';
-    else grade = 'Pass';
-
-    const cert = await Certificate.create({
-      certificateNumber,
-      verificationCode,
-      student: student._id || student,
-      internship: internship._id || internship,
-      company: company?._id || company || student._id,
-      mentor: mentor?._id || mentor,
-      allocation: allocation?._id || allocation,
-      evaluation: evaluation?._id || evaluation,
-      studentName: student.name || 'Student Candidate',
-      studentEmail: student.email || '',
-      studentCollegeId: student.profile?.studentDetails?.studentId || '',
-      internshipTitle: internship.title || 'Internship Program',
-      companyName: internship.companyName || company?.name || 'Partner Enterprise',
-      mentorName: mentor?.name || 'Industry Supervisor',
-      duration: internship.duration || '3 Months',
-      startDate: allocation?.startDate,
-      endDate: allocation?.endDate,
-      issueDate: new Date(),
-      finalRating,
-      grade,
-      recommendation,
-      status: CERTIFICATE_STATUSES.ISSUED,
-    });
-
-    return cert;
-  } catch (err) {
-    logger.error('Failed to issue certificate:', err);
-    throw err;
-  }
-};
-
-/**
- * Streams a PDF certificate dynamically using PDFKit.
- * @param {Object} certificate - Certificate Mongoose document or plain object
- * @param {Object} res - Express response stream
- */
-export const streamCertificatePdf = (certificate, res) => {
-  const doc = new PDFDocument({
-    size: 'A4',
-    layout: 'landscape',
-    margin: 40,
-  });
-
-  // Pipe directly to HTTP response
-  doc.pipe(res);
-
+export const renderCertificateDocument = (doc, certificate) => {
   const width = doc.page.width;
   const height = doc.page.height;
 
-  // Background gradient-like fills
+  // Background fills
   doc.rect(0, 0, width, height).fill('#0f172a'); // Slate 900 background
 
   // Inner card container
@@ -120,6 +46,9 @@ export const streamCertificatePdf = (certificate, res) => {
     doc.rect(x, y, 3, cornerSize).fill('#0369a1');
   };
   drawCorner(margin + 16, margin + 16);
+  drawCorner(width - margin - 16 - cornerSize, margin + 16);
+  drawCorner(margin + 16, height - margin - 16 - 3);
+  drawCorner(width - margin - 16 - cornerSize, height - margin - 16 - 3);
 
   // Header Subtitle
   doc
@@ -154,20 +83,26 @@ export const streamCertificatePdf = (certificate, res) => {
     .font('Helvetica-Bold')
     .fontSize(26)
     .fillColor('#0369a1')
-    .text(certificate.studentName || 'Student Name', 0, 140, {
+    .text(certificate.studentName || 'Student Candidate', 0, 138, {
       align: 'center',
     });
 
   // Decorative line under student name
-  const nameLineWidth = 240;
+  const nameLineWidth = 260;
   doc
-    .moveTo((width - nameLineWidth) / 2, 175)
-    .lineTo((width + nameLineWidth) / 2, 175)
+    .moveTo((width - nameLineWidth) / 2, 172)
+    .lineTo((width + nameLineWidth) / 2, 172)
     .lineWidth(1.5)
     .stroke('#0284c7');
 
   // Context Paragraph
-  const collegeIdText = certificate.studentCollegeId ? `(ID: ${certificate.studentCollegeId})` : '';
+  const startFormatted = certificate.startDate
+    ? new Date(certificate.startDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+    : 'N/A';
+  const endFormatted = certificate.endDate
+    ? new Date(certificate.endDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+    : 'N/A';
+
   doc
     .font('Helvetica')
     .fontSize(12)
@@ -175,11 +110,11 @@ export const streamCertificatePdf = (certificate, res) => {
     .text(
       `has actively and successfully fulfilled all academic milestones, practical competencies, and workplace assignments for the position of`,
       60,
-      192,
+      188,
       {
         align: 'center',
         width: width - 120,
-        lineGap: 4,
+        lineGap: 3,
       }
     );
 
@@ -188,33 +123,32 @@ export const streamCertificatePdf = (certificate, res) => {
     .font('Helvetica-Bold')
     .fontSize(16)
     .fillColor('#0f172a')
-    .text(`"${certificate.internshipTitle}"`, 0, 222, {
+    .text(`"${certificate.internshipTitle || 'Internship Program'}"`, 0, 216, {
       align: 'center',
     });
 
   doc
     .font('Helvetica')
-    .fontSize(13)
+    .fontSize(12.5)
     .fillColor('#475569')
-    .text(`hosted and supervised at ${certificate.companyName}`, 0, 246, {
+    .text(`hosted and supervised at ${certificate.companyName || 'Partner Organization'}`, 0, 238, {
       align: 'center',
     });
 
-  // Details Pill Grid
-  const pillY = 280;
-  const ratingText = certificate.finalRating ? `${certificate.finalRating.toFixed(1)} / 5.0` : '4.8 / 5.0';
+  // Details Pill Grid: 4 Prominent verified attribute boxes
+  const pillY = 276;
+  const ratingText = certificate.finalRating ? `${certificate.finalRating.toFixed(1)} / 5.0` : '4.5 / 5.0';
   const gradeText = certificate.grade || 'Distinction';
-  const durationText = certificate.duration || '3 Months';
   const issueDateText = new Date(certificate.issueDate || Date.now()).toLocaleDateString('en-US', {
     year: 'numeric',
-    month: 'long',
+    month: 'short',
     day: 'numeric',
   });
 
   const details = [
-    { label: 'PROGRAM DURATION', val: durationText },
-    { label: 'PERFORMANCE SCORE', val: ratingText },
-    { label: 'EVALUATION GRADE', val: gradeText },
+    { label: 'VERIFIED START DATE', val: startFormatted },
+    { label: 'VERIFIED END DATE', val: endFormatted },
+    { label: 'PERFORMANCE SCORE', val: `${gradeText} (${ratingText})` },
     { label: 'DATE OF ISSUANCE', val: issueDateText },
   ];
 
@@ -222,14 +156,14 @@ export const streamCertificatePdf = (certificate, res) => {
   details.forEach((item, index) => {
     const x = 60 + index * colWidth;
     doc
-      .roundedRect(x + 5, pillY, colWidth - 10, 44, 6)
+      .roundedRect(x + 5, pillY, colWidth - 10, 46, 6)
       .fillAndStroke('#f8fafc', '#e2e8f0');
 
     doc
       .font('Helvetica-Bold')
-      .fontSize(8)
+      .fontSize(7.5)
       .fillColor('#64748b')
-      .text(item.label, x + 5, pillY + 8, {
+      .text(item.label, x + 5, pillY + 9, {
         width: colWidth - 10,
         align: 'center',
         characterSpacing: 0.5,
@@ -237,16 +171,16 @@ export const streamCertificatePdf = (certificate, res) => {
 
     doc
       .font('Helvetica-Bold')
-      .fontSize(11)
+      .fontSize(10.5)
       .fillColor('#0f172a')
-      .text(item.val, x + 5, pillY + 24, {
+      .text(item.val, x + 5, pillY + 25, {
         width: colWidth - 10,
         align: 'center',
       });
   });
 
   // Signatures Section
-  const sigY = 370;
+  const sigY = 368;
 
   // Left Signature: Mentor
   doc
@@ -313,7 +247,7 @@ export const streamCertificatePdf = (certificate, res) => {
     .fontSize(8.5)
     .fillColor('#0f172a')
     .text(
-      `Credential Number: ${certificate.certificateNumber || 'SIMS-CERT'}  •  Security Verification Code: ${certificate.verificationCode || 'VERIFIED'}`,
+      `Credential ID: ${certificate.certificateNumber || 'SIMS-CERT'}  •  Security Verification Code: ${certificate.verificationCode || 'VERIFIED'}`,
       50,
       bottomBarY + 5,
       { align: 'center' }
@@ -329,7 +263,237 @@ export const streamCertificatePdf = (certificate, res) => {
       bottomBarY + 16,
       { align: 'center' }
     );
+};
 
+/**
+ * Generates an in-memory PDF Buffer using PDFKit.
+ * @param {Object} certificate - Certificate document or object
+ * @returns {Promise<Buffer>}
+ */
+export const generateCertificatePdfBuffer = (certificate) => {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({
+        size: 'A4',
+        layout: 'landscape',
+        margin: 40,
+      });
+
+      const chunks = [];
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', (err) => reject(err));
+
+      renderCertificateDocument(doc, certificate);
+      doc.end();
+    } catch (err) {
+      reject(err);
+    }
+  });
+};
+
+/**
+ * Streams a PDF certificate dynamically using PDFKit to an Express response.
+ * @param {Object} certificate - Certificate Mongoose document or plain object
+ * @param {Object} res - Express response stream
+ */
+export const streamCertificatePdf = (certificate, res) => {
+  const doc = new PDFDocument({
+    size: 'A4',
+    layout: 'landscape',
+    margin: 40,
+  });
+
+  doc.pipe(res);
+  renderCertificateDocument(doc, certificate);
   doc.end();
+};
+
+/**
+ * Issues a new Certificate record in MongoDB if not already created for this allocation.
+ * Strictly verifies actual dates and enforces non-duplication.
+ */
+export const issueCertificate = async ({
+  allocation,
+  internship,
+  student,
+  company,
+  mentor,
+  evaluation,
+  startDate: customStartDate,
+  endDate: customEndDate,
+  finalRating = 4.5,
+  recommendation = 'Recommended',
+}) => {
+  try {
+    const studentId = student?._id || student;
+    const internshipId = internship?._id || internship;
+    const allocationId = allocation?._id || allocation;
+
+    // 1. Idempotency check: Reuse existing certificate if already issued
+    const existingQuery = [];
+    if (allocationId) {
+      existingQuery.push({ allocation: allocationId });
+    }
+    if (studentId && internshipId) {
+      existingQuery.push({ student: studentId, internship: internshipId });
+    }
+    if (existingQuery.length > 0) {
+      const existing = await Certificate.findOne({ $or: existingQuery });
+      if (existing) {
+        logger.info(`Reusing existing certificate ${existing.certificateNumber} for student ${studentId}`);
+        return existing;
+      }
+    }
+
+    // 2. Strict Date Validation: Never invent, never estimate, never use createdAt
+    const rawStartDate = allocation?.startDate || customStartDate;
+    const rawEndDate = allocation?.endDate || customEndDate;
+
+    if (!rawStartDate || isNaN(new Date(rawStartDate).getTime())) {
+      const err = new Error('Cannot issue certificate: Verified internship start date is missing or invalid.');
+      err.statusCode = 400;
+      err.code = 'INVALID_START_DATE';
+      throw err;
+    }
+
+    if (!rawEndDate || isNaN(new Date(rawEndDate).getTime())) {
+      const err = new Error('Cannot issue certificate: Verified internship end date is missing or invalid.');
+      err.statusCode = 400;
+      err.code = 'INVALID_END_DATE';
+      throw err;
+    }
+
+    const verifiedStartDate = new Date(rawStartDate);
+    const verifiedEndDate = new Date(rawEndDate);
+
+    if (verifiedEndDate < verifiedStartDate) {
+      const err = new Error('Cannot issue certificate: Verified internship end date cannot be earlier than start date.');
+      err.statusCode = 400;
+      err.code = 'INVALID_DATE_RANGE';
+      throw err;
+    }
+
+    // 3. Generate Unique Identifiers
+    const verificationCode = generateVerificationCode();
+    const certificateNumber = `CERT-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
+
+    let grade = 'Distinction';
+    if (finalRating >= 4.5) grade = 'Distinction';
+    else if (finalRating >= 3.8) grade = 'First Class with Honors';
+    else if (finalRating >= 3.0) grade = 'First Class';
+    else grade = 'Pass';
+
+    // 4. Create and persist Certificate record in MongoDB
+    const cert = await Certificate.create({
+      certificateNumber,
+      verificationCode,
+      student: studentId,
+      internship: internshipId,
+      company: company?._id || company || studentId,
+      mentor: mentor?._id || mentor,
+      allocation: allocationId || undefined,
+      evaluation: evaluation?._id || evaluation || undefined,
+      studentName: student?.name || 'Student Candidate',
+      studentEmail: student?.email || '',
+      studentCollegeId: student?.profile?.studentDetails?.studentId || '',
+      internshipTitle: internship?.title || 'Internship Program',
+      companyName: internship?.companyName || company?.name || 'Partner Enterprise',
+      mentorName: mentor?.name || 'Industry Supervisor',
+      duration: internship?.duration || '3 Months',
+      startDate: verifiedStartDate,
+      endDate: verifiedEndDate,
+      issueDate: new Date(),
+      finalRating,
+      grade,
+      recommendation,
+      status: CERTIFICATE_STATUSES.ISSUED,
+      emailDeliveryStatus: EMAIL_DELIVERY_STATUSES.PENDING,
+      emailDeliveredAt: null,
+      emailError: '',
+    });
+
+    logger.info(`Certificate created successfully: ${cert.certificateNumber} for student ${studentId}`);
+    return cert;
+  } catch (err) {
+    logger.error('Failed to issue certificate:', err);
+    throw err;
+  }
+};
+
+/**
+ * Delivers the certificate PDF via email to the student's registered email address.
+ * Updates MongoDB delivery status safely. Separated from certificate creation for retryability.
+ *
+ * @param {string|ObjectId} certificateId - Certificate document ID
+ * @returns {Promise<{ sent: boolean, certificate: Object, error?: string }>}
+ */
+export const deliverCertificateEmail = async (certificateId) => {
+  const cert = await Certificate.findById(certificateId)
+    .populate('student', 'name email')
+    .populate('company', 'name')
+    .populate('internship', 'title companyName');
+
+  if (!cert) {
+    const error = new Error(`Certificate ${certificateId} not found for delivery.`);
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const recipientEmail = cert.studentEmail || cert.student?.email;
+  if (!recipientEmail) {
+    cert.emailDeliveryStatus = EMAIL_DELIVERY_STATUSES.FAILED;
+    cert.emailError = 'Student has no registered email address in database.';
+    await cert.save();
+    return { sent: false, error: cert.emailError, certificate: cert };
+  }
+
+  try {
+    // Generate PDF Buffer dynamically
+    const pdfBuffer = await generateCertificatePdfBuffer(cert);
+
+    // Dispatch email with PDF attachment
+    const result = await sendCertificateEmail({
+      to: recipientEmail,
+      studentName: cert.studentName || cert.student?.name || 'Student',
+      internshipTitle: cert.internshipTitle || cert.internship?.title || 'Internship Program',
+      companyName: cert.companyName || cert.internship?.companyName || 'Partner Enterprise',
+      certificateNumber: cert.certificateNumber,
+      verificationCode: cert.verificationCode,
+      startDate: cert.startDate,
+      endDate: cert.endDate,
+      pdfBuffer,
+    });
+
+    if (result.sent) {
+      cert.emailDeliveryStatus = EMAIL_DELIVERY_STATUSES.SENT;
+      cert.emailDeliveredAt = new Date();
+      cert.emailError = '';
+      await cert.save();
+      logger.info(`Certificate ${cert.certificateNumber} emailed successfully to ${recipientEmail}`);
+      return { sent: true, certificate: cert, result };
+    } else {
+      cert.emailDeliveryStatus = EMAIL_DELIVERY_STATUSES.FAILED;
+      cert.emailError = result.error || 'SMTP delivery failed or unconfigured';
+      await cert.save();
+      logger.warn(`Certificate ${cert.certificateNumber} email delivery failed: ${cert.emailError}`);
+      return { sent: false, error: cert.emailError, certificate: cert, result };
+    }
+  } catch (deliveryErr) {
+    cert.emailDeliveryStatus = EMAIL_DELIVERY_STATUSES.FAILED;
+    cert.emailError = deliveryErr.message || 'Error occurred during PDF generation or email dispatch';
+    await cert.save();
+    logger.error(`Exception during certificate email delivery for ${cert.certificateNumber}:`, deliveryErr);
+    return { sent: false, error: cert.emailError, certificate: cert };
+  }
+};
+
+export default {
+  generateVerificationCode,
+  renderCertificateDocument,
+  generateCertificatePdfBuffer,
+  streamCertificatePdf,
+  issueCertificate,
+  deliverCertificateEmail,
 };
 

@@ -14,6 +14,8 @@ import {
   Search,
   Eye,
   FileCheck,
+  Mail,
+  Clock,
 } from 'lucide-react';
 import certificateService from '../services/certificateService';
 import PageHeader from '../components/common/PageHeader';
@@ -190,14 +192,42 @@ export const CertificatesPage = () => {
                 <div className="absolute top-0 left-0 right-0 h-1.5 gradient-brand" />
 
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
                       {cert.certificateNumber}
                     </span>
-                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-2.5 py-0.5 rounded-full">
-                      <ShieldCheck className="w-3 h-3" />
-                      Verified
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {cert.emailDeliveryStatus === 'sent' && (
+                        <span
+                          className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 px-2 py-0.5 rounded-full"
+                          title={cert.emailDeliveredAt ? `Delivered to registered email on ${new Date(cert.emailDeliveredAt).toLocaleString()}` : 'Delivered to registered email'}
+                        >
+                          <Mail className="w-3 h-3 text-blue-600" />
+                          <span>Emailed</span>
+                        </span>
+                      )}
+                      {cert.emailDeliveryStatus === 'failed' && (
+                        <span
+                          className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-full"
+                          title={cert.emailError || 'Email delivery failed'}
+                        >
+                          <AlertCircle className="w-3 h-3 text-amber-600" />
+                          <span>Delivery Pending</span>
+                        </span>
+                      )}
+                      {cert.emailDeliveryStatus === 'pending' && (
+                        <span
+                          className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-full"
+                        >
+                          <Clock className="w-3 h-3" />
+                          <span>Queued</span>
+                        </span>
+                      )}
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-2.5 py-0.5 rounded-full">
+                        <ShieldCheck className="w-3 h-3" />
+                        Verified
+                      </span>
+                    </div>
                   </div>
 
                   <div>
@@ -211,7 +241,7 @@ export const CertificatesPage = () => {
                   </div>
 
                   {/* Highlights Grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 text-xs">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 text-xs">
                     <div>
                       <span className="text-[10px] text-slate-400 block uppercase">Grade</span>
                       <span className="font-bold text-brand-600 dark:text-brand-400">
@@ -225,9 +255,15 @@ export const CertificatesPage = () => {
                       </span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-400 block uppercase">Issued Date</span>
+                      <span className="text-[10px] text-slate-400 block uppercase">Start Date</span>
                       <span className="font-medium text-slate-700 dark:text-slate-300">
-                        {new Date(cert.issueDate).toLocaleDateString()}
+                        {cert.startDate ? new Date(cert.startDate).toLocaleDateString() : 'N/A'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block uppercase">End Date</span>
+                      <span className="font-medium text-slate-700 dark:text-slate-300">
+                        {cert.endDate ? new Date(cert.endDate).toLocaleDateString() : 'N/A'}
                       </span>
                     </div>
                   </div>

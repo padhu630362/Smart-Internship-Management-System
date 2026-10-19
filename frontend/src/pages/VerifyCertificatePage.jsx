@@ -183,10 +183,20 @@ export const VerifyCertificatePage = () => {
 
                 <div className="space-y-1">
                   <span className="text-[11px] text-slate-400 uppercase tracking-wider block font-semibold">
-                    Duration & Dates
+                    Verified Tenure & Dates
                   </span>
                   <div className="text-sm text-slate-700 dark:text-slate-300">
-                    {certificateData.duration} • Issued {new Date(certificateData.issueDate).toLocaleDateString()}
+                    {certificateData.startDate && certificateData.endDate ? (
+                      <span>
+                        {new Date(certificateData.startDate).toLocaleDateString()} to{' '}
+                        {new Date(certificateData.endDate).toLocaleDateString()}
+                      </span>
+                    ) : (
+                      <span>{certificateData.duration || 'Standard Term'}</span>
+                    )}
+                    <span className="text-slate-400 block text-xs mt-0.5">
+                      Issued {new Date(certificateData.issueDate).toLocaleDateString()}
+                    </span>
                   </div>
                 </div>
               </div>

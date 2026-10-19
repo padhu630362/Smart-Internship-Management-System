@@ -1,5 +1,10 @@
 import { Certificate, CERTIFICATE_STATUSES } from '../models/Certificate.js';
-import { streamCertificatePdf } from '../services/certificateService.js';
+import { Allocation } from '../models/Allocation.js';
+import {
+  streamCertificatePdf,
+  issueCertificate,
+  deliverCertificateEmail,
+} from '../services/certificateService.js';
 import { ROLES } from '../models/User.js';
 import { logger } from '../utils/logger.js';
 
@@ -98,6 +103,7 @@ export const downloadCertificatePdf = async (req, res, next) => {
 
 /**
  * Public endpoint to verify credential authenticity via verification code.
+ * Omits private student information (such as email, ID, phone).
  */
 export const verifyCertificate = async (req, res, next) => {
   try {
@@ -146,10 +152,152 @@ export const verifyCertificate = async (req, res, next) => {
         companyName: certificate.companyName,
         mentorName: certificate.mentorName,
         duration: certificate.duration,
+        startDate: certificate.startDate,
+        endDate: certificate.endDate,
         issueDate: certificate.issueDate,
         finalRating: certificate.finalRating,
         grade: certificate.grade,
         status: certificate.status,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Authorized mentor, coordinator, or admin issues a certificate for an allocation.
+ */
+export const issueAllocationCertificate = async (req, res, next) => {
+  try {
+    const { allocationId } = req.params;
+    const userRole = req.user.role;
+    const userId = req.user.id;
+
+    if (userRole === ROLES.STUDENT) {
+      const error = new Error('Access denied: Students are not authorized to issue certificates.');
+      error.statusCode = 403;
+      error.code = 'FORBIDDEN';
+      return next(error);
+    }
+
+    const allocation = await Allocation.findById(allocationId)
+      .populate('student', 'name email profile')
+      .populate('internship', 'title companyName duration')
+      .populate('company', 'name email profile')
+      .populate('mentor', 'name email profile');
+
+    if (!allocation) {
+      const error = new Error('Internship allocation not found.');
+      error.statusCode = 404;
+      error.code = 'ALLOCATION_NOT_FOUND';
+      return next(error);
+    }
+
+    // Role check
+    const isPrivileged = userRole === ROLES.ADMIN || userRole === ROLES.COORDINATOR;
+    const isAssignedMentor = allocation.mentor && allocation.mentor._id.toString() === userId;
+    const isHostCompany = allocation.company && allocation.company._id.toString() === userId;
+
+    if (!isPrivileged && !isAssignedMentor && !isHostCompany) {
+      const error = new Error('You are not authorized to issue a certificate for this allocation.');
+      error.statusCode = 403;
+      error.code = 'FORBIDDEN';
+      return next(error);
+    }
+
+    // Strict Date Validation
+    if (!allocation.startDate || isNaN(new Date(allocation.startDate).getTime())) {
+      const error = new Error('Cannot issue certificate: Verified internship start date is missing or invalid.');
+      error.statusCode = 400;
+      error.code = 'INVALID_START_DATE';
+      return next(error);
+    }
+
+    if (!allocation.endDate || isNaN(new Date(allocation.endDate).getTime())) {
+      const error = new Error('Cannot issue certificate: Verified internship end date is missing or invalid.');
+      error.statusCode = 400;
+      error.code = 'INVALID_END_DATE';
+      return next(error);
+    }
+
+    if (new Date(allocation.endDate) < new Date(allocation.startDate)) {
+      const error = new Error('Cannot issue certificate: Verified internship end date cannot be earlier than start date.');
+      error.statusCode = 400;
+      error.code = 'INVALID_DATE_RANGE';
+      return next(error);
+    }
+
+    const certificate = await issueCertificate({
+      allocation,
+      internship: allocation.internship,
+      student: allocation.student,
+      company: allocation.company,
+      mentor: allocation.mentor,
+      startDate: allocation.startDate,
+      endDate: allocation.endDate,
+    });
+
+    const emailDelivery = await deliverCertificateEmail(certificate._id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Certificate processed successfully.',
+      data: {
+        certificate,
+        emailDelivery,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Explicit authorized endpoint to resend a certificate email.
+ */
+export const resendCertificateEmail = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const userRole = req.user.role;
+    const userId = req.user.id;
+
+    if (userRole === ROLES.STUDENT) {
+      const error = new Error('Access denied: Students are not authorized to resend certificates.');
+      error.statusCode = 403;
+      error.code = 'FORBIDDEN';
+      return next(error);
+    }
+
+    const certificate = await Certificate.findById(id);
+    if (!certificate) {
+      const error = new Error('Certificate not found.');
+      error.statusCode = 404;
+      error.code = 'NOT_FOUND';
+      return next(error);
+    }
+
+    const isPrivileged = userRole === ROLES.ADMIN || userRole === ROLES.COORDINATOR;
+    const isAssignedMentor = certificate.mentor && certificate.mentor.toString() === userId;
+    const isHostCompany = certificate.company && certificate.company.toString() === userId;
+
+    if (!isPrivileged && !isAssignedMentor && !isHostCompany) {
+      const error = new Error('You are not authorized to resend email for this certificate.');
+      error.statusCode = 403;
+      error.code = 'FORBIDDEN';
+      return next(error);
+    }
+
+    const emailDelivery = await deliverCertificateEmail(certificate._id);
+
+    res.status(200).json({
+      success: true,
+      message: emailDelivery.sent
+        ? 'Certificate email resent successfully.'
+        : 'Certificate email delivery attempt failed.',
+      data: {
+        certificate: emailDelivery.certificate || certificate,
+        emailDelivery,
       },
     });
   } catch (err) {

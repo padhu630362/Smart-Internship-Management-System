@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { Conversation, CONVERSATION_TYPES } from '../models/Conversation.js';
 import { Message } from '../models/Message.js';
-import { User, ROLES } from '../models/User.js';
+import { User, ROLES, USER_STATUSES } from '../models/User.js';
 import { Allocation } from '../models/Allocation.js';
 import { Application } from '../models/Application.js';
 import {
@@ -474,22 +474,31 @@ export const getContacts = async (req, res, next) => {
   try {
     const user = req.user;
     const userId = user.id;
-    let query = { _id: { $ne: userId }, status: 'active' };
+    let query = { _id: { $ne: userId }, status: USER_STATUSES.ACTIVE };
 
     // Fetch staff (administrators & coordinators)
     const staff = await User.find({
       role: { $in: [ROLES.ADMIN, ROLES.COORDINATOR] },
-      status: 'active',
+      status: USER_STATUSES.ACTIVE,
     }).select('_id');
     const staffIds = staff.map((s) => s._id.toString());
 
+    // Fetch all active companies and mentors so users can message all company members
+    const companyAndMentors = await User.find({
+      role: { $in: [ROLES.COMPANY, ROLES.MENTOR] },
+      status: USER_STATUSES.ACTIVE,
+    }).select('_id');
+    const companyAndMentorIds = companyAndMentors.map((c) => c._id.toString());
+
+    let allowedUserIds = new Set([...staffIds, ...companyAndMentorIds]);
+
     if (user.role === ROLES.STUDENT) {
+      // Students can message all company members, mentors, staff, plus any allocated peers
       const [allocations, applications] = await Promise.all([
         Allocation.find({ student: userId, status: 'active' }).select('company mentor'),
         Application.find({ student: userId }).select('company'),
       ]);
 
-      const allowedUserIds = new Set(staffIds);
       allocations.forEach((a) => {
         if (a.company) allowedUserIds.add(a.company.toString());
         if (a.mentor) allowedUserIds.add(a.mentor.toString());
@@ -500,35 +509,25 @@ export const getContacts = async (req, res, next) => {
 
       query._id = { $in: Array.from(allowedUserIds) };
     } else if (user.role === ROLES.COMPANY) {
-      const [allocations, applications] = await Promise.all([
-        Allocation.find({ company: userId, status: 'active' }).select('student mentor'),
-        Application.find({ company: userId }).select('student'),
-      ]);
-
-      const allowedUserIds = new Set(staffIds);
-      allocations.forEach((a) => {
-        if (a.student) allowedUserIds.add(a.student.toString());
-        if (a.mentor) allowedUserIds.add(a.mentor.toString());
-      });
-      applications.forEach((a) => {
-        if (a.student) allowedUserIds.add(a.student.toString());
-      });
+      // Companies can message all staff, mentors, and all students
+      const allStudents = await User.find({ role: ROLES.STUDENT, status: USER_STATUSES.ACTIVE }).select('_id');
+      allStudents.forEach((s) => allowedUserIds.add(s._id.toString()));
 
       query._id = { $in: Array.from(allowedUserIds) };
     } else if (user.role === ROLES.MENTOR) {
-      const allocations = await Allocation.find({ mentor: userId, status: 'active' }).select('student company');
-      const allowedUserIds = new Set(staffIds);
-      allocations.forEach((a) => {
-        if (a.student) allowedUserIds.add(a.student.toString());
-        if (a.company) allowedUserIds.add(a.company.toString());
-      });
+      // Mentors can message all staff, company members, other mentors, and students
+      const allStudents = await User.find({ role: ROLES.STUDENT, status: USER_STATUSES.ACTIVE }).select('_id');
+      allStudents.forEach((s) => allowedUserIds.add(s._id.toString()));
 
       query._id = { $in: Array.from(allowedUserIds) };
+    } else {
+      // Admins and coordinators can message anyone in the system
+      query._id = { $ne: userId, status: USER_STATUSES.ACTIVE };
     }
 
     const contacts = await User.find(query)
-      .select('name email role profile')
-      .sort({ name: 1 })
+      .select('name email role status profile createdAt')
+      .sort({ role: 1, name: 1 })
       .lean();
 
     const onlineSet = new Set(getOnlineUserIds());

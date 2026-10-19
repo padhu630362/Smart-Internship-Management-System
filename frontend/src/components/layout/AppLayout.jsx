@@ -41,6 +41,37 @@ export const AppLayout = ({ children, healthStatus, onOpenLogin }) => {
     );
   }
 
+  const isChat = location.pathname === '/chat';
+
+  // If this is the Chat view, render a dedicated full-height workspace without outer page scroll or footer
+  if (isChat) {
+    return (
+      <div className="h-screen w-screen overflow-hidden bg-slate-50 dark:bg-[#0b141a] text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-200">
+        {/* Workspace Sidebar */}
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          healthStatus={healthStatus}
+        />
+
+        {/* Main Workspace Area with Sidebar Offset */}
+        <div className="flex-1 flex flex-col lg:pl-64 h-full min-h-0 overflow-hidden">
+          {/* Workspace Top Navbar */}
+          <TopNavbar
+            onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+            healthStatus={healthStatus}
+            onOpenLogin={onOpenLogin}
+          />
+
+          {/* Full-bleed Chat Viewport: Pinned height, no outer overflow, no footer */}
+          <main className="flex-1 w-full min-h-0 overflow-hidden flex flex-col">
+            {children}
+          </main>
+        </div>
+      </div>
+    );
+  }
+
   // Standard Internal Platform & Dashboard Layout with Sidebar
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#070b14] text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-200">

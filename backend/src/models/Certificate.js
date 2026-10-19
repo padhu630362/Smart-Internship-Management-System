@@ -5,6 +5,12 @@ export const CERTIFICATE_STATUSES = {
   REVOKED: 'revoked',
 };
 
+export const EMAIL_DELIVERY_STATUSES = {
+  PENDING: 'pending',
+  SENT: 'sent',
+  FAILED: 'failed',
+};
+
 const certificateSchema = new mongoose.Schema(
   {
     certificateNumber: {
@@ -84,9 +90,11 @@ const certificateSchema = new mongoose.Schema(
     },
     startDate: {
       type: Date,
+      required: [true, 'Actual verified internship start date is required'],
     },
     endDate: {
       type: Date,
+      required: [true, 'Actual verified internship end date is required'],
     },
     issueDate: {
       type: Date,
@@ -111,13 +119,29 @@ const certificateSchema = new mongoose.Schema(
       enum: Object.values(CERTIFICATE_STATUSES),
       default: CERTIFICATE_STATUSES.ISSUED,
     },
+    emailDeliveryStatus: {
+      type: String,
+      enum: Object.values(EMAIL_DELIVERY_STATUSES),
+      default: EMAIL_DELIVERY_STATUSES.PENDING,
+      index: true,
+    },
+    emailDeliveredAt: {
+      type: Date,
+      default: null,
+    },
+    emailError: {
+      type: String,
+      default: '',
+      trim: true,
+    },
   },
   {
     timestamps: true,
   }
 );
 
-certificateSchema.index({ student: 1, internship: 1 });
+certificateSchema.index({ student: 1, internship: 1 }, { unique: true });
+certificateSchema.index({ allocation: 1 }, { unique: true, sparse: true });
 
 export const Certificate = mongoose.model('Certificate', certificateSchema);
 export default Certificate;

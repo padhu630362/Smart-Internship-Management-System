@@ -23,7 +23,7 @@ export const getNotifications = async (req, res, next) => {
 
     const [notifications, total, unreadCount] = await Promise.all([
       Notification.find(query)
-        .populate('sender', 'name email role')
+        .populate('sender', 'name email role profile.avatarUrl')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)

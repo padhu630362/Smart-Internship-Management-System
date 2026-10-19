@@ -4,6 +4,11 @@ import {
   createAndDispatchNotification,
   NOTIFICATION_TYPES,
 } from '../services/notificationService.js';
+import {
+  issueCertificate,
+  deliverCertificateEmail,
+} from '../services/certificateService.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Create a new internship allocation
@@ -201,6 +206,28 @@ export const updateAllocationStatus = async (req, res, next) => {
     const allocation = req.allocation;
     const { status, note, reason } = req.body;
 
+    // Strict Date Validation for Completion & Certificate Issuance
+    if (status === ALLOCATION_STATUSES.COMPLETED) {
+      if (!allocation.startDate || isNaN(new Date(allocation.startDate).getTime())) {
+        const error = new Error('Cannot approve internship completion: verified internship start date is missing or invalid.');
+        error.statusCode = 400;
+        error.code = 'INVALID_START_DATE';
+        return next(error);
+      }
+      if (!allocation.endDate || isNaN(new Date(allocation.endDate).getTime())) {
+        const error = new Error('Cannot approve internship completion: verified internship end date is missing or invalid.');
+        error.statusCode = 400;
+        error.code = 'INVALID_END_DATE';
+        return next(error);
+      }
+      if (new Date(allocation.endDate) < new Date(allocation.startDate)) {
+        const error = new Error('Cannot approve internship completion: internship end date cannot precede start date.');
+        error.statusCode = 400;
+        error.code = 'INVALID_DATE_RANGE';
+        return next(error);
+      }
+    }
+
     const previousStatus = allocation.status;
     allocation.status = status;
 
@@ -215,10 +242,60 @@ export const updateAllocationStatus = async (req, res, next) => {
 
     await allocation.save();
 
+    let certificate = null;
+    let emailDelivery = null;
+
+    if (status === ALLOCATION_STATUSES.COMPLETED) {
+      try {
+        const populated = await Allocation.findById(allocation._id)
+          .populate('student', 'name email profile')
+          .populate('internship', 'title companyName duration')
+          .populate('company', 'name email')
+          .populate('mentor', 'name email');
+
+        certificate = await issueCertificate({
+          allocation: populated,
+          internship: populated.internship,
+          student: populated.student,
+          company: populated.company,
+          mentor: populated.mentor,
+          startDate: populated.startDate,
+          endDate: populated.endDate,
+        });
+
+        // Await tracked email delivery safely
+        emailDelivery = await deliverCertificateEmail(certificate._id);
+
+        createAndDispatchNotification({
+          recipientId: populated.student._id,
+          senderId: req.user.id,
+          type: NOTIFICATION_TYPES.CERTIFICATE_ISSUED,
+          title: 'Completion Certificate Issued!',
+          message: `Congratulations! Your internship completion certificate for "${populated.internship?.title || 'Internship'}" has been generated and emailed.`,
+          link: '/certificates',
+          eventKey: `cert_issued:${certificate._id}`,
+          metadata: {
+            certificateId: certificate._id,
+            certificateNumber: certificate.certificateNumber,
+            verificationCode: certificate.verificationCode,
+          },
+        }).catch(() => {});
+      } catch (certErr) {
+        logger.error('Failed to issue certificate or deliver email on completion:', certErr);
+        if (certErr.statusCode === 400) {
+          return next(certErr);
+        }
+      }
+    }
+
     res.status(200).json({
       success: true,
       message: `Allocation status successfully changed to '${status}'.`,
-      data: { allocation },
+      data: {
+        allocation,
+        certificate,
+        emailDelivery,
+      },
     });
   } catch (err) {
     next(err);

@@ -29,6 +29,7 @@ import NotificationsPage from './pages/NotificationsPage';
 import PoliciesPage from './pages/PoliciesPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import healthService from './services/healthService';
+import NotificationToastContainer from './components/common/NotificationToastContainer';
 
 export const App = () => {
   const [healthStatus, setHealthStatus] = useState(null);
@@ -48,6 +49,7 @@ export const App = () => {
   return (
     <AuthProvider>
       <SocketProvider>
+        <NotificationToastContainer />
         <AppLayout healthStatus={healthStatus}>
           <Routes>
             {/* Public routes */}

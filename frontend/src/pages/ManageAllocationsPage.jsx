@@ -14,10 +14,13 @@ import {
   ShieldCheck,
   Ban,
   Check,
+  Award,
+  Mail,
 } from 'lucide-react';
 import allocationService, { ALLOCATION_STATUSES } from '../services/allocationService';
 import internshipService from '../services/internshipService';
 import userService from '../services/userService';
+import certificateService from '../services/certificateService';
 import PageHeader from '../components/common/PageHeader';
 import StatusBadge from '../components/common/StatusBadge';
 import Button from '../components/common/Button';
@@ -171,17 +174,46 @@ export const ManageAllocationsPage = () => {
       });
 
       if (res?.success) {
-        setSuccessMessage(`Allocation marked as '${targetStatus}'.`);
+        if (targetStatus === ALLOCATION_STATUSES.COMPLETED && res.data?.certificate) {
+          const emailSent = res.data?.emailDelivery?.sent;
+          setSuccessMessage(
+            emailSent
+              ? `Allocation completed! Certificate #${res.data.certificate.certificateNumber} generated & delivered to student email.`
+              : `Allocation completed! Certificate generated (email queued/pending retry).`
+          );
+        } else {
+          setSuccessMessage(`Allocation marked as '${targetStatus}'.`);
+        }
         setIsStatusModalOpen(false);
         fetchAllocations();
-        setTimeout(() => setSuccessMessage(''), 4000);
+        setTimeout(() => setSuccessMessage(''), 5000);
       }
     } catch (err) {
       setErrorMessage(
-        err.response?.data?.error?.message || 'Failed to update allocation status.'
+        err.response?.data?.message || err.response?.data?.error?.message || 'Failed to update allocation status.'
       );
     } finally {
       setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleIssueOrResendCertificate = async (alc) => {
+    try {
+      setSuccessMessage('');
+      setErrorMessage('');
+      const res = await certificateService.issueAllocationCertificate(alc._id);
+      if (res?.success) {
+        setSuccessMessage(
+          res.data?.emailDelivery?.sent
+            ? `Certificate officially issued & delivered to ${alc.student?.email}!`
+            : `Certificate processed! Email delivery status: ${res.data?.emailDelivery?.error || 'queued'}`
+        );
+        setTimeout(() => setSuccessMessage(''), 5000);
+      }
+    } catch (err) {
+      setErrorMessage(
+        err.response?.data?.message || err.response?.data?.error?.message || 'Failed to process certificate.'
+      );
     }
   };
 
@@ -340,7 +372,7 @@ export const ManageAllocationsPage = () => {
               </div>
 
               {/* Status transition action */}
-              <div className="shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100 dark:border-slate-800">
+              <div className="shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100 dark:border-slate-800 flex items-center gap-2">
                 {alc.status === ALLOCATION_STATUSES.ACTIVE && (
                   <Button
                     variant="outline"
@@ -350,6 +382,18 @@ export const ManageAllocationsPage = () => {
                     className="text-xs"
                   >
                     Update Term Status
+                  </Button>
+                )}
+                {alc.status === ALLOCATION_STATUSES.COMPLETED && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={Award}
+                    onClick={() => handleIssueOrResendCertificate(alc)}
+                    className="text-xs"
+                    title="Issue official certificate or re-trigger email dispatch"
+                  >
+                    Issue / Resend Certificate
                   </Button>
                 )}
               </div>

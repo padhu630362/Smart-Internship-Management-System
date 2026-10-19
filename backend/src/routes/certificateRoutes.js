@@ -6,6 +6,8 @@ import {
   getCertificateById,
   downloadCertificatePdf,
   verifyCertificate,
+  issueAllocationCertificate,
+  resendCertificateEmail,
 } from '../controllers/certificateController.js';
 
 const router = Router();
@@ -35,6 +37,23 @@ router.get(
   '/:id/download',
   authenticateToken,
   downloadCertificatePdf
+);
+
+// ==========================================
+// Authorized Management Endpoints (Admin, Coordinator, Mentor, Company)
+// ==========================================
+router.post(
+  '/allocation/:allocationId/issue',
+  authenticateToken,
+  requireRoles(ROLES.ADMIN, ROLES.COORDINATOR, ROLES.MENTOR, ROLES.COMPANY),
+  issueAllocationCertificate
+);
+
+router.post(
+  '/:id/resend-email',
+  authenticateToken,
+  requireRoles(ROLES.ADMIN, ROLES.COORDINATOR, ROLES.MENTOR, ROLES.COMPANY),
+  resendCertificateEmail
 );
 
 export default router;

@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { io } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 import notificationService from '../services/notificationService';
+import chatService from '../services/chatService';
+import soundManager from '../utils/audio';
 
 const SocketContext = createContext(null);
 
@@ -14,10 +16,40 @@ export const SocketProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState(new Set());
   const [totalChatUnread, setTotalChatUnread] = useState(0);
+  const [toasts, setToasts] = useState([]);
+  const [activeChatConversationId, setActiveChatConversationIdState] = useState(null);
+  const [soundEnabled, setSoundEnabledState] = useState(soundManager.isSoundEnabled());
   const [pushPermission, setPushPermission] = useState(
     typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported'
   );
+
   const socketRef = useRef(null);
+  const activeChatConvRef = useRef(null);
+  const recentToastedMessagesRef = useRef(new Set());
+
+  const setActiveChatConversationId = useCallback((convId) => {
+    activeChatConvRef.current = convId ? convId.toString() : null;
+    setActiveChatConversationIdState(convId ? convId.toString() : null);
+  }, []);
+
+  const toggleSound = useCallback(() => {
+    setSoundEnabledState((prev) => {
+      const next = !prev;
+      soundManager.setSoundEnabled(next);
+      return next;
+    });
+  }, []);
+
+  const dismissToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const addToast = useCallback((toastData) => {
+    setToasts((prev) => {
+      if (prev.some((t) => t.id === toastData.id)) return prev;
+      return [toastData, ...prev.slice(0, 3)];
+    });
+  }, []);
 
   // Request browser desktop push permission
   const requestPushPermission = useCallback(async () => {
@@ -52,6 +84,20 @@ export const SocketProvider = ({ children }) => {
     }
   }, [isAuthenticated]);
 
+  // Fetch total unread count across all chat conversations
+  const refreshChatUnread = useCallback(async () => {
+    if (!isAuthenticated) return;
+    try {
+      const res = await chatService.getConversations();
+      if (res?.data?.conversations) {
+        const sum = res.data.conversations.reduce((acc, c) => acc + (c.unreadCount || 0), 0);
+        setTotalChatUnread(sum);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch chat conversations for unread count:', err?.message);
+    }
+  }, [isAuthenticated]);
+
   useEffect(() => {
     if (!isAuthenticated || !token) {
       if (socketRef.current) {
@@ -64,10 +110,12 @@ export const SocketProvider = ({ children }) => {
       setUnreadCount(0);
       setOnlineUsers(new Set());
       setTotalChatUnread(0);
+      setToasts([]);
       return;
     }
 
     refreshNotifications();
+    refreshChatUnread();
 
     // Determine backend socket URL
     const socketUrl = import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_BACKEND_URL || 'http://localhost:5001';
@@ -117,7 +165,7 @@ export const SocketProvider = ({ children }) => {
       });
     });
 
-    // Handle incoming real-time notifications with deduplication and desktop push
+    // Handle incoming real-time notifications with deduplication, in-app toast popup & desktop push
     newSocket.on('notification:new', (notification) => {
       if (!notification || !notification._id) return;
 
@@ -129,12 +177,47 @@ export const SocketProvider = ({ children }) => {
 
       setUnreadCount((prev) => prev + 1);
 
+      const isMsg = notification.type === 'new_message';
+      const convId = notification.metadata?.conversationId?.toString();
+      const isCurrentActiveChat = isMsg && convId && activeChatConvRef.current === convId;
+
+      if (isCurrentActiveChat) {
+        // Recipient is actively inside this open conversation in ChatPage; auto-mark read and suppress popup
+        notificationService.markAsRead(notification._id).catch(() => {});
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+        return;
+      }
+
+      // Play pleasant audio chime
+      soundManager.playNotificationChime();
+
+      // Record message ID for deduplication against chat:new_message
+      if (notification.metadata?.messageId) {
+        recentToastedMessagesRef.current.add(notification.metadata.messageId.toString());
+        // Clean up set after 10 seconds
+        setTimeout(() => {
+          recentToastedMessagesRef.current.delete(notification.metadata.messageId.toString());
+        }, 10000);
+      }
+
+      // Show real-time interactive in-app popup toast
+      addToast({
+        id: notification._id,
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+        link: notification.link,
+        sender: notification.sender,
+        metadata: notification.metadata,
+        createdAt: notification.createdAt || new Date(),
+      });
+
       // Trigger native browser notification if granted
       if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
         try {
-          const title = notification.title || 'InternHub Opportunity Alert';
+          const title = notification.title || 'InternHub Notification';
           const options = {
-            body: notification.message || 'A new update is available in your InternHub portal.',
+            body: notification.message || 'A new update is available in your portal.',
             icon: '/favicon.ico',
             tag: notification._id,
           };
@@ -145,13 +228,55 @@ export const SocketProvider = ({ children }) => {
       }
     });
 
+    // Handle real-time direct & group chat incoming message alerts across the app
+    newSocket.on('chat:new_message', ({ conversationId, message }) => {
+      if (!conversationId || !message) return;
+      const currentUid = (user?.id || user?._id || '').toString();
+      const senderId = (message.sender?._id || message.sender)?.toString();
+
+      // Don't toast own sent messages
+      if (senderId && senderId === currentUid) return;
+
+      const isCurrentActiveChat = activeChatConvRef.current === conversationId.toString();
+
+      if (!isCurrentActiveChat) {
+        setTotalChatUnread((prev) => prev + 1);
+
+        const msgId = (message._id || '').toString();
+        if (msgId && !recentToastedMessagesRef.current.has(msgId)) {
+          recentToastedMessagesRef.current.add(msgId);
+          setTimeout(() => {
+            recentToastedMessagesRef.current.delete(msgId);
+          }, 10000);
+
+          soundManager.playNotificationChime();
+
+          addToast({
+            id: `chat-${msgId || Date.now()}`,
+            type: 'new_message',
+            title: `New message from ${message.sender?.name || 'Someone'}`,
+            message: message.content || 'Sent a new message',
+            link: `/chat?conversationId=${conversationId}`,
+            sender: message.sender,
+            metadata: { conversationId, messageId: message._id },
+            createdAt: message.createdAt || new Date(),
+          });
+        }
+      }
+    });
+
+    // Handle read receipt updates
+    newSocket.on('chat:read_update', () => {
+      refreshChatUnread();
+    });
+
     setSocket(newSocket);
 
     return () => {
       newSocket.disconnect();
       socketRef.current = null;
     };
-  }, [isAuthenticated, token, refreshNotifications]);
+  }, [isAuthenticated, token, user, refreshNotifications, refreshChatUnread, addToast]);
 
   // Chat Socket Helpers
   const joinConversation = useCallback((conversationId, callback) => {
@@ -247,8 +372,16 @@ export const SocketProvider = ({ children }) => {
         onlineUsers,
         totalChatUnread,
         pushPermission,
+        toasts,
+        soundEnabled,
+        toggleSound,
+        dismissToast,
+        addToast,
+        activeChatConversationId,
+        setActiveChatConversationId,
         requestPushPermission,
         setTotalChatUnread,
+        refreshChatUnread,
         isUserOnline,
         joinConversation,
         leaveConversation,

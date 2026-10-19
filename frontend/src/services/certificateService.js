@@ -26,6 +26,22 @@ export const certificateService = {
   },
 
   /**
+   * Explicitly issue certificate for an allocation (Admin, Coordinator, Mentor, Company)
+   */
+  async issueAllocationCertificate(allocationId) {
+    const response = await apiClient.post(`/api/certificates/allocation/${allocationId}/issue`);
+    return response.data;
+  },
+
+  /**
+   * Resend certificate email to student (Admin, Coordinator, Mentor, Company)
+   */
+  async resendCertificateEmail(certificateId) {
+    const response = await apiClient.post(`/api/certificates/${certificateId}/resend-email`);
+    return response.data;
+  },
+
+  /**
    * Constructs secure authenticated URL for downloading/viewing certificate PDF
    */
   getCertificateDownloadUrl(id, token, download = false) {

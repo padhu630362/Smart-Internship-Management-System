@@ -5,7 +5,7 @@ import { Notification, NOTIFICATION_TYPES } from '../models/Notification.js';
 import { createAndDispatchNotification } from '../services/notificationService.js';
 import { emitNotificationToUser } from '../socket.js';
 import { ROLES } from '../models/User.js';
-import { issueCertificate } from '../services/certificateService.js';
+import { issueCertificate, deliverCertificateEmail } from '../services/certificateService.js';
 
 /**
  * Submit internship evaluation
@@ -68,6 +68,7 @@ export const createEvaluation = async (req, res, next) => {
 
     // Auto-issue completion certificate if final evaluation is passed
     let issuedCertificate = null;
+    let emailDelivery = null;
     if (evaluationType === 'final' && Boolean(isPassed)) {
       try {
         issuedCertificate = await issueCertificate({
@@ -80,6 +81,11 @@ export const createEvaluation = async (req, res, next) => {
           finalRating: populatedEvaluation.ratings?.overallRating || 4.5,
           recommendation,
         });
+
+        // Safely dispatch tracked email delivery
+        if (issuedCertificate) {
+          emailDelivery = await deliverCertificateEmail(issuedCertificate._id);
+        }
 
         // Dispatch completion certificate notification
         createAndDispatchNotification({
@@ -107,6 +113,7 @@ export const createEvaluation = async (req, res, next) => {
       data: {
         evaluation: populatedEvaluation,
         certificate: issuedCertificate,
+        emailDelivery,
       },
     });
   } catch (err) {
