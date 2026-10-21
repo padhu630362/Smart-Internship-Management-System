@@ -870,7 +870,7 @@ export const ProfilePage = () => {
 
                   <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                     <a
-                      href={`${profile.studentDetails.resumeUrl}${profile.studentDetails.resumeUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(token || localStorage.getItem('sims_auth_token') || '')}`}
+                      href={`${profile.studentDetails.resumeUrl}${profile.studentDetails.resumeUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(token || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('sims_auth_token') : null) || '')}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex-1 sm:flex-none"
@@ -887,7 +887,7 @@ export const ProfilePage = () => {
                     </a>
 
                     <a
-                      href={`${profile.studentDetails.resumeUrl}${profile.studentDetails.resumeUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(token || localStorage.getItem('sims_auth_token') || '')}&download=true`}
+                      href={`${profile.studentDetails.resumeUrl}${profile.studentDetails.resumeUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(token || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('sims_auth_token') : null) || '')}&download=true`}
                       download={profile.studentDetails.resumeFileName || 'Resume.pdf'}
                       target="_blank"
                       rel="noopener noreferrer"

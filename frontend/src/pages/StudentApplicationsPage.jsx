@@ -34,7 +34,7 @@ export const StudentApplicationsPage = () => {
 
   const getResumeUrl = (rawUrl) => {
     if (!rawUrl) return '#';
-    const authToken = token || localStorage.getItem('sims_auth_token') || '';
+    const authToken = token || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('sims_auth_token') : null) || (typeof localStorage !== 'undefined' ? localStorage.getItem('sims_auth_token') : null) || '';
     return `${rawUrl}${rawUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(authToken)}`;
   };
 

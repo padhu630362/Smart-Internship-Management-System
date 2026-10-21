@@ -2,29 +2,54 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import authService from '../services/authService';
 import { setAuthToken } from '../api/client';
 
+// Clean up any legacy persistent login from localStorage so newly opened tabs always start fresh
+try {
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem('sims_auth_user');
+    localStorage.removeItem('sims_auth_token');
+  }
+} catch {}
+
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     try {
-      const savedUser = localStorage.getItem('sims_auth_user');
+      const savedUser = sessionStorage.getItem('sims_auth_user');
       return savedUser ? JSON.parse(savedUser) : null;
     } catch {
       return null;
     }
   });
-  const [token, setToken] = useState(() => localStorage.getItem('sims_auth_token'));
+  const [token, setToken] = useState(() => {
+    try {
+      return sessionStorage.getItem('sims_auth_token');
+    } catch {
+      return null;
+    }
+  });
   const [isLoading, setIsLoading] = useState(() => {
-    return Boolean(localStorage.getItem('sims_auth_token') && !localStorage.getItem('sims_auth_user'));
+    try {
+      return Boolean(sessionStorage.getItem('sims_auth_token') && !sessionStorage.getItem('sims_auth_user'));
+    } catch {
+      return false;
+    }
   });
   const [error, setError] = useState(null);
 
-  // Restore authenticated session on initial load
+  // Restore authenticated session on initial load (scoped strictly to this browser tab)
   const loadUser = useCallback(async () => {
-    const savedToken = localStorage.getItem('sims_auth_token');
+    let savedToken = null;
+    try {
+      savedToken = sessionStorage.getItem('sims_auth_token');
+    } catch {}
+
     if (!savedToken) {
       setAuthToken(null);
-      localStorage.removeItem('sims_auth_user');
+      try {
+        sessionStorage.removeItem('sims_auth_user');
+        localStorage.removeItem('sims_auth_user');
+      } catch {}
       setUser(null);
       setIsLoading(false);
       return;
@@ -36,21 +61,27 @@ export const AuthProvider = ({ children }) => {
       if (response?.data?.user) {
         setUser(response.data.user);
         try {
-          localStorage.setItem('sims_auth_user', JSON.stringify(response.data.user));
+          sessionStorage.setItem('sims_auth_user', JSON.stringify(response.data.user));
         } catch {
           // Ignore storage quota error
         }
         setToken(savedToken);
       } else {
         setAuthToken(null);
-        localStorage.removeItem('sims_auth_user');
+        try {
+          sessionStorage.removeItem('sims_auth_user');
+          localStorage.removeItem('sims_auth_user');
+        } catch {}
         setUser(null);
         setToken(null);
       }
     } catch {
       // Stale or invalid token
       setAuthToken(null);
-      localStorage.removeItem('sims_auth_user');
+      try {
+        sessionStorage.removeItem('sims_auth_user');
+        localStorage.removeItem('sims_auth_user');
+      } catch {}
       setUser(null);
       setToken(null);
     } finally {
@@ -64,7 +95,10 @@ export const AuthProvider = ({ children }) => {
     // Listen for automatic token expiration from axios interceptor
     const handleExpired = () => {
       setAuthToken(null);
-      localStorage.removeItem('sims_auth_user');
+      try {
+        sessionStorage.removeItem('sims_auth_user');
+        localStorage.removeItem('sims_auth_user');
+      } catch {}
       setUser(null);
       setToken(null);
       setError('Your session has expired. Please sign in again.');
@@ -121,7 +155,7 @@ export const AuthProvider = ({ children }) => {
       setAuthToken(authToken);
       setUser(authUser);
       try {
-        localStorage.setItem('sims_auth_user', JSON.stringify(authUser));
+        sessionStorage.setItem('sims_auth_user', JSON.stringify(authUser));
       } catch {
         // Ignore storage write error
       }
@@ -145,7 +179,7 @@ export const AuthProvider = ({ children }) => {
       setAuthToken(authToken);
       setUser(authUser);
       try {
-        localStorage.setItem('sims_auth_user', JSON.stringify(authUser));
+        sessionStorage.setItem('sims_auth_user', JSON.stringify(authUser));
       } catch {
         // Ignore storage write error
       }
@@ -169,7 +203,7 @@ export const AuthProvider = ({ children }) => {
       setAuthToken(authToken);
       setUser(authUser);
       try {
-        localStorage.setItem('sims_auth_user', JSON.stringify(authUser));
+        sessionStorage.setItem('sims_auth_user', JSON.stringify(authUser));
       } catch {
         // Ignore storage write error
       }
@@ -193,7 +227,7 @@ export const AuthProvider = ({ children }) => {
       setAuthToken(authToken);
       setUser(authUser);
       try {
-        localStorage.setItem('sims_auth_user', JSON.stringify(authUser));
+        sessionStorage.setItem('sims_auth_user', JSON.stringify(authUser));
       } catch {
         // Ignore storage write error
       }
@@ -212,7 +246,10 @@ export const AuthProvider = ({ children }) => {
       await authService.logout();
     } finally {
       setAuthToken(null);
-      localStorage.removeItem('sims_auth_user');
+      try {
+        sessionStorage.removeItem('sims_auth_user');
+        localStorage.removeItem('sims_auth_user');
+      } catch {}
       setUser(null);
       setToken(null);
       setError(null);
@@ -226,7 +263,7 @@ export const AuthProvider = ({ children }) => {
     setUser((prev) => {
       const nextUser = prev ? { ...prev, ...updatedUser } : updatedUser;
       try {
-        localStorage.setItem('sims_auth_user', JSON.stringify(nextUser));
+        sessionStorage.setItem('sims_auth_user', JSON.stringify(nextUser));
       } catch {
         // Ignore storage write error
       }

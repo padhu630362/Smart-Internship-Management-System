@@ -45,7 +45,7 @@ export const certificateService = {
    * Constructs secure authenticated URL for downloading/viewing certificate PDF
    */
   getCertificateDownloadUrl(id, token, download = false) {
-    const authToken = token || localStorage.getItem('sims_auth_token') || '';
+    const authToken = token || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('sims_auth_token') : null) || (typeof localStorage !== 'undefined' ? localStorage.getItem('sims_auth_token') : null) || '';
     const baseUrl = `/api/certificates/${id}/download`;
     const params = new URLSearchParams();
     if (authToken) params.append('token', authToken);

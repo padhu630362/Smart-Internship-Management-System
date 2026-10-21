@@ -14,26 +14,39 @@ export const apiClient = axios.create({
 });
 
 /**
- * Helper to update auth token both in localStorage and in Axios defaults synchronously
+ * Helper to update auth token in sessionStorage and in Axios defaults synchronously.
+ * Using sessionStorage ensures that opening new tabs starts with a fresh login and sessions are tab-isolated.
  */
 export const setAuthToken = (token) => {
   if (token) {
-    localStorage.setItem('sims_auth_token', token);
+    try {
+      sessionStorage.setItem('sims_auth_token', token);
+      localStorage.removeItem('sims_auth_token');
+    } catch {}
     apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
   } else {
-    localStorage.removeItem('sims_auth_token');
+    try {
+      sessionStorage.removeItem('sims_auth_token');
+      localStorage.removeItem('sims_auth_token');
+    } catch {}
     delete apiClient.defaults.headers.common['Authorization'];
   }
 };
 
-// Initialize default Authorization header if token exists in storage
+// Initialize default Authorization header if token exists in session storage
 try {
-  const initialToken = typeof localStorage !== 'undefined' ? localStorage.getItem('sims_auth_token') : null;
+  // Clear legacy persistent credentials from localStorage
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem('sims_auth_token');
+    localStorage.removeItem('sims_auth_user');
+  }
+
+  const initialToken = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('sims_auth_token') : null;
   if (initialToken) {
     apiClient.defaults.headers.common['Authorization'] = `Bearer ${initialToken}`;
   }
 } catch {
-  // Local storage access restricted or unavailable
+  // Session storage access restricted or unavailable
 }
 
 // Request interceptor to automatically attach JWT token and normalize endpoint URLs
@@ -51,7 +64,7 @@ apiClient.interceptors.request.use(
       config.url = `/api${urlClean.startsWith('/') ? '' : '/'}${urlClean}`;
     }
 
-    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('sims_auth_token') : null;
+    const token = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('sims_auth_token') : null;
     if (token) {
       if (typeof config.headers?.set === 'function') {
         config.headers.set('Authorization', `Bearer ${token}`);
