@@ -39,9 +39,16 @@ export const validateCreateTask = async (req, res, next) => {
     // Authorization
     const userId = req.user.id;
     const userRole = req.user.role;
-    const isCompany = allocation.company.toString() === userId;
-    const isMentor = allocation.mentor && allocation.mentor.toString() === userId;
+    const isCompany = allocation.company?.toString() === userId;
+    let isMentor = allocation.mentor && allocation.mentor.toString() === userId;
     const isPrivileged = userRole === ROLES.ADMIN || userRole === ROLES.COORDINATOR;
+
+    // If user is a mentor and allocation has no mentor or is demo, assign this mentor to the allocation
+    if (userRole === ROLES.MENTOR && (!allocation.mentor || allocation.isDemo)) {
+      allocation.mentor = userId;
+      await allocation.save();
+      isMentor = true;
+    }
 
     if (!isCompany && !isMentor && !isPrivileged) {
       const error = new Error('You are not authorized to assign tasks to this intern.');

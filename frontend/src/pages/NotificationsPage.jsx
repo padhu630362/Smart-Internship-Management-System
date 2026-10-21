@@ -43,24 +43,27 @@ export const NotificationsPage = () => {
     toggleSound,
     requestPushPermission,
     markAsRead,
+    markConversationNotificationsRead,
     markAllAsRead,
     deleteNotification,
     clearAllNotifications,
     refreshNotifications,
+    addToast,
   } = useSocket();
 
   const { user } = useAuth();
   const navigate = useNavigate();
 
   const [filterType, setFilterType] = useState('all'); // 'all' | 'unread' | 'messages' | 'job_alert' | 'application' | 'task'
-  const [groupBySender, setGroupBySender] = useState(true); // WhatsApp style grouped messages
+  const [groupBySender, setGroupBySender] = useState(true); // Direct message grouped cards
 
   // Refresh notifications immediately on page mount
   useEffect(() => {
     refreshNotifications();
   }, [refreshNotifications]);
 
-  // Group chat notifications by conversation / sender for clean WhatsApp-style cards
+  // Group chat notifications by conversation / sender for clean direct message cards
+  // Checked/read messages disappear from the notification section!
   const { groupedChatCards, nonChatNotifications } = useMemo(() => {
     const chatMap = new Map();
     const nonChats = [];
@@ -68,6 +71,9 @@ export const NotificationsPage = () => {
     notifications.forEach((notif) => {
       const isChat = notif.type === NOTIFICATION_TYPES.NEW_MESSAGE || notif.link?.includes('chat');
       if (isChat) {
+        // Ephemeral chat messages disappear once checked/read
+        if (notif.isRead) return;
+
         const senderId = (notif.sender?._id || notif.sender || notif.title).toString();
         const convId =
           notif.metadata?.conversationId ||
@@ -94,7 +100,7 @@ export const NotificationsPage = () => {
         const group = chatMap.get(convId);
         group.notifications.push(notif);
         group.allMessages.push(notif.message);
-        if (!notif.isRead) group.unreadCount++;
+        group.unreadCount++;
 
         const itemDate = new Date(notif.createdAt);
         if (itemDate >= group.latestDate) {
@@ -107,21 +113,16 @@ export const NotificationsPage = () => {
       }
     });
 
-    const groupedChats = Array.from(chatMap.values()).sort(
-      (a, b) => b.latestDate - a.latestDate
-    );
+    const groupedChats = Array.from(chatMap.values())
+      .filter((g) => g.unreadCount > 0)
+      .sort((a, b) => b.latestDate - a.latestDate);
 
     return { groupedChatCards: groupedChats, nonChatNotifications: nonChats };
   }, [notifications]);
 
-  // Handle opening a WhatsApp-style grouped conversation
+  // Handle opening a direct message grouped conversation
   const handleOpenGroupedChat = (group) => {
-    // Mark all notifications in this group as read
-    group.notifications.forEach((n) => {
-      if (!n.isRead) {
-        markAsRead(n._id);
-      }
-    });
+    markConversationNotificationsRead(group.convId);
     const target = resolveNotificationRoute(group.link, NOTIFICATION_TYPES.NEW_MESSAGE, user?.role);
     navigate(target);
   };
@@ -131,13 +132,29 @@ export const NotificationsPage = () => {
       markAsRead(notif._id);
     }
     const target = resolveNotificationRoute(notif.link, notif.type, user?.role);
-    navigate(target);
+    if (target && target !== window.location.pathname) {
+      navigate(target);
+    }
   };
 
-  const filteredNotifications = notifications.filter((notif) => {
+  // Messages disappear once checked/read
+  const displayableNotifications = useMemo(() => {
+    return notifications.filter((notif) => {
+      const isChat = notif.type === NOTIFICATION_TYPES.NEW_MESSAGE || notif.link?.includes('chat');
+      return !(isChat && notif.isRead);
+    });
+  }, [notifications]);
+
+  const totalMessageNotifs = useMemo(() => {
+    return notifications.filter(
+      (n) => (n.type === NOTIFICATION_TYPES.NEW_MESSAGE || n.link?.includes('chat')) && !n.isRead
+    ).length;
+  }, [notifications]);
+
+  const filteredNotifications = displayableNotifications.filter((notif) => {
     if (filterType === 'unread') return !notif.isRead;
     if (filterType === 'messages') {
-      return notif.type === NOTIFICATION_TYPES.NEW_MESSAGE || notif.link?.includes('chat');
+      return (notif.type === NOTIFICATION_TYPES.NEW_MESSAGE || notif.link?.includes('chat')) && !notif.isRead;
     }
     if (filterType === 'job_alert') return notif.type === NOTIFICATION_TYPES.JOB_ALERT;
     if (filterType === 'application')
@@ -146,10 +163,6 @@ export const NotificationsPage = () => {
       return [NOTIFICATION_TYPES.TASK_ASSIGNED, NOTIFICATION_TYPES.TASK_DEADLINE, NOTIFICATION_TYPES.TASK_FEEDBACK].includes(notif.type);
     return true;
   });
-
-  const totalMessageNotifs = notifications.filter(
-    (n) => n.type === NOTIFICATION_TYPES.NEW_MESSAGE || n.link?.includes('chat')
-  ).length;
 
   const getTypeIcon = (type) => {
     switch (type) {
@@ -213,7 +226,7 @@ export const NotificationsPage = () => {
             )}
           </div>
           <p className="text-xs sm:text-sm text-stone-500 dark:text-stone-400 mt-1">
-            WhatsApp-style direct messaging alerts, opportunity broadcasts, and system updates.
+            Real-time direct messaging alerts, opportunity broadcasts, and system updates.
           </p>
         </div>
 
@@ -246,6 +259,34 @@ export const NotificationsPage = () => {
             </Button>
           )}
 
+          {/* Preview Notification Pop-up Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            icon={Sparkles}
+            onClick={() => {
+              addToast({
+                id: `demo-${Date.now()}`,
+                type: 'new_message',
+                title: 'John Doe',
+                message: 'How can I help you?',
+                link: '/chat',
+                sender: {
+                  name: 'John Doe',
+                  role: 'mentor',
+                  profile: {
+                    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256',
+                  },
+                },
+                createdAt: new Date(),
+              });
+            }}
+            className="text-xs border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 font-semibold"
+            title="Preview live notification popup model"
+          >
+            Preview Pop-up
+          </Button>
+
           {unreadCount > 0 && (
             <Button
               variant="secondary"
@@ -255,6 +296,18 @@ export const NotificationsPage = () => {
               className="text-xs"
             >
               Mark All Read
+            </Button>
+          )}
+
+          {notifications.some((n) => n.isRead) && (
+            <Button
+              variant="outline"
+              size="sm"
+              icon={Check}
+              onClick={() => clearAllNotifications(true)}
+              className="text-xs border-champagne-300 hover:bg-champagne-50"
+            >
+              Clear Read
             </Button>
           )}
 
@@ -288,7 +341,7 @@ export const NotificationsPage = () => {
                 : 'text-stone-600 hover:bg-champagne-50 dark:text-stone-400'
             }`}
           >
-            All ({notifications.length})
+            All ({displayableNotifications.length})
           </button>
 
           <button
@@ -301,7 +354,7 @@ export const NotificationsPage = () => {
             }`}
           >
             <MessageSquare className="w-3.5 h-3.5" />
-            <span>WhatsApp Messages ({totalMessageNotifs})</span>
+            <span>Direct Msg ({totalMessageNotifs})</span>
           </button>
 
           <button
@@ -356,7 +409,7 @@ export const NotificationsPage = () => {
           </button>
         </div>
 
-        {/* View Layout Toggle: WhatsApp Grouped vs Standard Timeline */}
+        {/* View Layout Toggle: Direct Messages Grouped vs Standard Timeline */}
         {(filterType === 'all' || filterType === 'messages') && groupedChatCards.length > 0 && (
           <div className="flex items-center gap-1 p-1 bg-stone-100 dark:bg-stone-850 rounded-xl shrink-0 self-end sm:self-auto">
             <button
@@ -367,10 +420,10 @@ export const NotificationsPage = () => {
                   ? 'bg-white dark:bg-stone-700 text-emerald-700 dark:text-emerald-300 shadow-xs'
                   : 'text-stone-500 hover:text-stone-800'
               }`}
-              title="Group messages from same sender like WhatsApp"
+              title="Group messages from same sender"
             >
               <Layers className="w-3 h-3" />
-              <span>WhatsApp View</span>
+              <span>Direct Msg View</span>
             </button>
             <button
               type="button"
@@ -389,13 +442,13 @@ export const NotificationsPage = () => {
         )}
       </div>
 
-      {/* WHATSAPP-STYLE GROUPED CHATS SECTION */}
+      {/* DIRECT MESSAGES GROUPED SECTION */}
       {groupBySender && (filterType === 'all' || filterType === 'messages') && groupedChatCards.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center justify-between px-1">
             <h2 className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
               <MessageSquare className="w-3.5 h-3.5" />
-              <span>Active WhatsApp Direct Conversations ({groupedChatCards.length})</span>
+              <span>Active Direct Conversations ({groupedChatCards.length})</span>
             </h2>
             <span className="text-[11px] text-stone-400">Click to reply instantly</span>
           </div>
@@ -414,7 +467,7 @@ export const NotificationsPage = () => {
                       : 'border-l-transparent hover:bg-stone-50 dark:hover:bg-warmdark-850'
                   }`}
                 >
-                  {/* WhatsApp Contact Avatar */}
+                  {/* Resilient Contact Avatar */}
                   <UserAvatar
                     sender={group.sender}
                     name={group.senderName}
@@ -455,7 +508,7 @@ export const NotificationsPage = () => {
                       </div>
                     </div>
 
-                    {/* WhatsApp-Style Message Bubble Preview */}
+                    {/* Direct Message Bubble Preview */}
                     <div className="mt-1 flex items-center gap-1.5 text-xs text-stone-600 dark:text-stone-300">
                       <CheckCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                       <span className="truncate font-medium">
@@ -529,8 +582,10 @@ export const NotificationsPage = () => {
                 <div
                   key={notif._id}
                   onClick={() => handleNotificationClick(notif)}
-                  className={`p-3.5 sm:p-4 transition-colors group flex items-start gap-3.5 cursor-pointer hover:bg-peach-50/50 dark:hover:bg-warmdark-850 ${
-                    !notif.isRead ? 'bg-peach-50/30 dark:bg-brand-950/20' : ''
+                  className={`p-3.5 sm:p-4 transition-all group flex items-start gap-3.5 cursor-pointer hover:bg-peach-50/50 dark:hover:bg-warmdark-850 border-l-4 ${
+                    !notif.isRead
+                      ? 'border-l-emerald-500 bg-emerald-50/30 dark:bg-emerald-950/20'
+                      : 'border-l-transparent'
                   }`}
                 >
                   {/* Left Avatar / Type Icon */}
@@ -566,6 +621,9 @@ export const NotificationsPage = () => {
                             {notif.sender.role}
                           </span>
                         )}
+                        {!notif.isRead && (
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="Unread" />
+                        )}
                       </div>
                       <span className="text-[11px] text-stone-400 shrink-0">
                         {new Date(notif.createdAt).toLocaleTimeString([], {
@@ -581,7 +639,7 @@ export const NotificationsPage = () => {
                   </div>
 
                   {/* Actions */}
-                  <div className="shrink-0 flex items-center gap-1 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="shrink-0 flex items-center gap-1.5 transition-opacity">
                     {!notif.isRead && (
                       <button
                         type="button"
@@ -589,10 +647,11 @@ export const NotificationsPage = () => {
                           e.stopPropagation();
                           markAsRead(notif._id);
                         }}
-                        className="p-1.5 rounded-lg text-stone-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-warmdark-800"
+                        className="px-2 py-1 rounded-lg text-[11px] font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 flex items-center gap-1 shadow-xs transition-colors"
                         title="Mark as read"
                       >
                         <Check className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Mark read</span>
                       </button>
                     )}
                     <button
@@ -601,7 +660,7 @@ export const NotificationsPage = () => {
                         e.stopPropagation();
                         deleteNotification(notif._id);
                       }}
-                      className="p-1.5 rounded-lg text-stone-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-warmdark-800"
+                      className="p-1.5 rounded-lg text-stone-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-warmdark-800 opacity-60 group-hover:opacity-100 transition-all"
                       title="Delete notification"
                     >
                       <Trash2 className="w-3.5 h-3.5" />

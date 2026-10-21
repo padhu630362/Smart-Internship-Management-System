@@ -13,6 +13,7 @@ import {
   MessageSquare,
   Check,
   RotateCcw,
+  Sparkles,
 } from 'lucide-react';
 import taskService, { TASK_STATUSES, TASK_PRIORITIES } from '../services/taskService';
 import allocationService, { ALLOCATION_STATUSES } from '../services/allocationService';
@@ -46,6 +47,24 @@ export const ManageTasksPage = () => {
     priority: TASK_PRIORITIES.MEDIUM,
   });
   const [isCreating, setIsCreating] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
+
+  const handleSeedDemoAllocations = async () => {
+    try {
+      setIsSeeding(true);
+      setErrorMessage('');
+      const res = await allocationService.seedDemo();
+      if (res?.success) {
+        setSuccessMessage(res.message || 'Demo interns & dummy internships successfully prepared!');
+        await Promise.all([fetchInitialAllocations(), fetchTasks()]);
+        setTimeout(() => setSuccessMessage(''), 5000);
+      }
+    } catch (err) {
+      setErrorMessage(err.response?.data?.message || err.message || 'Failed to seed demo interns.');
+    } finally {
+      setIsSeeding(false);
+    }
+  };
 
   // Review Task Modal
   const [selectedTask, setSelectedTask] = useState(null);
@@ -70,6 +89,12 @@ export const ManageTasksPage = () => {
       });
       if (res?.data?.allocations) {
         setAllocations(res.data.allocations);
+        if (res.data.allocations.length > 0) {
+          setTaskForm((prev) => ({
+            ...prev,
+            allocationId: prev.allocationId || res.data.allocations[0]._id,
+          }));
+        }
       }
     } catch (err) {
       console.warn('Could not load active allocations for task assignment:', err);
@@ -101,6 +126,7 @@ export const ManageTasksPage = () => {
   };
 
   const handleOpenCreateModal = () => {
+    fetchInitialAllocations();
     setTaskForm({
       allocationId: allocations[0]?._id || '',
       title: '',
@@ -192,15 +218,28 @@ export const ManageTasksPage = () => {
           />
         }
         actions={
-          <Button
-            variant="primary"
-            size="sm"
-            icon={Plus}
-            onClick={handleOpenCreateModal}
-            className="font-semibold shadow-2xs"
-          >
-            Assign New Task
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              icon={Sparkles}
+              loading={isSeeding}
+              onClick={handleSeedDemoAllocations}
+              className="text-xs border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 font-semibold"
+              title="Seed demo enrolled interns and dummy internships with start/end dates"
+            >
+              Seed Demo Interns
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              icon={Plus}
+              onClick={handleOpenCreateModal}
+              className="font-semibold shadow-2xs text-xs"
+            >
+              Assign New Task
+            </Button>
+          </div>
         }
       />
 
@@ -374,21 +413,58 @@ export const ManageTasksPage = () => {
       >
         <form onSubmit={handleCreateTaskSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Assigned Intern / Allocation <span className="text-rose-500">*</span>
-            </label>
-            <select
-              value={taskForm.allocationId}
-              onChange={(e) => setTaskForm({ ...taskForm, allocationId: e.target.value })}
-              required
-              className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white"
-            >
-              {allocations.map((alc) => (
-                <option key={alc._id} value={alc._id}>
-                  {alc.student?.name} - {alc.internship?.title}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Assigned Intern / Allocation <span className="text-rose-500">*</span>
+              </label>
+              {allocations.length > 0 && (
+                <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                  {allocations.length} intern(s) available
+                </span>
+              )}
+            </div>
+
+            {allocations.length === 0 ? (
+              <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 space-y-2 text-xs">
+                <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-medium">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>No placed interns currently assigned to your mentorship.</span>
+                </div>
+                <p className="text-stone-600 dark:text-stone-400 text-[11px]">
+                  Click below to automatically load enrolled demo students (Hari, Alex, Demo Student) and dummy internships:
+                </p>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  icon={Sparkles}
+                  loading={isSeeding}
+                  onClick={handleSeedDemoAllocations}
+                  className="w-full text-xs font-bold"
+                >
+                  Load Demo Interns & Allocations
+                </Button>
+              </div>
+            ) : (
+              <select
+                value={taskForm.allocationId}
+                onChange={(e) => setTaskForm({ ...taskForm, allocationId: e.target.value })}
+                required
+                className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white"
+              >
+                <option value="" disabled>-- Select an Enrolled Intern ({allocations.length} available) --</option>
+                {allocations.map((alc) => {
+                  const startStr = alc.startDate ? new Date(alc.startDate).toLocaleDateString() : '';
+                  const endStr = alc.endDate ? new Date(alc.endDate).toLocaleDateString() : '';
+                  const datesStr = startStr && endStr ? ` [${startStr} - ${endStr}]` : '';
+                  return (
+                    <option key={alc._id} value={alc._id}>
+                      {alc.student?.name || 'Intern'} ({alc.student?.email}) • {alc.internship?.title || 'Internship'}{datesStr}
+                    </option>
+                  );
+                })}
+              </select>
+            )}
           </div>
 
           <div>

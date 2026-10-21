@@ -29,6 +29,8 @@ import {
   ExternalLink,
   Copy,
   ChevronRight,
+  Smile,
+  SmilePlus,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -38,6 +40,60 @@ import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import StatusBadge from '../components/common/StatusBadge';
 import UserAvatar from '../components/common/UserAvatar';
+
+// Standard quick reaction emojis (like WhatsApp / image 2)
+const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏', '👏'];
+
+// Categorized emojis for emoji drawer
+const EMOJI_CATEGORIES = [
+  {
+    name: 'Smileys',
+    icon: '😊',
+    emojis: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😋', '😛', '🤗', '🤫', '🤔', '🤐', '😴', '🥳', '😎', '🤓', '🥺', '😭', '😤', '🤯', '😱', '🥵', '🥶'],
+  },
+  {
+    name: 'Gestures',
+    icon: '👍',
+    emojis: ['👍', '👎', '👏', '🙌', '👐', '🤝', '✌️', '🤞', '🤙', '👊', '✊', '🤛', '🤜', '🖐️', '✋', '👌', '🤌', '🤏', '👈', '👉', '👆', '👇', '☝️', '🙏', '💪', '✍️'],
+  },
+  {
+    name: 'Hearts & Fire',
+    icon: '❤️',
+    emojis: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💖', '💘', '💝', '🔥', '✨', '⭐', '🌟', '💥', '💯', '🚀'],
+  },
+  {
+    name: 'Work & Chat',
+    icon: '💼',
+    emojis: ['💼', '📁', '📂', '📝', '📊', '📈', '📅', '🕒', '💡', '🎯', '📢', '📌', '📎', '🎓', '🏢', '🤝', '🔍', '⚡', '☕', '💻', '🖥️', '📱', '✉️', '📦'],
+  },
+];
+
+// Group message reactions by emoji with counts and reactor list
+const groupReactions = (reactions = [], currentUserId = '') => {
+  const map = new Map();
+  (reactions || []).forEach((r) => {
+    if (!r.emoji) return;
+    const uid = (r.user?._id || r.user)?.toString();
+    const userName = r.user?.name || (uid === currentUserId ? 'You' : 'User');
+    if (!map.has(r.emoji)) {
+      map.set(r.emoji, {
+        emoji: r.emoji,
+        count: 0,
+        userNames: [],
+        reactedByMe: false,
+      });
+    }
+    const item = map.get(r.emoji);
+    item.count++;
+    if (!item.userNames.includes(userName)) {
+      item.userNames.push(userName);
+    }
+    if (uid && currentUserId && uid === currentUserId) {
+      item.reactedByMe = true;
+    }
+  });
+  return Array.from(map.values());
+};
 
 export const ChatPage = () => {
   const { user } = useAuth();
@@ -52,6 +108,7 @@ export const ChatPage = () => {
     leaveConversation,
     sendTyping,
     setActiveChatConversationId,
+    markConversationNotificationsRead,
   } = useSocket();
 
   // State
@@ -96,10 +153,51 @@ export const ChatPage = () => {
   const [showContactDetails, setShowContactDetails] = useState(false);
   const [copiedField, setCopiedField] = useState(null);
 
+  // Emoji & Reaction state
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [activeEmojiCategory, setActiveEmojiCategory] = useState(0);
+  const [activeReactionMsgId, setActiveReactionMsgId] = useState(null);
+  const [showMoreReactionMsgId, setShowMoreReactionMsgId] = useState(null);
+
+  const emojiPickerRef = useRef(null);
+  const reactionPickerRef = useRef(null);
+  const moreReactionPickerRef = useRef(null);
+
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const messageInputRef = useRef(null);
+
+  // Close emoji & reaction pickers on click outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (
+        emojiPickerRef.current &&
+        !emojiPickerRef.current.contains(e.target) &&
+        !e.target.closest('#btn-toggle-emoji')
+      ) {
+        setShowEmojiPicker(false);
+      }
+      if (
+        reactionPickerRef.current &&
+        !reactionPickerRef.current.contains(e.target) &&
+        !e.target.closest('.reaction-trigger-btn')
+      ) {
+        setActiveReactionMsgId(null);
+      }
+      if (
+        moreReactionPickerRef.current &&
+        !moreReactionPickerRef.current.contains(e.target) &&
+        !e.target.closest('.reaction-more-btn')
+      ) {
+        setShowMoreReactionMsgId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const currentUserId = user?.id || user?._id?.toString();
   const canCreateGroup = ['admin', 'coordinator', 'mentor', 'company'].includes(user?.role);
@@ -156,6 +254,7 @@ export const ChatPage = () => {
   // Mark conversation read
   const markAsRead = useCallback(async (convId) => {
     try {
+      markConversationNotificationsRead(convId);
       await chatService.markConversationRead(convId);
       setConversations((prev) =>
         prev.map((c) => (c._id === convId ? { ...c, unreadCount: 0 } : c))
@@ -163,7 +262,7 @@ export const ChatPage = () => {
     } catch (err) {
       console.warn('Could not mark conversation as read:', err);
     }
-  }, []);
+  }, [markConversationNotificationsRead]);
 
   // Fetch contacts for starting chat/group
   const fetchContacts = useCallback(async () => {
@@ -204,9 +303,8 @@ export const ChatPage = () => {
       joinConversation(conv._id);
       fetchMessages(conv._id);
 
-      if (conv.unreadCount > 0) {
-        markAsRead(conv._id);
-      }
+      // Always mark as read to clear any notifications and update badges
+      markAsRead(conv._id);
     },
     [activeConversation, joinConversation, leaveConversation, fetchMessages, markAsRead, setSearchParams]
   );
@@ -362,8 +460,26 @@ export const ChatPage = () => {
       }
     };
 
+    // Message reaction in real-time
+    const handleChatMessageReaction = ({ conversationId, messageId, reactions }) => {
+      const activeId = (activeConversation?._id || '').toString();
+      const incId = (conversationId || '').toString();
+      if (activeId && incId && activeId === incId) {
+        setMessages((prev) =>
+          prev.map((m) => {
+            const idStr = (m._id || m.id || '').toString();
+            if (idStr === (messageId || '').toString()) {
+              return { ...m, reactions };
+            }
+            return m;
+          })
+        );
+      }
+    };
+
     socket.on('chat:message', handleChatMessage);
     socket.on('chat:new_message', handleNewMessageAlert);
+    socket.on('chat:message_reaction', handleChatMessageReaction);
     socket.on('conversation:updated', handleConversationUpdated);
     socket.on('chat:read_update', handleReadUpdate);
     socket.on('chat:typing', handleTyping);
@@ -371,6 +487,7 @@ export const ChatPage = () => {
     return () => {
       socket.off('chat:message', handleChatMessage);
       socket.off('chat:new_message', handleNewMessageAlert);
+      socket.off('chat:message_reaction', handleChatMessageReaction);
       socket.off('conversation:updated', handleConversationUpdated);
       socket.off('chat:read_update', handleReadUpdate);
       socket.off('chat:typing', handleTyping);
@@ -441,6 +558,77 @@ export const ChatPage = () => {
     }
   };
 
+  // Insert emoji into composer at cursor position
+  const handleInsertEmoji = (emoji) => {
+    const input = messageInputRef.current;
+    if (input) {
+      const start = input.selectionStart ?? messageInput.length;
+      const end = input.selectionEnd ?? messageInput.length;
+      const updated = messageInput.slice(0, start) + emoji + messageInput.slice(end);
+      setMessageInput(updated);
+      setTimeout(() => {
+        input.focus();
+        const newCursorPos = start + emoji.length;
+        input.setSelectionRange(newCursorPos, newCursorPos);
+      }, 0);
+    } else {
+      setMessageInput((prev) => prev + emoji);
+    }
+  };
+
+  // Toggle emoji reaction on a message
+  const handleToggleReaction = async (messageId, emoji) => {
+    if (!messageId || !emoji) return;
+    const msgIdStr = messageId.toString();
+    try {
+      // Optimistic update
+      setMessages((prev) =>
+        prev.map((m) => {
+          if ((m._id || m.id || '').toString() !== msgIdStr) return m;
+          const currentReactions = [...(m.reactions || [])];
+          const myIdStr = (currentUserId || '').toString();
+          const existingIdx = currentReactions.findIndex(
+            (r) =>
+              r.emoji === emoji &&
+              (r.user?._id || r.user)?.toString() === myIdStr
+          );
+
+          if (existingIdx > -1) {
+            currentReactions.splice(existingIdx, 1);
+          } else {
+            currentReactions.push({
+              emoji,
+              user: {
+                _id: currentUserId,
+                name: user?.name || 'You',
+                role: user?.role,
+              },
+              createdAt: new Date().toISOString(),
+            });
+          }
+          return { ...m, reactions: currentReactions };
+        })
+      );
+
+      // Call backend API
+      const res = await chatService.toggleReaction(messageId, emoji);
+      if (res?.data?.reactions) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            (m._id || m.id || '').toString() === msgIdStr
+              ? { ...m, reactions: res.data.reactions }
+              : m
+          )
+        );
+      }
+    } catch (err) {
+      console.error('Failed to toggle reaction:', err);
+    } finally {
+      setActiveReactionMsgId(null);
+      setShowMoreReactionMsgId(null);
+    }
+  };
+
   // Simulate colleague live reply for real-time testing
   const handleSimulateReply = async () => {
     if (!activeConversation || simulatingReply) return;
@@ -506,7 +694,7 @@ export const ChatPage = () => {
   // Create new group
   const handleCreateGroup = async (e) => {
     e.preventDefault();
-    if (!groupName.trim() || selectedParticipants.length < 1) return;
+    if (!groupName.trim() || creatingGroup) return;
 
     try {
       setCreatingGroup(true);
@@ -523,6 +711,7 @@ export const ChatPage = () => {
         setGroupName('');
         setGroupDesc('');
         setSelectedParticipants([]);
+        setContactSearch('');
         await fetchConversations();
         selectConversation(conv);
       }
@@ -669,6 +858,18 @@ export const ChatPage = () => {
       );
     });
   }, [companyMembers, searchQuery]);
+
+  // Filter contacts for group creation modal
+  const filteredModalContacts = useMemo(() => {
+    if (!contactSearch.trim()) return contacts;
+    const q = contactSearch.toLowerCase().trim();
+    return contacts.filter(
+      (c) =>
+        (c.name || '').toLowerCase().includes(q) ||
+        (c.email || '').toLowerCase().includes(q) ||
+        (c.role || '').toLowerCase().includes(q)
+    );
+  }, [contacts, contactSearch]);
 
   // Filter conversations
   const filteredConversations = conversations.filter((c) => {
@@ -1316,6 +1517,8 @@ export const ChatPage = () => {
                     const isReadByOthers = (msg.readBy || []).some(
                       (id) => (id._id || id).toString() !== myId
                     );
+                    const msgId = (msg._id || msg.id || index).toString();
+                    const groupedReactions = groupReactions(msg.reactions, currentUserId);
 
                     return (
                       <div
@@ -1376,16 +1579,146 @@ export const ChatPage = () => {
                             )}
                           </div>
 
-                          {/* Message Bubble: Brand Blue on Right, White Card on Left */}
-                          <div
-                            className={`px-4 py-2.5 rounded-2xl shadow-xs transition-all relative text-xs sm:text-[13px] leading-relaxed wrap-break-word whitespace-pre-wrap select-text ${
-                              isSender
-                                ? 'bg-brand-600 dark:bg-brand-600 text-white rounded-tr-xs'
-                                : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-tl-xs border border-slate-200/90 dark:border-slate-700/80'
-                            }`}
-                          >
-                            <p>{msg.content}</p>
+                          {/* Message Bubble & Reactions Container */}
+                          <div className="relative group/bubble flex items-center gap-1.5 max-w-full">
+                            {/* If Sender, reaction trigger button appears on left of bubble */}
+                            {isSender && (
+                              <button
+                                type="button"
+                                onClick={() => setActiveReactionMsgId(activeReactionMsgId === msgId ? null : msgId)}
+                                className={`reaction-trigger-btn p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-all opacity-0 group-hover/bubble:opacity-100 group-hover:opacity-100 focus:opacity-100 shrink-0 ${
+                                  activeReactionMsgId === msgId ? 'opacity-100 bg-slate-200/80 dark:bg-slate-800' : ''
+                                }`}
+                                title="Add reaction"
+                              >
+                                <SmilePlus className="w-4 h-4" />
+                              </button>
+                            )}
+
+                            {/* Message Bubble: Brand Blue on Right, White Card on Left */}
+                            <div
+                              className={`px-4 py-2.5 rounded-2xl shadow-xs transition-all relative text-xs sm:text-[13px] leading-relaxed wrap-break-word whitespace-pre-wrap select-text ${
+                                isSender
+                                  ? 'bg-brand-600 dark:bg-brand-600 text-white rounded-tr-xs'
+                                  : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-tl-xs border border-slate-200/90 dark:border-slate-700/80'
+                              }`}
+                            >
+                              <p>{msg.content}</p>
+                            </div>
+
+                            {/* If Receiver, reaction trigger button appears on right of bubble */}
+                            {!isSender && (
+                              <button
+                                type="button"
+                                onClick={() => setActiveReactionMsgId(activeReactionMsgId === msgId ? null : msgId)}
+                                className={`reaction-trigger-btn p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-all opacity-0 group-hover/bubble:opacity-100 group-hover:opacity-100 focus:opacity-100 shrink-0 ${
+                                  activeReactionMsgId === msgId ? 'opacity-100 bg-slate-200/80 dark:bg-slate-800' : ''
+                                }`}
+                                title="Add reaction"
+                              >
+                                <SmilePlus className="w-4 h-4" />
+                              </button>
+                            )}
+
+                            {/* Floating WhatsApp-style Quick Reaction Pill Bar (Image 2 style) */}
+                            {activeReactionMsgId === msgId && (
+                              <div
+                                ref={reactionPickerRef}
+                                className={`absolute -top-11 z-30 flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 shadow-xl animate-in fade-in zoom-in-95 duration-150 ${
+                                  isSender ? 'right-0 origin-top-right' : 'left-0 origin-top-left'
+                                }`}
+                              >
+                                {QUICK_REACTIONS.map((emoji) => {
+                                  const isMyReaction = (msg.reactions || []).some(
+                                    (r) => r.emoji === emoji && (r.user?._id || r.user)?.toString() === currentUserId?.toString()
+                                  );
+                                  return (
+                                    <button
+                                      key={emoji}
+                                      type="button"
+                                      onClick={() => handleToggleReaction(msgId, emoji)}
+                                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-base sm:text-lg hover:scale-125 transition-transform active:scale-95 ${
+                                        isMyReaction
+                                          ? 'bg-brand-100 dark:bg-brand-900/60 ring-2 ring-brand-500'
+                                          : 'hover:bg-slate-100 dark:hover:bg-slate-750'
+                                      }`}
+                                      title={`React ${emoji}`}
+                                    >
+                                      <span>{emoji}</span>
+                                    </button>
+                                  );
+                                })}
+                                {/* Plus button to open more emojis */}
+                                <button
+                                  type="button"
+                                  onClick={() => setShowMoreReactionMsgId(showMoreReactionMsgId === msgId ? null : msgId)}
+                                  className="reaction-more-btn w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors ml-0.5"
+                                  title="More reactions"
+                                >
+                                  <Plus className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Extended Emojis popover if user clicked '+' */}
+                            {showMoreReactionMsgId === msgId && (
+                              <div
+                                ref={moreReactionPickerRef}
+                                className={`absolute -top-52 z-40 w-72 sm:w-80 p-2.5 rounded-2xl bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 shadow-2xl animate-in fade-in zoom-in-95 duration-150 ${
+                                  isSender ? 'right-0' : 'left-0'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between pb-1.5 border-b border-slate-100 dark:border-slate-750 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                                  <span>React with Emoji</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowMoreReactionMsgId(null)}
+                                    className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                                <div className="grid grid-cols-7 gap-1 pt-2 max-h-36 overflow-y-auto no-scrollbar">
+                                  {EMOJI_CATEGORIES.flatMap((c) => c.emojis).map((emoji, idx) => (
+                                    <button
+                                      key={idx}
+                                      type="button"
+                                      onClick={() => handleToggleReaction(msgId, emoji)}
+                                      className="w-8 h-8 rounded-lg flex items-center justify-center text-base hover:bg-slate-100 dark:hover:bg-slate-750 hover:scale-125 transition-transform active:scale-95"
+                                    >
+                                      {emoji}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
+
+                          {/* Reaction Badges Below Message Bubble */}
+                          {groupedReactions.length > 0 && (
+                            <div
+                              className={`flex flex-wrap items-center gap-1 mt-1 ${
+                                isSender ? 'justify-end' : 'justify-start'
+                              }`}
+                            >
+                              {groupedReactions.map(({ emoji, count, userNames, reactedByMe }) => (
+                                <button
+                                  key={emoji}
+                                  type="button"
+                                  onClick={() => handleToggleReaction(msgId, emoji)}
+                                  title={userNames.join(', ')}
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border transition-all active:scale-95 ${
+                                    reactedByMe
+                                      ? 'bg-brand-50 dark:bg-brand-950/80 border-brand-300 dark:border-brand-700 text-brand-700 dark:text-brand-300 shadow-2xs'
+                                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
+                                  }`}
+                                >
+                                  <span>{emoji}</span>
+                                  <span className="text-[11px] font-semibold">{count}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
 
                           {/* Status / Receipt under sent message */}
                           {isSender && (
@@ -1439,13 +1772,81 @@ export const ChatPage = () => {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Corporate Message Input Composer (Slack/Teams style) */}
-              <div className="p-3.5 sm:p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
-                <form onSubmit={handleSendMessage} className="space-y-2">
-                  <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-850 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 focus-within:bg-white dark:focus-within:bg-slate-900 transition-all shadow-2xs p-3">
+              {/* Message Input Composer: Single normal text box, emoji button, and send button */}
+              <div className="relative p-3 sm:p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
+                {/* Floating Emoji Picker Drawer */}
+                {showEmojiPicker && (
+                  <div
+                    ref={emojiPickerRef}
+                    className="absolute bottom-full left-4 mb-2 z-40 w-80 sm:w-96 rounded-2xl bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 shadow-2xl p-3 animate-in fade-in slide-in-from-bottom-2 duration-150"
+                  >
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-700">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                        <span>😊</span> Emoji Section
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowEmojiPicker(false)}
+                        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Category Tabs */}
+                    <div className="flex items-center gap-1 py-2 border-b border-slate-100 dark:border-slate-700/60 overflow-x-auto no-scrollbar">
+                      {EMOJI_CATEGORIES.map((cat, idx) => (
+                        <button
+                          key={cat.name}
+                          type="button"
+                          onClick={() => setActiveEmojiCategory(idx)}
+                          className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors shrink-0 flex items-center gap-1 ${
+                            activeEmojiCategory === idx
+                              ? 'bg-brand-50 text-brand-700 dark:bg-brand-900/60 dark:text-brand-300 font-semibold'
+                              : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-750'
+                          }`}
+                        >
+                          <span>{cat.icon}</span>
+                          <span>{cat.name}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Emoji Grid */}
+                    <div className="grid grid-cols-8 gap-1 pt-2 max-h-48 overflow-y-auto no-scrollbar">
+                      {EMOJI_CATEGORIES[activeEmojiCategory].emojis.map((emoji, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => handleInsertEmoji(emoji)}
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-lg hover:bg-slate-100 dark:hover:bg-slate-750 hover:scale-125 transition-transform active:scale-90"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+                  {/* Emoji button */}
+                  <button
+                    type="button"
+                    id="btn-toggle-emoji"
+                    onClick={() => setShowEmojiPicker((prev) => !prev)}
+                    className={`p-2.5 rounded-full text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0 ${
+                      showEmojiPicker ? 'bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-400' : ''
+                    }`}
+                    title="Insert Emoji"
+                  >
+                    <Smile className="w-5 h-5" />
+                  </button>
+
+                  {/* Single Normal Text Box */}
+                  <div className="flex-1 relative flex items-center">
                     <textarea
                       ref={messageInputRef}
-                      rows={2}
+                      rows={1}
                       value={messageInput}
                       onChange={handleInputChange}
                       onKeyDown={(e) => {
@@ -1454,43 +1855,32 @@ export const ChatPage = () => {
                           handleSendMessage(e);
                         }
                       }}
-                      placeholder={`Message ${activeDetails.title || 'conversation'}... (Enter to send, Shift + Enter for new line)`}
+                      placeholder={`Message ${activeDetails.title || 'conversation'}...`}
                       maxLength={2000}
-                      className="w-full text-xs sm:text-sm bg-transparent border-none text-slate-900 dark:text-white placeholder-slate-400 resize-none outline-hidden max-h-36 min-h-[46px] leading-relaxed"
+                      className="w-full py-2.5 px-4 text-xs sm:text-sm bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 rounded-full border border-slate-200 dark:border-slate-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:bg-white dark:focus:bg-slate-900 outline-none resize-none leading-relaxed transition-all max-h-32 min-h-[42px]"
                     />
-
-                    {/* Composer Toolbar */}
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-800">
-                      <div className="flex items-center gap-2 text-[11px] text-slate-400 dark:text-slate-500">
-                        <span className="hidden sm:inline">Press <kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-2xs">Enter ↵</kbd> to send</span>
-                        <span className="hidden sm:inline">•</span>
-                        <span><kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-2xs">Shift + Enter</kbd> for new line</span>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        {messageInput.length > 1500 && (
-                          <span className="text-[10px] text-slate-400">
-                            {messageInput.length}/2000
-                          </span>
-                        )}
-
-                        <button
-                          type="submit"
-                          id="btn-send-message"
-                          disabled={!messageInput.trim() || sending}
-                          className="px-4 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-500 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold transition-all shadow-xs flex items-center gap-1.5 shrink-0"
-                          title="Send Message"
-                        >
-                          {sending ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Send className="w-3.5 h-3.5" />
-                          )}
-                          <span>Send</span>
-                        </button>
-                      </div>
-                    </div>
+                    {messageInput.length > 1500 && (
+                      <span className="absolute right-3 text-[10px] text-slate-400 pointer-events-none">
+                        {messageInput.length}/2000
+                      </span>
+                    )}
                   </div>
+
+                  {/* Send Button */}
+                  <button
+                    type="submit"
+                    id="btn-send-message"
+                    disabled={!messageInput.trim() || sending}
+                    className="p-2.5 sm:px-4 sm:py-2.5 rounded-full sm:rounded-xl bg-brand-600 hover:bg-brand-500 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs sm:text-sm font-semibold transition-all shadow-xs flex items-center justify-center gap-1.5 shrink-0"
+                    title="Send Message"
+                  >
+                    {sending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                    <span className="hidden sm:inline">Send</span>
+                  </button>
                 </form>
               </div>
             </>
@@ -1879,36 +2269,98 @@ export const ChatPage = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Select Members ({selectedParticipants.length} selected)
-            </label>
-            <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl p-2 space-y-1">
-              {contacts.map((contact) => {
-                const checked = selectedParticipants.includes(contact._id);
-                return (
-                  <label
-                    key={contact._id}
-                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer"
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Select Members ({selectedParticipants.length} selected)
+              </label>
+              {contacts.length > 0 && (
+                <div className="flex items-center gap-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedParticipants(contacts.map((c) => c._id))}
+                    className="text-brand-600 dark:text-brand-400 hover:underline text-[11px] font-medium"
                   >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => {
-                        setSelectedParticipants((prev) =>
-                          checked ? prev.filter((id) => id !== contact._id) : [...prev, contact._id]
-                        );
-                      }}
-                      className="rounded-sm border-slate-300 text-brand-600 focus:ring-brand-500"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-slate-900 dark:text-white truncate">
-                        {contact.name}
-                      </p>
-                      <p className="text-[10px] text-slate-400 capitalize">{contact.role}</p>
-                    </div>
-                  </label>
-                );
-              })}
+                    Select All ({contacts.length})
+                  </button>
+                  <span className="text-slate-300 dark:text-slate-700">•</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedParticipants([])}
+                    className="text-slate-500 hover:underline text-[11px]"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Quick search input to filter contacts inside modal */}
+            {contacts.length > 3 && (
+              <div className="relative mb-2">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Filter members by name, email, or role..."
+                  value={contactSearch}
+                  onChange={(e) => setContactSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white outline-hidden focus:border-brand-500"
+                />
+              </div>
+            )}
+
+            <div className="max-h-52 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl p-2 space-y-1">
+              {filteredModalContacts.length === 0 ? (
+                <div className="p-4 text-center text-xs text-slate-400">
+                  <p>No members found.</p>
+                  {contacts.length === 0 && (
+                    <button
+                      type="button"
+                      onClick={() => fetchContacts()}
+                      className="mt-2 text-brand-600 hover:underline font-medium"
+                    >
+                      Refresh Contacts
+                    </button>
+                  )}
+                </div>
+              ) : (
+                filteredModalContacts.map((contact) => {
+                  const checked = selectedParticipants.includes(contact._id);
+                  return (
+                    <label
+                      key={contact._id}
+                      className={`flex items-center gap-3 p-2 rounded-lg transition-colors cursor-pointer ${
+                        checked ? 'bg-brand-50/70 dark:bg-brand-950/40' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          setSelectedParticipants((prev) =>
+                            checked ? prev.filter((id) => id !== contact._id) : [...prev, contact._id]
+                          );
+                        }}
+                        className="rounded-sm border-slate-300 text-brand-600 focus:ring-brand-500"
+                      />
+                      <UserAvatar
+                        sender={contact}
+                        name={contact.name}
+                        size="xs"
+                        isOnline={contact.isOnline}
+                        showStatus={false}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-slate-900 dark:text-white truncate">
+                          {contact.name}
+                        </p>
+                        <p className="text-[10px] text-slate-400 truncate">
+                          {contact.email} • <span className="capitalize font-semibold text-slate-500 dark:text-slate-400">{contact.role}</span>
+                        </p>
+                      </div>
+                    </label>
+                  );
+                })
+              )}
             </div>
           </div>
 
@@ -1922,9 +2374,9 @@ export const ChatPage = () => {
             </Button>
             <Button
               type="submit"
-              disabled={!groupName.trim() || selectedParticipants.length === 0 || creatingGroup}
+              disabled={!groupName.trim() || creatingGroup}
             >
-              {creatingGroup ? 'Creating...' : 'Create Group'}
+              {creatingGroup ? 'Creating Group...' : 'Create Group'}
             </Button>
           </div>
         </form>

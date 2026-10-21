@@ -43,6 +43,14 @@ export const notificationService = {
   },
 
   /**
+   * Mark all unread notifications for a conversation as read
+   */
+  async markConversationAsRead(conversationId) {
+    const response = await apiClient.patch(`/api/notifications/conversation/${conversationId}/read`);
+    return response.data;
+  },
+
+  /**
    * Mark all unread notifications as read for current user
    */
   async markAllAsRead() {

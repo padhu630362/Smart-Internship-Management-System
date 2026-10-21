@@ -1,4 +1,5 @@
 import { Task, TASK_STATUSES, TASK_PRIORITIES } from '../models/Task.js';
+import { Allocation } from '../models/Allocation.js';
 import { ROLES } from '../models/User.js';
 import {
   createAndDispatchNotification,
@@ -84,7 +85,11 @@ export const getTasks = async (req, res, next) => {
     if (userRole === ROLES.STUDENT) {
       query.assignedTo = req.user.id;
     } else if (userRole === ROLES.MENTOR) {
-      query.$or = [{ assignedBy: req.user.id }, { 'allocation.mentor': req.user.id }];
+      const mentorAllocations = await Allocation.find({
+        $or: [{ mentor: req.user.id }, { isDemo: true }],
+      }).select('_id');
+      const allocIds = mentorAllocations.map((a) => a._id);
+      query.$or = [{ assignedBy: req.user.id }, { allocation: { $in: allocIds } }];
     } else if (userRole === ROLES.COMPANY) {
       query.assignedBy = req.user.id;
     }

@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { Certificate, CERTIFICATE_STATUSES, EMAIL_DELIVERY_STATUSES } from '../models/Certificate.js';
 import { logger } from '../utils/logger.js';
 import { sendCertificateEmail } from './emailService.js';
+import { env } from '../config/env.js';
 
 /**
  * Generates a unique, tamper-evident verification code.
@@ -49,6 +50,21 @@ export const renderCertificateDocument = (doc, certificate) => {
   drawCorner(width - margin - 16 - cornerSize, margin + 16);
   drawCorner(margin + 16, height - margin - 16 - 3);
   drawCorner(width - margin - 16 - cornerSize, height - margin - 16 - 3);
+
+  // If Demo certificate, render prominent demonstration indicator
+  if (certificate.isDemo) {
+    doc
+      .roundedRect(margin + 20, margin + 20, width - (margin + 20) * 2, 18, 4)
+      .fill('#fef3c7');
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(8)
+      .fillColor('#b45309')
+      .text('★ DEMONSTRATION CREDENTIAL • SAMPLE SIMS INTERNSHIP FOR EVALUATION PURPOSES ONLY ★', 0, margin + 25, {
+        align: 'center',
+        characterSpacing: 1.2,
+      });
+  }
 
   // Header Subtitle
   doc
@@ -131,8 +147,18 @@ export const renderCertificateDocument = (doc, certificate) => {
     .font('Helvetica')
     .fontSize(12.5)
     .fillColor('#475569')
-    .text(`hosted and supervised at ${certificate.companyName || 'Partner Organization'}`, 0, 238, {
+    .text(`hosted and supervised at ${certificate.companyName || 'Partner Organization'}`, 0, 236, {
       align: 'center',
+    });
+
+  // Dedicated Highlighted Tenure Dates Callout
+  doc
+    .font('Helvetica-Bold')
+    .fontSize(10.5)
+    .fillColor('#0284c7')
+    .text(`INTERNSHIP TENURE: ${startFormatted.toUpperCase()}  TO  ${endFormatted.toUpperCase()}`, 0, 255, {
+      align: 'center',
+      characterSpacing: 0.8,
     });
 
   // Details Pill Grid: 4 Prominent verified attribute boxes
@@ -242,6 +268,8 @@ export const renderCertificateDocument = (doc, certificate) => {
     .roundedRect(44, bottomBarY, width - 88, 28, 4)
     .fill('#f1f5f9');
 
+  const verifyUrl = `${env.CLIENT_URL || 'http://localhost:5173'}/verify-certificate/${certificate.verificationCode || 'VERIFIED'}`;
+
   doc
     .font('Helvetica-Bold')
     .fontSize(8.5)
@@ -258,7 +286,7 @@ export const renderCertificateDocument = (doc, certificate) => {
     .fontSize(7.5)
     .fillColor('#64748b')
     .text(
-      'To verify authenticity, visit platform verification portal or scan official institution transcript.',
+      `Verify authenticity online: ${verifyUrl}`,
       50,
       bottomBarY + 16,
       { align: 'center' }
@@ -324,6 +352,10 @@ export const issueCertificate = async ({
   endDate: customEndDate,
   finalRating = 4.5,
   recommendation = 'Recommended',
+  deliveryEmail,
+  issuedBy,
+  issuedByRole = 'mentor',
+  isDemo = false,
 }) => {
   try {
     const studentId = student?._id || student;
@@ -384,6 +416,15 @@ export const issueCertificate = async ({
     else if (finalRating >= 3.0) grade = 'First Class';
     else grade = 'Pass';
 
+    const resolvedDeliveryEmail = (
+      deliveryEmail ||
+      allocation?.completionRequest?.preferredDeliveryEmail ||
+      student?.email ||
+      ''
+    ).trim().toLowerCase();
+
+    const resolvedIsDemo = Boolean(isDemo || allocation?.isDemo);
+
     // 4. Create and persist Certificate record in MongoDB
     const cert = await Certificate.create({
       certificateNumber,
@@ -397,6 +438,10 @@ export const issueCertificate = async ({
       studentName: student?.name || 'Student Candidate',
       studentEmail: student?.email || '',
       studentCollegeId: student?.profile?.studentDetails?.studentId || '',
+      deliveryEmail: resolvedDeliveryEmail,
+      issuedBy: issuedBy?._id || issuedBy || undefined,
+      issuedByRole: issuedByRole || 'mentor',
+      isDemo: resolvedIsDemo,
       internshipTitle: internship?.title || 'Internship Program',
       companyName: internship?.companyName || company?.name || 'Partner Enterprise',
       mentorName: mentor?.name || 'Industry Supervisor',
@@ -411,9 +456,10 @@ export const issueCertificate = async ({
       emailDeliveryStatus: EMAIL_DELIVERY_STATUSES.PENDING,
       emailDeliveredAt: null,
       emailError: '',
+      emailDeliveryHistory: [],
     });
 
-    logger.info(`Certificate created successfully: ${cert.certificateNumber} for student ${studentId}`);
+    logger.info(`Certificate created successfully: ${cert.certificateNumber} for student ${studentId} (Demo: ${resolvedIsDemo})`);
     return cert;
   } catch (err) {
     logger.error('Failed to issue certificate:', err);
@@ -422,7 +468,7 @@ export const issueCertificate = async ({
 };
 
 /**
- * Delivers the certificate PDF via email to the student's registered email address.
+ * Delivers the certificate PDF via email to the student's chosen delivery address.
  * Updates MongoDB delivery status safely. Separated from certificate creation for retryability.
  *
  * @param {string|ObjectId} certificateId - Certificate document ID
@@ -432,7 +478,8 @@ export const deliverCertificateEmail = async (certificateId) => {
   const cert = await Certificate.findById(certificateId)
     .populate('student', 'name email')
     .populate('company', 'name')
-    .populate('internship', 'title companyName');
+    .populate('internship', 'title companyName')
+    .populate('issuedBy', 'name email');
 
   if (!cert) {
     const error = new Error(`Certificate ${certificateId} not found for delivery.`);
@@ -440,10 +487,17 @@ export const deliverCertificateEmail = async (certificateId) => {
     throw error;
   }
 
-  const recipientEmail = cert.studentEmail || cert.student?.email;
+  const recipientEmail = cert.deliveryEmail || cert.studentEmail || cert.student?.email;
   if (!recipientEmail) {
     cert.emailDeliveryStatus = EMAIL_DELIVERY_STATUSES.FAILED;
-    cert.emailError = 'Student has no registered email address in database.';
+    cert.emailError = 'Student has no registered or preferred delivery email address.';
+    cert.emailDeliveryHistory = cert.emailDeliveryHistory || [];
+    cert.emailDeliveryHistory.push({
+      sentAt: new Date(),
+      recipientEmail: 'unspecified',
+      status: 'failed',
+      error: cert.emailError,
+    });
     await cert.save();
     return { sent: false, error: cert.emailError, certificate: cert };
   }
@@ -463,7 +517,17 @@ export const deliverCertificateEmail = async (certificateId) => {
       startDate: cert.startDate,
       endDate: cert.endDate,
       pdfBuffer,
+      isDemo: cert.isDemo,
     });
+
+    cert.emailDeliveryHistory = cert.emailDeliveryHistory || [];
+    const historyItem = {
+      sentAt: new Date(),
+      recipientEmail,
+      status: result.sent ? 'sent' : 'failed',
+      error: result.sent ? '' : (result.error || 'SMTP delivery failed or unconfigured'),
+    };
+    cert.emailDeliveryHistory.push(historyItem);
 
     if (result.sent) {
       cert.emailDeliveryStatus = EMAIL_DELIVERY_STATUSES.SENT;
@@ -482,6 +546,13 @@ export const deliverCertificateEmail = async (certificateId) => {
   } catch (deliveryErr) {
     cert.emailDeliveryStatus = EMAIL_DELIVERY_STATUSES.FAILED;
     cert.emailError = deliveryErr.message || 'Error occurred during PDF generation or email dispatch';
+    cert.emailDeliveryHistory = cert.emailDeliveryHistory || [];
+    cert.emailDeliveryHistory.push({
+      sentAt: new Date(),
+      recipientEmail,
+      status: 'failed',
+      error: cert.emailError,
+    });
     await cert.save();
     logger.error(`Exception during certificate email delivery for ${cert.certificateNumber}:`, deliveryErr);
     return { sent: false, error: cert.emailError, certificate: cert };

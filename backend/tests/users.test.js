@@ -31,6 +31,7 @@ describe('Phase 3: User Profiles and User Management Tests', () => {
   // Temp file paths for upload tests
   const testPdfPath = path.resolve(process.cwd(), `test-resume-${timestamp}.pdf`);
   const testExePath = path.resolve(process.cwd(), `test-malicious-${timestamp}.exe`);
+  const testImagePath = path.resolve(process.cwd(), `test-avatar-${timestamp}.png`);
 
   before(async () => {
     await connectDB();
@@ -38,6 +39,7 @@ describe('Phase 3: User Profiles and User Management Tests', () => {
     // Create dummy files for upload testing
     fs.writeFileSync(testPdfPath, '%PDF-1.4 sample resume content for testing purposes');
     fs.writeFileSync(testExePath, 'MZ binary executable content');
+    fs.writeFileSync(testImagePath, '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82');
 
     const passwordHash = await hashPassword(defaultPassword);
 
@@ -84,6 +86,7 @@ describe('Phase 3: User Profiles and User Management Tests', () => {
     // Clean up temporary files
     if (fs.existsSync(testPdfPath)) fs.unlinkSync(testPdfPath);
     if (fs.existsSync(testExePath)) fs.unlinkSync(testExePath);
+    if (fs.existsSync(testImagePath)) fs.unlinkSync(testImagePath);
 
     // Clean up created accounts
     try {
@@ -214,6 +217,53 @@ describe('Phase 3: User Profiles and User Management Tests', () => {
     assert.equal(res.status, 400);
     assert.equal(res.body.success, false);
     assert.equal(res.body.error.code, 'INVALID_FILE_TYPE');
+  });
+
+  it('TC-PROF-08: Should allow user to upload valid avatar picture (PNG/JPG)', async () => {
+    const res = await request(app)
+      .post('/api/users/profile/avatar')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .attach('avatar', testImagePath);
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.ok(res.body.data.avatarUrl.includes('/uploads/avatars/'));
+    assert.equal(res.body.data.user.profile.avatarUrl, res.body.data.avatarUrl);
+  });
+
+  it('TC-PROF-09: Security - Should reject executable file for avatar upload', async () => {
+    const res = await request(app)
+      .post('/api/users/profile/avatar')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .attach('avatar', testExePath);
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.success, false);
+    assert.equal(res.body.error.code, 'INVALID_FILE_TYPE');
+  });
+
+  it('TC-PROF-10: Should allow updating profile with avatarUrl preset or direct URL', async () => {
+    const presetUrl = 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix';
+    const res = await request(app)
+      .put('/api/users/profile')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({
+        avatarUrl: presetUrl,
+      });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.equal(res.body.data.user.profile.avatarUrl, presetUrl);
+  });
+
+  it('TC-PROF-11: Should allow user to delete their avatar picture', async () => {
+    const res = await request(app)
+      .delete('/api/users/profile/avatar')
+      .set('Authorization', `Bearer ${studentToken}`);
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.equal(res.body.data.user.profile.avatarUrl, '');
   });
 
   // ==========================================

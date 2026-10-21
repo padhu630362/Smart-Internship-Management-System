@@ -91,7 +91,7 @@ export const issueUserSession = async ({ user, req, expiresIn }) => {
   const uaString = req?.headers?.['user-agent'] || 'Browser Client';
   const { deviceType, browser, os } = parseUserAgent(uaString);
   const ip = extractClientIp(req);
-  const ttlSeconds = parseExpiresIn(expiresIn || env.JWT_EXPIRES_IN || '5m');
+  const ttlSeconds = parseExpiresIn(expiresIn || env.JWT_EXPIRES_IN || '500s');
   const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
 
   const session = await Session.create({
@@ -120,7 +120,7 @@ export const createSessionRecord = async ({ user, token, req, ttlSeconds }) => {
   const uaString = req?.headers?.['user-agent'] || 'Browser Client';
   const { deviceType, browser, os } = parseUserAgent(uaString);
   const ip = extractClientIp(req);
-  const sessionTtl = ttlSeconds !== undefined ? ttlSeconds : parseExpiresIn(env.JWT_EXPIRES_IN || '5m');
+  const sessionTtl = ttlSeconds !== undefined ? ttlSeconds : parseExpiresIn(env.JWT_EXPIRES_IN || '500s');
   const expiresAt = new Date(Date.now() + sessionTtl * 1000);
 
   const session = await Session.create({

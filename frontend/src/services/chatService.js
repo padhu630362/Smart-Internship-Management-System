@@ -94,6 +94,16 @@ export const chatService = {
     const response = await apiClient.get('/api/chat/online-users');
     return response.data;
   },
+
+  /**
+   * Toggle emoji reaction on a message
+   * @param {string} messageId - Message ID
+   * @param {string} emoji - Unicode Emoji string
+   */
+  async toggleReaction(messageId, emoji) {
+    const response = await apiClient.patch(`/api/chat/messages/${messageId}/react`, { emoji });
+    return response.data;
+  },
 };
 
 export default chatService;

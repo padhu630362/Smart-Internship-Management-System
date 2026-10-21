@@ -18,6 +18,29 @@ export const userService = {
   },
 
   /**
+   * Upload profile avatar image file
+   */
+  async uploadAvatar(file) {
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    const response = await apiClient.post('/api/users/profile/avatar', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  /**
+   * Delete uploaded avatar (revert to initials monogram)
+   */
+  async deleteAvatar() {
+    const response = await apiClient.delete('/api/users/profile/avatar');
+    return response.data;
+  },
+
+  /**
    * Upload resume file (Students only)
    */
   async uploadResume(file) {

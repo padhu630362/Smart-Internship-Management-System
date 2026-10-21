@@ -495,6 +495,47 @@ describe('Phase 8: Secure Real-Time Chat & Group Messaging Tests', () => {
     );
   });
 
+  it('TC-CHAT-15: Message emoji reactions toggle on and off properly', async () => {
+    // 1. Send a message
+    const sendRes = await request(app)
+      .post(`/api/chat/conversations/${directConversationId}/messages`)
+      .set('Authorization', `Bearer ${coordinatorToken}`)
+      .send({ content: 'Hello reaction testing message' });
+
+    assert.equal(sendRes.status, 201);
+    const msgId = sendRes.body.data.message._id;
+
+    // 2. Student1 adds 👍 reaction
+    const reactRes1 = await request(app)
+      .patch(`/api/chat/messages/${msgId}/react`)
+      .set('Authorization', `Bearer ${student1Token}`)
+      .send({ emoji: '👍' });
+
+    assert.equal(reactRes1.status, 200);
+    assert.equal(reactRes1.body.data.reactions.length, 1);
+    assert.equal(reactRes1.body.data.reactions[0].emoji, '👍');
+    assert.equal(reactRes1.body.data.reactions[0].user._id.toString(), student1User._id.toString());
+
+    // 3. Coordinator adds ❤️ reaction
+    const reactRes2 = await request(app)
+      .patch(`/api/chat/messages/${msgId}/react`)
+      .set('Authorization', `Bearer ${coordinatorToken}`)
+      .send({ emoji: '❤️' });
+
+    assert.equal(reactRes2.status, 200);
+    assert.equal(reactRes2.body.data.reactions.length, 2);
+
+    // 4. Student1 clicks 👍 again to toggle off
+    const reactRes3 = await request(app)
+      .patch(`/api/chat/messages/${msgId}/react`)
+      .set('Authorization', `Bearer ${student1Token}`)
+      .send({ emoji: '👍' });
+
+    assert.equal(reactRes3.status, 200);
+    assert.equal(reactRes3.body.data.reactions.length, 1);
+    assert.equal(reactRes3.body.data.reactions[0].emoji, '❤️');
+  });
+
   after(async () => {
     if (student1Socket?.connected) student1Socket.disconnect();
     if (coordinatorSocket?.connected) coordinatorSocket.disconnect();

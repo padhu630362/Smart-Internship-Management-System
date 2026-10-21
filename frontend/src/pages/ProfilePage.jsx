@@ -30,6 +30,10 @@ import {
   CheckCircle2,
   Lock,
   AlertTriangle,
+  Camera,
+  Image as ImageIcon,
+  Edit3,
+  Link as LinkIcon,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import userService from '../services/userService';
@@ -40,6 +44,23 @@ import Input from '../components/common/Input';
 import StatusBadge from '../components/common/StatusBadge';
 import LoadingState from '../components/common/LoadingState';
 import Modal from '../components/common/Modal';
+import UserAvatar from '../components/common/UserAvatar';
+
+// Curated high-resolution SVG preset avatars
+const PRESET_AVATARS = [
+  { id: 'dev-1', label: 'Engineer', url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix&mouth=smile&eyebrows=default' },
+  { id: 'dev-2', label: 'Tech Lead', url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka&mouth=smile' },
+  { id: 'dev-3', label: 'Full Stack', url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Jack&mouth=smile' },
+  { id: 'dev-4', label: 'Frontend', url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sara&mouth=smile' },
+  { id: 'bot-1', label: 'AI Specialist', url: 'https://api.dicebear.com/7.x/bottts/svg?seed=Alex' },
+  { id: 'bot-2', label: 'Cyber Tech', url: 'https://api.dicebear.com/7.x/bottts/svg?seed=Circuit' },
+  { id: 'notion-1', label: 'Designer', url: 'https://api.dicebear.com/7.x/notionists/svg?seed=Leo' },
+  { id: 'notion-2', label: 'Scientist', url: 'https://api.dicebear.com/7.x/notionists/svg?seed=Luna' },
+  { id: 'lorelei-1', label: 'Researcher', url: 'https://api.dicebear.com/7.x/lorelei/svg?seed=Milo' },
+  { id: 'lorelei-2', label: 'Analyst', url: 'https://api.dicebear.com/7.x/lorelei/svg?seed=Zoe' },
+  { id: 'persona-1', label: 'Manager', url: 'https://api.dicebear.com/7.x/personas/svg?seed=Mason' },
+  { id: 'persona-2', label: 'Coordinator', url: 'https://api.dicebear.com/7.x/personas/svg?seed=Maya' },
+];
 
 export const ProfilePage = () => {
   const { user: authUser, updateUserState, reloadUser, token } = useAuth();
@@ -51,10 +72,21 @@ export const ProfilePage = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const fileInputRef = useRef(null);
 
+  // Profile Picture (Avatar) Modal State
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [avatarTab, setAvatarTab] = useState('upload'); // 'upload' | 'preset' | 'url'
+  const [selectedAvatarFile, setSelectedAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState('');
+  const [customAvatarUrl, setCustomAvatarUrl] = useState('');
+  const [savingAvatar, setSavingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState('');
+  const avatarFileInputRef = useRef(null);
+
   // Form State
   const [profile, setProfile] = useState({
     name: '',
     email: '',
+    avatarUrl: '',
     phone: '',
     bio: '',
     department: '',
@@ -266,6 +298,7 @@ export const ProfilePage = () => {
         setProfile({
           name: u.name || '',
           email: u.email || '',
+          avatarUrl: u.profile?.avatarUrl || '',
           phone: u.profile?.phone || '',
           bio: u.profile?.bio || '',
           department: u.profile?.department || '',
@@ -327,6 +360,7 @@ export const ProfilePage = () => {
         phone: profile.phone,
         bio: profile.bio,
         department: profile.department,
+        avatarUrl: profile.avatarUrl,
       };
 
       if (authUser?.role === 'student') {
@@ -511,6 +545,108 @@ export const ProfilePage = () => {
     }
   };
 
+  // Profile Picture (Avatar) Handlers
+  const handleOpenAvatarModal = () => {
+    setAvatarError('');
+    setSelectedAvatarFile(null);
+    setAvatarPreview(profile.avatarUrl || '');
+    setCustomAvatarUrl(profile.avatarUrl && !profile.avatarUrl.startsWith('/uploads') ? profile.avatarUrl : '');
+    setAvatarTab('upload');
+    setShowAvatarModal(true);
+  };
+
+  const handleAvatarFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setAvatarError('Please select a valid image file (PNG, JPG, JPEG, WEBP, GIF, SVG).');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setAvatarError('Image file size must be less than 5MB.');
+      return;
+    }
+
+    setAvatarError('');
+    setSelectedAvatarFile(file);
+    const objectUrl = URL.createObjectURL(file);
+    setAvatarPreview(objectUrl);
+  };
+
+  const handleSaveAvatar = async () => {
+    setSavingAvatar(true);
+    setAvatarError('');
+
+    try {
+      if (avatarTab === 'upload') {
+        if (!selectedAvatarFile) {
+          setAvatarError('Please choose an image file to upload.');
+          setSavingAvatar(false);
+          return;
+        }
+
+        const res = await userService.uploadAvatar(selectedAvatarFile);
+        if (res?.data?.avatarUrl) {
+          const newUrl = res.data.avatarUrl;
+          setProfile((prev) => ({ ...prev, avatarUrl: newUrl }));
+          if (res.data.user) {
+            updateUserState(res.data.user);
+          } else {
+            updateUserState({ profile: { ...(authUser?.profile || {}), avatarUrl: newUrl } });
+          }
+          setShowAvatarModal(false);
+          setSuccessMessage('Profile picture updated successfully!');
+          setTimeout(() => setSuccessMessage(''), 4000);
+        }
+      } else if (avatarTab === 'preset' || avatarTab === 'url') {
+        const targetUrl = avatarTab === 'preset' ? avatarPreview : customAvatarUrl.trim();
+        if (!targetUrl) {
+          setAvatarError(avatarTab === 'preset' ? 'Please select an avatar preset.' : 'Please enter an image web address.');
+          setSavingAvatar(false);
+          return;
+        }
+
+        const res = await userService.updateProfile({ avatarUrl: targetUrl });
+        const updatedUser = res?.data?.user;
+        setProfile((prev) => ({ ...prev, avatarUrl: targetUrl }));
+        if (updatedUser) {
+          updateUserState(updatedUser);
+        } else {
+          updateUserState({ profile: { ...(authUser?.profile || {}), avatarUrl: targetUrl } });
+        }
+        setShowAvatarModal(false);
+        setSuccessMessage('Profile picture updated successfully!');
+        setTimeout(() => setSuccessMessage(''), 4000);
+      }
+    } catch (err) {
+      setAvatarError(err.response?.data?.error?.message || err.message || 'Failed to update profile picture.');
+    } finally {
+      setSavingAvatar(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    if (!window.confirm('Remove your profile picture and revert to initial monogram?')) return;
+    setSavingAvatar(true);
+    try {
+      await userService.deleteAvatar();
+      setProfile((prev) => ({ ...prev, avatarUrl: '' }));
+      setAvatarPreview('');
+      setSelectedAvatarFile(null);
+      setCustomAvatarUrl('');
+      updateUserState({ profile: { ...(authUser?.profile || {}), avatarUrl: '' } });
+      setShowAvatarModal(false);
+      setSuccessMessage('Profile picture removed.');
+      setTimeout(() => setSuccessMessage(''), 4000);
+    } catch (err) {
+      setAvatarError(err.message || 'Failed to remove profile picture.');
+    } finally {
+      setSavingAvatar(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="py-12">
@@ -528,10 +664,55 @@ export const ProfilePage = () => {
         <div className="absolute top-0 right-0 w-64 h-64 bg-brand-500/5 rounded-full blur-3xl pointer-events-none" />
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 relative z-10">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl gradient-brand text-white flex items-center justify-center font-bold text-2xl shadow-md border-2 border-white/20">
-              {profile.name?.charAt(0)?.toUpperCase() || 'U'}
+          <div className="flex items-center gap-4 sm:gap-6">
+            {/* Interactive Profile Picture Container */}
+            <div className="relative group shrink-0">
+              <button
+                type="button"
+                onClick={handleOpenAvatarModal}
+                className="relative block rounded-2xl overflow-hidden focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 transition-all transform hover:scale-[1.02] shadow-md border-2 border-white/20"
+                title="Click to change profile picture"
+                id="profile-avatar-trigger"
+              >
+                {profile.avatarUrl ? (
+                  <img
+                    src={profile.avatarUrl.startsWith('/uploads') ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5001'}${profile.avatarUrl}` : profile.avatarUrl}
+                    alt={profile.name}
+                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover bg-slate-100 dark:bg-slate-850"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.style.display = 'none';
+                      if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <div
+                  className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl gradient-brand text-white flex items-center justify-center font-bold text-2xl ${
+                    profile.avatarUrl ? 'hidden' : 'flex'
+                  }`}
+                >
+                  {profile.name?.charAt(0)?.toUpperCase() || 'U'}
+                </div>
+
+                {/* Subtle Hover Action Overlay */}
+                <div className="absolute inset-0 bg-black/60 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-xs">
+                  <Camera className="w-5 h-5 mb-0.5 text-white" />
+                  <span className="text-[10px] font-bold tracking-tight">Edit Photo</span>
+                </div>
+              </button>
+
+              {/* Camera Badge Quick-Trigger Icon */}
+              <button
+                type="button"
+                onClick={handleOpenAvatarModal}
+                className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-brand-600 hover:bg-brand-700 text-white shadow-md border-2 border-white dark:border-stone-900 transition-transform hover:scale-110"
+                title="Change profile picture"
+                aria-label="Change profile picture"
+              >
+                <Camera className="w-3.5 h-3.5" />
+              </button>
             </div>
+
             <div>
               <div className="flex items-center gap-2.5 flex-wrap">
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
@@ -550,6 +731,36 @@ export const ProfilePage = () => {
                 <span className="text-slate-500 dark:text-slate-400">
                   Role-authorized profile fields active
                 </span>
+              </div>
+
+              {/* Action Buttons: Change Photo & Edit Profile */}
+              <div className="flex items-center gap-2 mt-3 flex-wrap">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  icon={Camera}
+                  onClick={handleOpenAvatarModal}
+                  className="text-xs border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 py-1 px-3"
+                  id="change-photo-btn"
+                >
+                  Change Photo
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  icon={Edit3}
+                  onClick={() => {
+                    setActiveTab('profile');
+                    document.getElementById('full-name-input')?.focus();
+                    document.getElementById('profile-form')?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="text-xs py-1 px-3"
+                  id="edit-profile-btn"
+                >
+                  Edit Profile
+                </Button>
               </div>
             </div>
           </div>
@@ -641,8 +852,54 @@ export const ProfilePage = () => {
           title="Account & Contact Information"
           subtitle="Basic identity and contact information visible across InternHub"
         >
+          {/* Profile Picture Quick Management Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 mb-6 rounded-xl bg-slate-50 dark:bg-slate-850/60 border border-slate-200/80 dark:border-slate-800">
+            <div className="flex items-center gap-4">
+              <UserAvatar
+                name={profile.name}
+                avatarUrl={profile.avatarUrl}
+                size="lg"
+                className="ring-2 ring-brand-500/20"
+              />
+              <div>
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white">Profile Photo</h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Visible to recruiters, coordinators, mentors, and peers across InternHub.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                icon={Camera}
+                onClick={handleOpenAvatarModal}
+                className="text-xs"
+                id="inline-change-photo-btn"
+              >
+                Change Photo
+              </Button>
+              {profile.avatarUrl ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  icon={Trash2}
+                  onClick={handleRemoveAvatar}
+                  disabled={savingAvatar}
+                  className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                  id="inline-remove-photo-btn"
+                >
+                  Remove
+                </Button>
+              ) : null}
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
+              id="full-name-input"
               label="Full Name"
               value={profile.name}
               onChange={(e) => setProfile({ ...profile, name: e.target.value })}
@@ -1532,6 +1789,304 @@ export const ProfilePage = () => {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Profile Picture (Avatar) Modal */}
+      <Modal
+        isOpen={showAvatarModal}
+        onClose={() => {
+          if (!savingAvatar) {
+            setShowAvatarModal(false);
+            setAvatarError('');
+          }
+        }}
+        title="Update Profile Picture"
+        subtitle="Upload a custom photo, pick a curated avatar preset, or enter an image link."
+        size="lg"
+      >
+        <div className="space-y-5 pt-1">
+          {avatarError && (
+            <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-xs text-rose-700 dark:text-rose-400 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{avatarError}</span>
+            </div>
+          )}
+
+          {/* Live Avatar Preview Card */}
+          <div className="flex flex-col sm:flex-row items-center gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-850/80 border border-slate-200/80 dark:border-slate-800">
+            <div className="relative shrink-0">
+              {avatarPreview ? (
+                <img
+                  src={
+                    avatarPreview.startsWith('/uploads')
+                      ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5001'}${avatarPreview}`
+                      : avatarPreview
+                  }
+                  alt="Avatar Preview"
+                  className="w-20 h-20 rounded-2xl object-cover ring-4 ring-brand-500/20 shadow-md bg-slate-100 dark:bg-slate-800"
+                  onError={() => {
+                    setAvatarError('Unable to load image from preview source. Please check the URL.');
+                  }}
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-2xl gradient-brand text-white flex items-center justify-center font-bold text-3xl shadow-md">
+                  {profile.name?.charAt(0)?.toUpperCase() || 'U'}
+                </div>
+              )}
+              {selectedAvatarFile && (
+                <span className="absolute -bottom-1 -right-1 px-1.5 py-0.5 rounded-full text-[10px] bg-emerald-600 text-white font-semibold shadow-xs">
+                  New
+                </span>
+              )}
+            </div>
+
+            <div className="flex-1 text-center sm:text-left">
+              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                {profile.name || 'Your Profile Picture'}
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                {avatarTab === 'upload' && selectedAvatarFile
+                  ? `Selected: ${selectedAvatarFile.name} (${(selectedAvatarFile.size / 1024).toFixed(1)} KB)`
+                  : avatarTab === 'preset'
+                  ? 'Selected from curated design presets'
+                  : avatarTab === 'url' && customAvatarUrl
+                  ? 'Custom direct URL source'
+                  : 'Currently active profile image preview'}
+              </p>
+              <div className="flex items-center gap-2 mt-2 justify-center sm:justify-start">
+                <span className="text-[11px] px-2 py-0.5 rounded-md bg-brand-50 dark:bg-brand-950/60 text-brand-700 dark:text-brand-300 font-medium">
+                  {avatarTab.toUpperCase()} MODE
+                </span>
+                {profile.avatarUrl && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAvatarPreview(profile.avatarUrl);
+                      setSelectedAvatarFile(null);
+                    }}
+                    className="text-[11px] text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 underline cursor-pointer"
+                  >
+                    Reset to current
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Tab Selector */}
+          <div className="grid grid-cols-3 gap-2 p-1 rounded-xl bg-slate-100 dark:bg-slate-850 border border-slate-200 dark:border-slate-800">
+            <button
+              type="button"
+              onClick={() => {
+                setAvatarTab('upload');
+                setAvatarError('');
+              }}
+              className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                avatarTab === 'upload'
+                  ? 'bg-white dark:bg-slate-750 text-brand-600 dark:text-brand-400 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Upload Photo</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAvatarTab('preset');
+                setAvatarError('');
+              }}
+              className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                avatarTab === 'preset'
+                  ? 'bg-white dark:bg-slate-750 text-brand-600 dark:text-brand-400 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Preset Avatars</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAvatarTab('url');
+                setAvatarError('');
+              }}
+              className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                avatarTab === 'url'
+                  ? 'bg-white dark:bg-slate-750 text-brand-600 dark:text-brand-400 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <LinkIcon className="w-3.5 h-3.5" />
+              <span>Image URL</span>
+            </button>
+          </div>
+
+          {/* Tab 1: Upload File */}
+          {avatarTab === 'upload' && (
+            <div className="space-y-3">
+              <input
+                ref={avatarFileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/svg+xml"
+                className="hidden"
+                onChange={handleAvatarFileChange}
+              />
+
+              <div
+                onClick={() => avatarFileInputRef.current?.click()}
+                className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-brand-500 dark:hover:border-brand-400 rounded-2xl p-6 text-center cursor-pointer transition-colors bg-slate-50/50 dark:bg-slate-900/40 hover:bg-brand-50/20 dark:hover:bg-brand-950/20 group"
+              >
+                <div className="w-12 h-12 rounded-full bg-brand-50 dark:bg-brand-950/60 text-brand-600 dark:text-brand-400 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                  <Camera className="w-6 h-6" />
+                </div>
+                <h5 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                  {selectedAvatarFile ? 'Replace selected image file' : 'Click to select or drop an image file'}
+                </h5>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Supports PNG, JPG, JPEG, WEBP, GIF, SVG up to 5MB
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  icon={Upload}
+                  className="mt-3 pointer-events-none text-xs"
+                >
+                  Browse Image
+                </Button>
+              </div>
+
+              {selectedAvatarFile && (
+                <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-xs">
+                  <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-medium">
+                    <CheckCircle className="w-4 h-4 shrink-0" />
+                    <span>Ready to save: {selectedAvatarFile.name}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedAvatarFile(null);
+                      setAvatarPreview(profile.avatarUrl || '');
+                    }}
+                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                    title="Clear selection"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab 2: Preset Gallery */}
+          {avatarTab === 'preset' && (
+            <div className="space-y-3">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Choose one of our vector-rendered illustrated avatars for your profile:
+              </p>
+              <div className="grid grid-cols-4 sm:grid-cols-6 gap-3 max-h-64 overflow-y-auto p-1 pr-2">
+                {PRESET_AVATARS.map((preset) => {
+                  const isSelected = avatarPreview === preset.url;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        setAvatarPreview(preset.url);
+                        setSelectedAvatarFile(null);
+                      }}
+                      className={`group relative flex flex-col items-center p-2 rounded-xl border transition-all text-center cursor-pointer ${
+                        isSelected
+                          ? 'border-brand-500 bg-brand-50/50 dark:bg-brand-950/40 ring-2 ring-brand-500/30'
+                          : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-900'
+                      }`}
+                    >
+                      <img
+                        src={preset.url}
+                        alt={preset.label}
+                        className="w-12 h-12 rounded-full object-cover group-hover:scale-105 transition-transform bg-slate-100 dark:bg-slate-800"
+                        loading="lazy"
+                      />
+                      <span className="text-[10px] font-semibold text-slate-700 dark:text-slate-300 mt-1 truncate max-w-full">
+                        {preset.label}
+                      </span>
+                      {isSelected && (
+                        <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-brand-600 text-white flex items-center justify-center text-[10px] font-bold">
+                          ✓
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Tab 3: Direct Web Image URL */}
+          {avatarTab === 'url' && (
+            <div className="space-y-3">
+              <Input
+                label="Direct Image Web Address (URL)"
+                placeholder="https://example.com/avatar.jpg"
+                icon={LinkIcon}
+                value={customAvatarUrl}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setCustomAvatarUrl(val);
+                  setAvatarPreview(val);
+                  setSelectedAvatarFile(null);
+                }}
+                helperText="Paste a secure (HTTPS) link to an image on Gravatar, Unsplash, GitHub, or any public host."
+              />
+            </div>
+          )}
+
+          {/* Dialog Action Footer */}
+          <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+            {profile.avatarUrl ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                icon={Trash2}
+                onClick={handleRemoveAvatar}
+                disabled={savingAvatar}
+                className="w-full sm:w-auto text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+              >
+                Remove Current Photo
+              </Button>
+            ) : (
+              <div />
+            )}
+
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowAvatarModal(false);
+                  setAvatarError('');
+                }}
+                disabled={savingAvatar}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                icon={Save}
+                loading={savingAvatar}
+                onClick={handleSaveAvatar}
+                className="font-bold shadow-xs"
+              >
+                Save Picture
+              </Button>
+            </div>
+          </div>
+        </div>
       </Modal>
     </div>
   );

@@ -26,10 +26,18 @@ export const certificateService = {
   },
 
   /**
+   * Preview certificate details before official issuance
+   */
+  async getCertificatePreview(allocationId) {
+    const response = await apiClient.get(`/api/certificates/allocation/${allocationId}/preview`);
+    return response.data;
+  },
+
+  /**
    * Explicitly issue certificate for an allocation (Admin, Coordinator, Mentor, Company)
    */
-  async issueAllocationCertificate(allocationId) {
-    const response = await apiClient.post(`/api/certificates/allocation/${allocationId}/issue`);
+  async issueAllocationCertificate(allocationId, payload = {}) {
+    const response = await apiClient.post(`/api/certificates/allocation/${allocationId}/issue`, payload);
     return response.data;
   },
 
@@ -42,10 +50,38 @@ export const certificateService = {
   },
 
   /**
+   * Admin certificate audit dashboard list & summary metrics
+   */
+  async getAdminCertificateAudit(params = {}) {
+    const response = await apiClient.get('/api/certificates/admin/audit', { params });
+    return response.data;
+  },
+
+  /**
+   * Admin mentor issuance statistics
+   */
+  async getAdminMentorIssuanceStats(params = {}) {
+    const response = await apiClient.get('/api/certificates/admin/mentor-stats', { params });
+    return response.data;
+  },
+
+  /**
+   * Seed demo scenario (Admin only)
+   */
+  async seedDemo(payload = {}) {
+    const response = await apiClient.post('/api/certificates/admin/seed-demo', payload);
+    return response.data;
+  },
+
+  /**
    * Constructs secure authenticated URL for downloading/viewing certificate PDF
    */
   getCertificateDownloadUrl(id, token, download = false) {
-    const authToken = token || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('sims_auth_token') : null) || (typeof localStorage !== 'undefined' ? localStorage.getItem('sims_auth_token') : null) || '';
+    const authToken =
+      token ||
+      (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('sims_auth_token') : null) ||
+      (typeof localStorage !== 'undefined' ? localStorage.getItem('sims_auth_token') : null) ||
+      '';
     const baseUrl = `/api/certificates/${id}/download`;
     const params = new URLSearchParams();
     if (authToken) params.append('token', authToken);
@@ -56,4 +92,3 @@ export const certificateService = {
 };
 
 export default certificateService;
-

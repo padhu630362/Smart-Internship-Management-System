@@ -5,6 +5,7 @@ import {
   getNotifications,
   getUnreadCount,
   markAsRead,
+  markConversationNotificationsRead,
   markAllAsRead,
   deleteNotification,
   clearAllNotifications,
@@ -19,6 +20,7 @@ router.use(authenticateToken);
 router.get('/', getNotifications);
 router.get('/unread-count', getUnreadCount);
 router.patch('/read-all', markAllAsRead);
+router.patch('/conversation/:conversationId/read', markConversationNotificationsRead);
 router.patch('/:id/read', markAsRead);
 router.delete('/', clearAllNotifications);
 router.delete('/:id', deleteNotification);

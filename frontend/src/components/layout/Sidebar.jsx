@@ -24,6 +24,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
 import SimsLogo from '../common/SimsLogo';
 import ThemeToggle from '../common/ThemeToggle';
+import UserAvatar from '../common/UserAvatar';
 
 export const Sidebar = ({ isOpen, onClose, healthStatus }) => {
   const { user, isAuthenticated, logout } = useAuth();
@@ -72,6 +73,9 @@ export const Sidebar = ({ isOpen, onClose, healthStatus }) => {
             : []),
           ...(user?.role === 'admin'
             ? [{ name: 'User Management', path: '/admin/users', icon: Users }]
+            : []),
+          ...(['admin', 'coordinator'].includes(user?.role)
+            ? [{ name: 'Certificate Audit', path: '/admin/certificates', icon: ShieldCheck }]
             : []),
         ]
       : []),
@@ -205,9 +209,11 @@ export const Sidebar = ({ isOpen, onClose, healthStatus }) => {
           {isAuthenticated ? (
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-2 truncate">
-                <div className="w-6 h-6 rounded-full gradient-brand text-white flex items-center justify-center font-bold text-[10px] shrink-0">
-                  {user?.name?.charAt(0)?.toUpperCase()}
-                </div>
+                <UserAvatar
+                  user={user}
+                  size="xs"
+                  className="w-6 h-6 shrink-0"
+                />
                 <div className="truncate leading-none">
                   <p className="text-xs font-semibold text-slate-900 dark:text-white truncate">
                     {user?.name}

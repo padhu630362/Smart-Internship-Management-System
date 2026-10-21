@@ -2,10 +2,15 @@ import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import morgan from 'morgan';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { env } from './config/env.js';
 import apiRoutes from './routes/index.js';
 import { notFoundHandler, errorHandler } from './middlewares/errorHandler.js';
 import { sanitizeInput } from './middlewares/sanitize.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 
@@ -63,6 +68,9 @@ app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
 // Input sanitization against NoSQL injection and prototype pollution
 app.use(sanitizeInput);
+
+// Serve static uploads (avatars, attachments)
+app.use('/uploads', express.static(path.resolve(__dirname, '../uploads')));
 
 // Mount API routes
 app.use('/api', apiRoutes);

@@ -2,7 +2,7 @@ import path from 'path';
 import fs from 'fs';
 import { User, ROLES, USER_STATUSES } from '../models/User.js';
 import { hashPassword } from '../utils/security.js';
-import { UPLOAD_DIR } from '../utils/fileUpload.js';
+import { UPLOAD_DIR, AVATAR_UPLOAD_DIR } from '../utils/fileUpload.js';
 import { logger } from '../utils/logger.js';
 import { escapeRegex } from '../middlewares/sanitize.js';
 
@@ -281,6 +281,122 @@ export const deleteResume = async (req, res, next) => {
       success: true,
       message: 'Resume deleted successfully.',
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Uploads user profile avatar image.
+ */
+export const uploadAvatar = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      const error = new Error('No avatar image file was provided.');
+      error.statusCode = 400;
+      error.code = 'FILE_REQUIRED';
+      return next(error);
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      const error = new Error('User not found.');
+      error.statusCode = 404;
+      error.code = 'USER_NOT_FOUND';
+      return next(error);
+    }
+
+    if (!user.profile) user.profile = {};
+
+    // Remove old avatar file if stored locally in uploads/avatars
+    const oldAvatarUrl = user.profile.avatarUrl;
+    if (oldAvatarUrl && oldAvatarUrl.includes('/uploads/avatars/')) {
+      const oldFilename = path.basename(oldAvatarUrl);
+      const oldPath = path.join(AVATAR_UPLOAD_DIR, oldFilename);
+      if (fs.existsSync(oldPath)) {
+        try {
+          fs.unlinkSync(oldPath);
+        } catch (unlinkErr) {
+          logger.warn(`Failed to remove previous avatar file: ${unlinkErr.message}`);
+        }
+      }
+    }
+
+    const relativeUrl = `/uploads/avatars/${req.file.filename}`;
+    user.profile.avatarUrl = relativeUrl;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile picture updated successfully.',
+      data: {
+        avatarUrl: relativeUrl,
+        user,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Deletes user profile avatar and reverts to monogram.
+ */
+export const deleteAvatar = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      const error = new Error('User not found.');
+      error.statusCode = 404;
+      error.code = 'USER_NOT_FOUND';
+      return next(error);
+    }
+
+    if (user.profile?.avatarUrl && user.profile.avatarUrl.includes('/uploads/avatars/')) {
+      const oldFilename = path.basename(user.profile.avatarUrl);
+      const oldPath = path.join(AVATAR_UPLOAD_DIR, oldFilename);
+      if (fs.existsSync(oldPath)) {
+        try {
+          fs.unlinkSync(oldPath);
+        } catch (unlinkErr) {
+          logger.warn(`Failed to delete avatar file: ${unlinkErr.message}`);
+        }
+      }
+    }
+
+    if (user.profile) {
+      user.profile.avatarUrl = '';
+    }
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile picture removed successfully.',
+      data: {
+        avatarUrl: '',
+        user,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Streams/serves an avatar image file.
+ */
+export const downloadAvatar = async (req, res, next) => {
+  try {
+    const safeFilename = path.basename(req.params.filename);
+    const filePath = path.join(AVATAR_UPLOAD_DIR, safeFilename);
+
+    if (!fs.existsSync(filePath)) {
+      const error = new Error('Avatar image not found.');
+      error.statusCode = 404;
+      return next(error);
+    }
+
+    res.sendFile(filePath);
   } catch (err) {
     next(err);
   }

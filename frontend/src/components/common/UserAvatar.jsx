@@ -47,6 +47,7 @@ export const UserAvatar = ({
     md: 'w-10 h-10 text-xs sm:text-sm',
     lg: 'w-12 h-12 text-sm sm:text-base',
     xl: 'w-14 h-14 text-base sm:text-lg',
+    '2xl': 'w-20 h-20 text-2xl',
   };
 
   const statusSizeMap = {
@@ -55,18 +56,25 @@ export const UserAvatar = ({
     md: 'w-2.5 h-2.5 border-2',
     lg: 'w-3 h-3 border-2',
     xl: 'w-3.5 h-3.5 border-2',
+    '2xl': 'w-4 h-4 border-2',
   };
 
   const currentSizeClass = sizeMap[size] || size;
   const currentStatusClass = statusSizeMap[size] || 'w-2.5 h-2.5 border-2';
 
-  const hasValidImage = rawAvatarUrl && !imgError;
+  // Support relative upload URLs safely
+  const resolvedAvatarUrl =
+    rawAvatarUrl && rawAvatarUrl.startsWith('/uploads')
+      ? `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5001'}${rawAvatarUrl}`
+      : rawAvatarUrl;
+
+  const hasValidImage = resolvedAvatarUrl && !imgError;
 
   return (
     <div className={`relative shrink-0 inline-flex items-center justify-center ${className}`}>
       {hasValidImage ? (
         <img
-          src={rawAvatarUrl}
+          src={resolvedAvatarUrl}
           alt=""
           referrerPolicy="no-referrer"
           onError={() => setImgError(true)}

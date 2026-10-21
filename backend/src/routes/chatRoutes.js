@@ -17,6 +17,7 @@ import {
   getContacts,
   getOnlineUsers,
   simulatePartnerReply,
+  toggleMessageReaction,
 } from '../controllers/chatController.js';
 
 const router = Router();
@@ -38,6 +39,9 @@ router.post(
   validateSendMessage,
   sendMessage
 );
+
+// Emoji message reaction toggle
+router.patch('/messages/:messageId/react', toggleMessageReaction);
 
 // Real-time live exchange simulation endpoint
 router.post(

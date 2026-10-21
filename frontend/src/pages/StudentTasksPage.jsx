@@ -14,8 +14,12 @@ import {
   History,
   Layers,
   MessageSquare,
+  Award,
+  Mail,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import taskService, { TASK_STATUSES, TASK_PRIORITIES } from '../services/taskService';
+import allocationService from '../services/allocationService';
 import PageHeader from '../components/common/PageHeader';
 import StatusBadge from '../components/common/StatusBadge';
 import Button from '../components/common/Button';
@@ -29,6 +33,14 @@ export const StudentTasksPage = () => {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Allocation & Completion Request State
+  const [activeAllocation, setActiveAllocation] = useState(null);
+  const [eligibility, setEligibility] = useState(null);
+  const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
+  const [preferredDeliveryEmail, setPreferredDeliveryEmail] = useState('');
+  const [studentNotes, setStudentNotes] = useState('');
+  const [isSubmittingCompletion, setIsSubmittingCompletion] = useState(false);
 
   // Filters
   const [selectedStatus, setSelectedStatus] = useState('all');
@@ -47,7 +59,27 @@ export const StudentTasksPage = () => {
 
   useEffect(() => {
     fetchTasks();
+    fetchAllocationAndEligibility();
   }, [selectedStatus, selectedPriority, onlyOverdue]);
+
+  const fetchAllocationAndEligibility = async () => {
+    try {
+      const res = await allocationService.getAllocations({ limit: 1 });
+      if (res?.data?.allocations?.length > 0) {
+        const alc = res.data.allocations[0];
+        setActiveAllocation(alc);
+        const eligRes = await allocationService.getCompletionEligibility(alc._id);
+        if (eligRes?.data) {
+          setEligibility(eligRes.data);
+          setPreferredDeliveryEmail(
+            eligRes.data.preferredDeliveryEmail || eligRes.data.defaultEmail || ''
+          );
+        }
+      }
+    } catch (err) {
+      console.warn('Could not load allocation eligibility:', err);
+    }
+  };
 
   const fetchTasks = async () => {
     try {
@@ -71,6 +103,47 @@ export const StudentTasksPage = () => {
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleOpenCompletionModal = () => {
+    if (!activeAllocation) return;
+    setPreferredDeliveryEmail(
+      activeAllocation.completionRequest?.preferredDeliveryEmail ||
+      eligibility?.preferredDeliveryEmail ||
+      eligibility?.defaultEmail ||
+      ''
+    );
+    setStudentNotes(activeAllocation.completionRequest?.studentNotes || '');
+    setIsCompletionModalOpen(true);
+  };
+
+  const handleSubmitCompletionRequest = async (e) => {
+    e.preventDefault();
+    if (!activeAllocation) return;
+
+    try {
+      setIsSubmittingCompletion(true);
+      setErrorMessage('');
+
+      const res = await allocationService.requestCompletion(activeAllocation._id, {
+        preferredDeliveryEmail: preferredDeliveryEmail.trim(),
+        studentNotes: studentNotes.trim(),
+      });
+
+      if (res?.success) {
+        setSuccessMessage('Completion request submitted successfully! Your mentor has been notified.');
+        setIsCompletionModalOpen(false);
+        fetchAllocationAndEligibility();
+        fetchTasks();
+        setTimeout(() => setSuccessMessage(''), 5000);
+      }
+    } catch (err) {
+      setErrorMessage(
+        err.response?.data?.message || 'Failed to submit completion request.'
+      );
+    } finally {
+      setIsSubmittingCompletion(false);
     }
   };
 
@@ -174,6 +247,90 @@ export const StudentTasksPage = () => {
             ×
           </button>
         </div>
+      )}
+
+      {/* Internship Completion Lifecycle Banner */}
+      {activeAllocation && (
+        <Card className={`p-5 rounded-2xl border transition-all ${
+          activeAllocation.completionRequest?.status === 'approved'
+            ? 'bg-emerald-500/10 border-emerald-500/30'
+            : activeAllocation.completionRequest?.status === 'pending'
+            ? 'bg-amber-500/10 border-amber-500/30'
+            : activeAllocation.completionRequest?.status === 'rejected'
+            ? 'bg-rose-500/10 border-rose-500/30'
+            : eligibility?.eligible
+            ? 'bg-gradient-to-r from-primary-900 via-indigo-900 to-slate-900 text-white border-primary-500/40 shadow-md'
+            : 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800'
+        }`}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Award className={`w-5 h-5 shrink-0 ${
+                  eligibility?.eligible && activeAllocation.completionRequest?.status === 'none'
+                    ? 'text-amber-300'
+                    : 'text-primary-600 dark:text-primary-400'
+                }`} />
+                <h3 className="font-bold text-sm">
+                  {activeAllocation.completionRequest?.status === 'approved'
+                    ? '🎉 Internship Completion Officially Approved!'
+                    : activeAllocation.completionRequest?.status === 'pending'
+                    ? '⏳ Completion Request Pending Mentor Review'
+                    : activeAllocation.completionRequest?.status === 'rejected'
+                    ? '⚠️ Completion Revision Requested by Mentor'
+                    : eligibility?.eligible
+                    ? '🎓 Milestone Requirements Fulfilled — Ready for Certification!'
+                    : `Internship Progress: ${activeAllocation.internship?.title || 'Program'}`}
+                </h3>
+              </div>
+              <p className="text-xs opacity-90">
+                {activeAllocation.completionRequest?.status === 'approved'
+                  ? 'Your supervising mentor has verified your work and approved internship completion. Your certificate of completion has been issued.'
+                  : activeAllocation.completionRequest?.status === 'pending'
+                  ? `Your completion request was submitted on ${new Date(activeAllocation.completionRequest.requestedAt).toLocaleDateString()}. Delivery destination: ${activeAllocation.completionRequest.preferredDeliveryEmail}.`
+                  : activeAllocation.completionRequest?.status === 'rejected'
+                  ? `Feedback: "${activeAllocation.completionRequest.feedback || 'Please review mentor instructions.'}"`
+                  : eligibility?.eligible
+                  ? 'All mandatory tasks have been submitted and accepted. You can now request your official completion certificate.'
+                  : `Complete all assigned milestone tasks to become eligible for internship completion (Completed: ${completedCount} / ${tasks.length}).`}
+              </p>
+            </div>
+
+            <div className="shrink-0 flex items-center gap-2">
+              {activeAllocation.completionRequest?.status === 'approved' ? (
+                <Link
+                  to="/certificates"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shadow-xs"
+                >
+                  <Award className="w-4 h-4" />
+                  View My Certificates
+                </Link>
+              ) : activeAllocation.completionRequest?.status === 'pending' ? (
+                <span className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                  Mentor Review in Progress
+                </span>
+              ) : eligibility?.eligible ? (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={Award}
+                  onClick={handleOpenCompletionModal}
+                  className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold shadow-md animate-bounce"
+                >
+                  Request Completion
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleOpenCompletionModal}
+                  className="text-xs"
+                >
+                  Check Criteria
+                </Button>
+              )}
+            </div>
+          </div>
+        </Card>
       )}
 
       {/* Metric Cards */}
@@ -460,6 +617,94 @@ export const StudentTasksPage = () => {
           </form>
         )}
       </Modal>
+
+      {/* Request Completion Modal */}
+      {activeAllocation && (
+        <Modal
+          isOpen={isCompletionModalOpen}
+          onClose={() => setIsCompletionModalOpen(false)}
+          title="Request Internship Completion"
+          subtitle="Submit your internship completion for mentor verification and certificate delivery."
+          size="md"
+        >
+          <form onSubmit={handleSubmitCompletionRequest} className="space-y-4 text-xs">
+            {/* Criteria Check */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-2">
+              <div className="flex items-center justify-between text-xs font-semibold">
+                <span>Task Deliverables Status:</span>
+                {eligibility?.eligible ? (
+                  <span className="text-emerald-600 font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-4 h-4" /> All Mandatory Tasks Approved
+                  </span>
+                ) : (
+                  <span className="text-amber-600 font-bold flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" /> {eligibility?.pendingTasks?.length || 0} Pending
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Internship: <strong>{activeAllocation.internship?.title}</strong> · Supervising Mentor:{' '}
+                <strong>{activeAllocation.mentor?.name || 'Assigned Mentor'}</strong>
+              </p>
+            </div>
+
+            {/* Email Destination Selection */}
+            <div>
+              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Preferred Certificate Delivery Email: <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="email"
+                value={preferredDeliveryEmail}
+                onChange={(e) => setPreferredDeliveryEmail(e.target.value)}
+                required
+                placeholder="student@example.com"
+                className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white font-mono"
+              />
+              <p className="text-[11px] text-slate-500 pt-1">
+                Your official completion certificate PDF will be emailed to this chosen address upon mentor approval.
+              </p>
+            </div>
+
+            {/* Student Summary Notes */}
+            <div>
+              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Completion Notes / Summary of Deliverables:
+              </label>
+              <textarea
+                value={studentNotes}
+                onChange={(e) => setStudentNotes(e.target.value)}
+                placeholder="Briefly summarize your deliverables, key outcomes, and project repository links..."
+                rows={3}
+                className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white"
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsCompletionModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                icon={Award}
+                disabled={!eligibility?.eligible}
+                loading={isSubmittingCompletion}
+                className="font-semibold"
+              >
+                Submit Completion Request
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 };

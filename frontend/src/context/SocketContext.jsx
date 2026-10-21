@@ -174,6 +174,21 @@ export const SocketProvider = ({ children }) => {
     newSocket.on('notification:new', (notification) => {
       if (!notification || !notification._id) return;
 
+      const isMsg = notification.type === 'new_message';
+      const convId = notification.metadata?.conversationId?.toString();
+      const isCurrentActiveChat = isMsg && convId && activeChatConvRef.current === convId;
+
+      if (isCurrentActiveChat) {
+        // Recipient is actively inside this open conversation in ChatPage; auto-mark read and suppress popup
+        notification.isRead = true;
+        setNotifications((prev) => {
+          const filtered = prev.filter((n) => n._id !== notification._id);
+          return [notification, ...filtered];
+        });
+        notificationService.markAsRead(notification._id).catch(() => {});
+        return;
+      }
+
       setNotifications((prev) => {
         const exists = prev.some((n) => n._id === notification._id);
         if (exists) return prev;
@@ -181,17 +196,6 @@ export const SocketProvider = ({ children }) => {
       });
 
       setUnreadCount((prev) => prev + 1);
-
-      const isMsg = notification.type === 'new_message';
-      const convId = notification.metadata?.conversationId?.toString();
-      const isCurrentActiveChat = isMsg && convId && activeChatConvRef.current === convId;
-
-      if (isCurrentActiveChat) {
-        // Recipient is actively inside this open conversation in ChatPage; auto-mark read and suppress popup
-        notificationService.markAsRead(notification._id).catch(() => {});
-        setUnreadCount((prev) => Math.max(0, prev - 1));
-        return;
-      }
 
       // Play pleasant audio chime
       soundManager.playNotificationChime();
@@ -230,6 +234,57 @@ export const SocketProvider = ({ children }) => {
         } catch (e) {
           console.debug('Browser notification error:', e);
         }
+      }
+    });
+
+    // Cross-tab real-time sync when notifications are read or cleared anywhere
+    newSocket.on('notification:read', (data) => {
+      if (!data) return;
+
+      if (data.all) {
+        setNotifications((prev) =>
+          prev
+            .filter((n) => n.type !== 'new_message' && !n.link?.includes('chat'))
+            .map((n) => ({ ...n, isRead: true, readAt: new Date() }))
+        );
+        setUnreadCount(0);
+        refreshChatUnread();
+      } else if (data.notificationId) {
+        const nid = data.notificationId.toString();
+        if (data.deleted) {
+          setNotifications((prev) => prev.filter((n) => (n._id || n.id)?.toString() !== nid));
+        } else {
+          setNotifications((prev) =>
+            prev.map((n) => ((n._id || n.id)?.toString() === nid ? { ...n, isRead: true, readAt: new Date() } : n))
+          );
+        }
+        if (typeof data.unreadCount === 'number') {
+          setUnreadCount(data.unreadCount);
+        } else {
+          setUnreadCount((c) => Math.max(0, c - 1));
+        }
+      } else if (data.conversationId) {
+        const cid = data.conversationId.toString();
+        setNotifications((prev) =>
+          prev.filter((n) => {
+            const matches =
+              n.metadata?.conversationId?.toString() === cid ||
+              n.link?.includes(cid);
+            return !matches;
+          })
+        );
+        if (typeof data.unreadCount === 'number') {
+          setUnreadCount(data.unreadCount);
+        }
+        refreshChatUnread();
+      } else if (data.deletedId) {
+        const did = data.deletedId.toString();
+        setNotifications((prev) => prev.filter((n) => n._id !== did));
+        if (typeof data.unreadCount === 'number') {
+          setUnreadCount(data.unreadCount);
+        }
+      } else if (typeof data.unreadCount === 'number') {
+        setUnreadCount(data.unreadCount);
       }
     });
 
@@ -320,59 +375,135 @@ export const SocketProvider = ({ children }) => {
     [onlineUsers]
   );
 
-  const markAsRead = async (id) => {
-    try {
-      const res = await notificationService.markAsRead(id);
-      setNotifications((prev) =>
-        prev.map((n) => (n._id === id ? { ...n, isRead: true, readAt: new Date() } : n))
-      );
-      if (typeof res?.data?.unreadCount === 'number') {
-        setUnreadCount(res.data.unreadCount);
-      } else {
+  // Optimistic & reactive notification read handler
+  const markAsRead = useCallback(async (id) => {
+    if (!id) return;
+    const idStr = id.toString();
+
+    // 1. Immediately & synchronously update state so UI changes instantly
+    setNotifications((prev) => {
+      const target = prev.find((n) => (n._id || n.id)?.toString() === idStr);
+      if (target && !target.isRead) {
         setUnreadCount((c) => Math.max(0, c - 1));
       }
-    } catch (err) {
-      console.error('Error marking notification as read:', err);
-    }
-  };
+      const isMsg = target && (target.type === 'new_message' || target.link?.includes('chat'));
+      if (isMsg) {
+        return prev.filter((n) => (n._id || n.id)?.toString() !== idStr);
+      }
+      return prev.map((n) =>
+        (n._id || n.id)?.toString() === idStr ? { ...n, isRead: true, readAt: new Date() } : n
+      );
+    });
 
-  const markAllAsRead = async () => {
+    // 2. Persist to server if it's a real MongoDB ObjectId
+    if (/^[0-9a-fA-F]{24}$/.test(idStr)) {
+      try {
+        const res = await notificationService.markAsRead(idStr);
+        if (typeof res?.data?.unreadCount === 'number') {
+          setUnreadCount(res.data.unreadCount);
+        }
+      } catch (err) {
+        console.warn('Error marking notification read on server:', err?.message);
+      }
+    }
+  }, []);
+
+  // Mark all notifications for a specific conversation as read (instant + server sync)
+  const markConversationNotificationsRead = useCallback(async (convId) => {
+    if (!convId) return;
+    const cidStr = convId.toString();
+
+    // 1. Immediately & synchronously update state: checked messages disappear from notification center
+    setNotifications((prev) => {
+      let unreadInGroup = 0;
+      const filtered = prev.filter((n) => {
+        const matches =
+          n.metadata?.conversationId?.toString() === cidStr ||
+          n.link?.includes(cidStr);
+        if (matches && !n.isRead) {
+          unreadInGroup++;
+        }
+        return !matches;
+      });
+
+      if (unreadInGroup > 0) {
+        setUnreadCount((c) => Math.max(0, c - unreadInGroup));
+      }
+      return filtered;
+    });
+
+    // 2. Refresh unread count in chat
+    refreshChatUnread();
+
+    // 3. Persist to server
+    try {
+      const res = await notificationService.markConversationAsRead(cidStr);
+      if (typeof res?.data?.unreadCount === 'number') {
+        setUnreadCount(res.data.unreadCount);
+      }
+    } catch (err) {
+      console.warn('Failed to mark conversation notifications as read:', err?.message);
+    }
+  }, [refreshChatUnread]);
+
+  const markAllAsRead = useCallback(async () => {
+    // 1. Immediately & synchronously update UI state:
+    // Message notifications disappear; workflow notifications become marked read
+    setNotifications((prev) =>
+      prev
+        .filter((n) => n.type !== 'new_message' && !n.link?.includes('chat'))
+        .map((n) => ({ ...n, isRead: true, readAt: new Date() }))
+    );
+    setUnreadCount(0);
+
+    // 2. Persist to server
     try {
       await notificationService.markAllAsRead();
-      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true, readAt: new Date() })));
-      setUnreadCount(0);
     } catch (err) {
       console.error('Error marking all notifications as read:', err);
     }
-  };
+    refreshChatUnread();
+  }, [refreshChatUnread]);
 
-  const deleteNotification = async (id) => {
-    try {
-      const res = await notificationService.deleteNotification(id);
-      setNotifications((prev) => prev.filter((n) => n._id !== id));
-      if (typeof res?.data?.unreadCount === 'number') {
-        setUnreadCount(res.data.unreadCount);
-      } else {
+  const deleteNotification = useCallback(async (id) => {
+    if (!id) return;
+    const idStr = id.toString();
+
+    // 1. Optimistic delete
+    setNotifications((prev) => {
+      const target = prev.find((n) => (n._id || n.id)?.toString() === idStr);
+      if (target && !target.isRead) {
         setUnreadCount((c) => Math.max(0, c - 1));
       }
-    } catch (err) {
-      console.error('Error deleting notification:', err);
-    }
-  };
+      return prev.filter((n) => (n._id || n.id)?.toString() !== idStr);
+    });
 
-  const clearAllNotifications = async (onlyRead = false) => {
+    // 2. Server delete
+    if (/^[0-9a-fA-F]{24}$/.test(idStr)) {
+      try {
+        const res = await notificationService.deleteNotification(idStr);
+        if (typeof res?.data?.unreadCount === 'number') {
+          setUnreadCount(res.data.unreadCount);
+        }
+      } catch (err) {
+        console.error('Error deleting notification:', err);
+      }
+    }
+  }, []);
+
+  const clearAllNotifications = useCallback(async (onlyRead = false) => {
     try {
-      await notificationService.clearAllNotifications({ onlyRead: onlyRead ? 'true' : 'false' });
       if (onlyRead) {
         setNotifications((prev) => prev.filter((n) => !n.isRead));
       } else {
         setNotifications([]);
         setUnreadCount(0);
       }
+      await notificationService.clearAllNotifications({ onlyRead: onlyRead ? 'true' : 'false' });
     } catch (err) {
       console.error('Error clearing notifications:', err);
     }
-  };
+  }, []);
 
   return (
     <SocketContext.Provider
@@ -401,6 +532,7 @@ export const SocketProvider = ({ children }) => {
         sendTyping,
         refreshNotifications,
         markAsRead,
+        markConversationNotificationsRead,
         markAllAsRead,
         deleteNotification,
         clearAllNotifications,

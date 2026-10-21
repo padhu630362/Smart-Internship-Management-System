@@ -23,6 +23,7 @@ import ChatPage from './pages/ChatPage';
 import ReportsPage from './pages/ReportsPage';
 import EvaluationsPage from './pages/EvaluationsPage';
 import CertificatesPage from './pages/CertificatesPage';
+import AdminCertificatesPage from './pages/AdminCertificatesPage';
 import VerifyCertificatePage from './pages/VerifyCertificatePage';
 import ExternalJobsPage from './pages/ExternalJobsPage';
 import NotificationsPage from './pages/NotificationsPage';
@@ -210,6 +211,18 @@ export const App = () => {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/admin/certificates"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'coordinator']}>
+                  <AdminCertificatesPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Notification destination aliases */}
+            <Route path="/allocations" element={<Navigate to="/manage/allocations" replace />} />
+            <Route path="/tasks" element={<Navigate to="/my-tasks" replace />} />
 
             {/* 404 Fallback */}
             <Route path="*" element={<NotFoundPage />} />

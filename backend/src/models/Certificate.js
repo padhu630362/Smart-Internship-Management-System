@@ -7,6 +7,7 @@ export const CERTIFICATE_STATUSES = {
 
 export const EMAIL_DELIVERY_STATUSES = {
   PENDING: 'pending',
+  QUEUED: 'queued',
   SENT: 'sent',
   FAILED: 'failed',
 };
@@ -118,6 +119,28 @@ const certificateSchema = new mongoose.Schema(
       type: String,
       enum: Object.values(CERTIFICATE_STATUSES),
       default: CERTIFICATE_STATUSES.ISSUED,
+      index: true,
+    },
+    deliveryEmail: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    issuedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+      index: true,
+    },
+    issuedByRole: {
+      type: String,
+      default: 'mentor',
+      trim: true,
+    },
+    isDemo: {
+      type: Boolean,
+      default: false,
+      index: true,
     },
     emailDeliveryStatus: {
       type: String,
@@ -134,6 +157,14 @@ const certificateSchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
+    emailDeliveryHistory: [
+      {
+        sentAt: { type: Date, default: Date.now },
+        recipientEmail: { type: String, default: '' },
+        status: { type: String, default: 'pending' },
+        error: { type: String, default: '' },
+      },
+    ],
   },
   {
     timestamps: true,

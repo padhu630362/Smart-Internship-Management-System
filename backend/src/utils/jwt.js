@@ -28,10 +28,10 @@ const base64UrlDecode = (str) => {
  */
 export const parseExpiresIn = (duration) => {
   if (typeof duration === 'number') return duration;
-  if (!duration || typeof duration !== 'string') return 5 * 60; // default 5 minutes
+  if (!duration || typeof duration !== 'string') return 500; // default 500 seconds
 
   const match = duration.match(/^(\d+)([smhd])$/);
-  if (!match) return 5 * 60;
+  if (!match) return 500;
 
   const value = parseInt(match[1], 10);
   const unit = match[2];
@@ -41,7 +41,7 @@ export const parseExpiresIn = (duration) => {
     case 'm': return value * 60;
     case 'h': return value * 3600;
     case 'd': return value * 86400;
-    default: return 5 * 60;
+    default: return 500;
   }
 };
 

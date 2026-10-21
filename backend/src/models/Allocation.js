@@ -96,6 +96,47 @@ const allocationSchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
+    completionRequest: {
+      status: {
+        type: String,
+        enum: ['none', 'pending', 'approved', 'rejected'],
+        default: 'none',
+        index: true,
+      },
+      requestedAt: {
+        type: Date,
+        default: null,
+      },
+      studentNotes: {
+        type: String,
+        default: '',
+        trim: true,
+      },
+      preferredDeliveryEmail: {
+        type: String,
+        default: '',
+        trim: true,
+      },
+      reviewedAt: {
+        type: Date,
+        default: null,
+      },
+      reviewedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null,
+      },
+      feedback: {
+        type: String,
+        default: '',
+        trim: true,
+      },
+    },
+    isDemo: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     statusHistory: [allocationHistorySchema],
   },
   {

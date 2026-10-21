@@ -51,7 +51,14 @@ export const errorHandler = (err, req, res, next) => {
   }
 
   // Handle Multer upload errors
-  if (err.name === 'MulterError' || err.code === 'LIMIT_FILE_SIZE' || err.code === 'INVALID_FILE_TYPE' || err.code === 'INVALID_FILE_MIME') {
+  if (
+    err.name === 'MulterError' ||
+    err.code === 'LIMIT_FILE_SIZE' ||
+    err.code === 'INVALID_FILE_TYPE' ||
+    err.code === 'INVALID_FILE_MIME' ||
+    err.code === 'INVALID_IMAGE_TYPE' ||
+    err.code === 'INVALID_IMAGE_MIME'
+  ) {
     const message = err.code === 'LIMIT_FILE_SIZE'
       ? 'File size exceeds the maximum permitted limit of 5MB.'
       : err.message || 'File upload failed validation.';

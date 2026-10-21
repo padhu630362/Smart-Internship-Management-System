@@ -39,6 +39,7 @@ export const NotificationBell = () => {
     toggleSound,
     requestPushPermission,
     markAsRead,
+    markConversationNotificationsRead,
     markAllAsRead,
     deleteNotification,
     refreshNotifications,
@@ -65,7 +66,7 @@ export const NotificationBell = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
 
-  // Consolidate chat notifications by sender / conversation like WhatsApp
+  // Consolidate direct chat notifications by sender / conversation
   const { groupedChatCards, nonChatNotifications } = useMemo(() => {
     const chatMap = new Map();
     const nonChats = [];
@@ -73,6 +74,9 @@ export const NotificationBell = () => {
     notifications.forEach((notif) => {
       const isChat = notif.type === NOTIFICATION_TYPES.NEW_MESSAGE || notif.link?.includes('chat');
       if (isChat) {
+        // Ephemeral chat messages disappear once checked/read
+        if (notif.isRead) return;
+
         const senderId = (notif.sender?._id || notif.sender || notif.title).toString();
         const convId =
           notif.metadata?.conversationId ||
@@ -103,7 +107,7 @@ export const NotificationBell = () => {
         const group = chatMap.get(convId);
         group.notifications.push(notif);
         group.allMessages.push(notif.message);
-        if (!notif.isRead) group.unreadCount++;
+        group.unreadCount++;
 
         const itemDate = new Date(notif.createdAt);
         if (itemDate >= group.latestDate) {
@@ -116,18 +120,16 @@ export const NotificationBell = () => {
       }
     });
 
-    const groupedChats = Array.from(chatMap.values()).sort(
-      (a, b) => b.latestDate - a.latestDate
-    );
+    const groupedChats = Array.from(chatMap.values())
+      .filter((g) => g.unreadCount > 0)
+      .sort((a, b) => b.latestDate - a.latestDate);
 
     return { groupedChatCards: groupedChats, nonChatNotifications: nonChats };
   }, [notifications]);
 
-  // Handle clicking WhatsApp-style consolidated card
+  // Handle clicking direct chat consolidated card
   const handleOpenGroupedChat = (group) => {
-    group.notifications.forEach((n) => {
-      if (!n.isRead) markAsRead(n._id);
-    });
+    markConversationNotificationsRead(group.convId);
     setIsOpen(false);
     const target = resolveNotificationRoute(group.link, NOTIFICATION_TYPES.NEW_MESSAGE, user?.role);
     navigate(target);
@@ -139,7 +141,9 @@ export const NotificationBell = () => {
     }
     setIsOpen(false);
     const target = resolveNotificationRoute(notif.link, notif.type, user?.role);
-    navigate(target);
+    if (target && target !== window.location.pathname) {
+      navigate(target);
+    }
   };
 
   const formatRelativeTime = (dateString) => {
@@ -343,7 +347,7 @@ export const NotificationBell = () => {
               }`}
             >
               <MessageSquare className="w-3 h-3" />
-              <span>WhatsApp ({groupedChatCards.length})</span>
+              <span>Direct Msg ({groupedChatCards.length})</span>
             </button>
           </div>
 
@@ -360,7 +364,7 @@ export const NotificationBell = () => {
                   {filter === 'unread'
                     ? 'No unread notifications'
                     : filter === 'chat'
-                    ? 'No WhatsApp messages yet'
+                    ? 'No direct messages yet'
                     : 'No notifications yet'}
                 </p>
                 <p className="text-[11px] text-stone-400 mt-0.5">
@@ -369,7 +373,7 @@ export const NotificationBell = () => {
               </div>
             ) : (
               <>
-                {/* 1. WHATSAPP-STYLE GROUPED CHAT CARDS */}
+                {/* 1. DIRECT CHAT GROUPED CARDS */}
                 {displayChatGroups.map((group) => {
                   const hasUnread = group.unreadCount > 0;
 
@@ -383,7 +387,7 @@ export const NotificationBell = () => {
                           : 'border-l-transparent hover:bg-peach-50/50 dark:hover:bg-warmdark-850/60'
                       }`}
                     >
-                      {/* WhatsApp Resilient Contact Avatar */}
+                      {/* Resilient Contact Avatar */}
                       <UserAvatar
                         sender={group.sender}
                         name={group.senderName}
@@ -393,7 +397,7 @@ export const NotificationBell = () => {
                         className="mt-0.5"
                       />
 
-                      {/* WhatsApp Message Snippet */}
+                      {/* Direct Message Snippet */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-1 mb-0.5">
                           <div className="flex items-center gap-1.5 min-w-0">
@@ -417,14 +421,14 @@ export const NotificationBell = () => {
                           </span>
                         </div>
 
-                        {/* WhatsApp Message Preview with Double Check */}
+                        {/* Direct Message Preview with Double Check */}
                         <div className="flex items-center justify-between gap-2 mt-0.5">
                           <div className="flex items-center gap-1 text-[11px] text-stone-600 dark:text-stone-300 truncate min-w-0">
                             <CheckCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                             <span className="truncate font-medium">{group.latestMessage}</span>
                           </div>
 
-                          {/* WhatsApp Unread Count Pill */}
+                          {/* Unread Count Pill */}
                           {hasUnread && (
                             <span className="px-1.5 py-0.2 min-w-4 text-center rounded-full text-[10px] font-bold bg-emerald-600 text-white shrink-0 shadow-xs animate-in zoom-in-75">
                               {group.unreadCount > 9 ? '9+' : group.unreadCount}

@@ -2,15 +2,18 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Menu, LogIn, LogOut, Activity, User, LayoutDashboard, ChevronDown, Users, Briefcase, FileText, UserCheck, Calendar, FileCheck2, MessageSquare, Award, BarChart3, Sparkles, Bell } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useSocket } from '../../context/SocketContext';
 import StatusBadge from '../common/StatusBadge';
 import ThemeToggle from '../common/ThemeToggle';
 import NotificationBell from '../common/NotificationBell';
 import Button from '../common/Button';
 import SimsLogo from '../common/SimsLogo';
+import UserAvatar from '../common/UserAvatar';
 import { Dropdown, DropdownItem, DropdownDivider } from '../common/Dropdown';
 
 export const TopNavbar = ({ onToggleSidebar, healthStatus, onOpenLogin }) => {
   const { user, isAuthenticated, logout } = useAuth();
+  const { totalChatUnread } = useSocket();
   const navigate = useNavigate();
   const isHealthy = healthStatus?.status === 'healthy';
 
@@ -72,10 +75,15 @@ export const TopNavbar = ({ onToggleSidebar, healthStatus, onOpenLogin }) => {
             <Link
               to="/chat"
               id="top-nav-chat-btn"
-              className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="relative p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               title="Real-time Chat & Messages"
             >
               <MessageSquare className="w-5 h-5 text-brand-500" />
+              {totalChatUnread > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-purple-600 text-[10px] font-bold text-white shadow-sm animate-pulse">
+                  {totalChatUnread > 99 ? '99+' : totalChatUnread}
+                </span>
+              )}
             </Link>
           )}
 
@@ -90,9 +98,11 @@ export const TopNavbar = ({ onToggleSidebar, healthStatus, onOpenLogin }) => {
                   type="button"
                   className="flex items-center gap-2.5 p-1 sm:px-2.5 sm:py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-850 transition-colors text-left"
                 >
-                  <div className="w-7 h-7 rounded-lg gradient-brand text-white flex items-center justify-center font-bold text-xs">
-                    {user?.name?.charAt(0)?.toUpperCase() || 'U'}
-                  </div>
+                  <UserAvatar
+                    user={user}
+                    size="sm"
+                    className="w-7 h-7"
+                  />
                   <div className="hidden sm:block leading-none">
                     <p className="text-xs font-bold text-slate-900 dark:text-white truncate max-w-[120px]">
                       {user?.name}

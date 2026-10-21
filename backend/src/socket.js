@@ -210,6 +210,16 @@ export const emitNotificationToUser = (userId, notification) => {
 };
 
 /**
+ * Dispatch real-time read sync to all active sessions / tabs of a user
+ */
+export const emitNotificationReadToUser = (userId, payload) => {
+  if (io && userId) {
+    const targetRoom = `user:${userId.toString()}`;
+    io.to(targetRoom).emit('notification:read', payload);
+  }
+};
+
+/**
  * Dispatch real-time chat message to conversation room and participants
  */
 export const emitChatMessage = (conversationId, message, participantIds = []) => {
@@ -267,6 +277,20 @@ export const emitReadReceipt = (conversationId, userId, readAt, participantIds =
     for (const participantId of participantIds) {
       const pid = (participantId._id || participantId).toString();
       io.to(`user:${pid}`).emit('chat:read_update', payload);
+    }
+  }
+};
+
+/**
+ * Dispatch real-time message reaction update to conversation room and participants
+ */
+export const emitMessageReaction = (conversationId, payload, participantIds = []) => {
+  if (io && conversationId) {
+    io.to(`conversation:${conversationId.toString()}`).emit('chat:message_reaction', payload);
+
+    for (const participantId of participantIds) {
+      const pid = (participantId._id || participantId).toString();
+      io.to(`user:${pid}`).emit('chat:message_reaction', payload);
     }
   }
 };

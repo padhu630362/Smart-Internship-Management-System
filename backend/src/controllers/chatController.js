@@ -8,8 +8,11 @@ import {
   emitChatMessage,
   emitConversationUpdated,
   emitReadReceipt,
+  emitNotificationReadToUser,
+  emitMessageReaction,
   getOnlineUserIds,
 } from '../socket.js';
+import { Notification } from '../models/Notification.js';
 import {
   createAndDispatchNotification,
   NOTIFICATION_TYPES,
@@ -228,6 +231,7 @@ export const getMessages = async (req, res, next) => {
     const [messagesDesc, total] = await Promise.all([
       Message.find(query)
         .populate('sender', 'name email role profile')
+        .populate('reactions.user', 'name role profile')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -472,6 +476,27 @@ export const markConversationRead = async (req, res, next) => {
 
     emitReadReceipt(conversationId, userId, now, req.conversation.participants);
 
+    // Also mark all in-app notifications for this conversation as read
+    // Delete in-app message notifications for this conversation since messages have been checked
+    await Notification.deleteMany({
+      recipient: userId,
+      $or: [
+        { 'metadata.conversationId': conversationId },
+        { link: { $regex: conversationId.toString() } },
+      ],
+    });
+
+    const remainingUnreadNotifs = await Notification.countDocuments({
+      recipient: userId,
+      isRead: false,
+    });
+
+    emitNotificationReadToUser(userId, {
+      conversationId: conversationId.toString(),
+      unreadCount: remainingUnreadNotifs,
+      deleted: true,
+    });
+
     res.status(200).json({
       success: true,
       message: 'Conversation marked as read.',
@@ -558,8 +583,8 @@ export const updateGroupMembers = async (req, res, next) => {
       );
     }
 
-    if (currentParticipants.length < 2) {
-      const error = new Error('A group conversation must have at least 2 members.');
+    if (currentParticipants.length < 1) {
+      const error = new Error('A group conversation must have at least 1 member.');
       error.statusCode = 400;
       error.code = 'INSUFFICIENT_PARTICIPANTS';
       return next(error);
@@ -640,7 +665,7 @@ export const getContacts = async (req, res, next) => {
       query._id = { $in: Array.from(allowedUserIds) };
     } else {
       // Admins and coordinators can message anyone in the system
-      query._id = { $ne: userId, status: USER_STATUSES.ACTIVE };
+      query = { _id: { $ne: userId }, status: USER_STATUSES.ACTIVE };
     }
 
     const contacts = await User.find(query)
@@ -676,4 +701,94 @@ export const getOnlineUsers = (req, res) => {
       onlineUserIds,
     },
   });
+};
+
+/**
+ * Toggle an emoji reaction on a message (add if not present, remove if already reacted)
+ */
+export const toggleMessageReaction = async (req, res, next) => {
+  try {
+    const { messageId } = req.params;
+    const { emoji } = req.body;
+    const userId = req.user.id;
+
+    if (!emoji || typeof emoji !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: 'Emoji string is required.',
+      });
+    }
+
+    const message = await Message.findById(messageId);
+    if (!message || message.isDeleted) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message not found.',
+      });
+    }
+
+    // Verify user is a member of this conversation
+    const conversation = await Conversation.findOne({
+      _id: message.conversation,
+      participants: userId,
+    });
+    if (!conversation) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You are not a member of this conversation.',
+      });
+    }
+
+    if (!Array.isArray(message.reactions)) {
+      message.reactions = [];
+    }
+
+    const trimmedEmoji = emoji.trim();
+    const existingIndex = message.reactions.findIndex(
+      (r) => r.user.toString() === userId.toString() && r.emoji === trimmedEmoji
+    );
+
+    if (existingIndex > -1) {
+      // User already reacted with this emoji: remove (toggle off)
+      message.reactions.splice(existingIndex, 1);
+    } else {
+      // Add new reaction
+      message.reactions.push({
+        emoji: trimmedEmoji,
+        user: userId,
+        createdAt: new Date(),
+      });
+    }
+
+    await message.save();
+
+    const populated = await Message.findById(message._id)
+      .populate('sender', 'name email role profile')
+      .populate('reactions.user', 'name role profile')
+      .lean();
+
+    // Broadcast reaction live via Socket.IO to room & user rooms
+    emitMessageReaction(
+      message.conversation,
+      {
+        conversationId: message.conversation.toString(),
+        messageId: message._id.toString(),
+        reactions: populated.reactions || [],
+        userId: userId.toString(),
+        emoji: trimmedEmoji,
+      },
+      conversation.participants
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Reaction updated successfully.',
+      data: {
+        messageId: message._id.toString(),
+        reactions: populated.reactions || [],
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
 };

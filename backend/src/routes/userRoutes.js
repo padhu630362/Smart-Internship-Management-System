@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authenticateToken, requireRoles } from '../middlewares/auth.js';
 import { ROLES } from '../models/User.js';
-import { uploadResumeFile } from '../utils/fileUpload.js';
+import { uploadResumeFile, uploadAvatarFile } from '../utils/fileUpload.js';
 import { uploadRateLimiter } from '../middlewares/rateLimiter.js';
 import {
   validateUpdateProfile,
@@ -11,6 +11,9 @@ import {
 import {
   getProfile,
   updateProfile,
+  uploadAvatar,
+  deleteAvatar,
+  downloadAvatar,
   uploadResume,
   downloadResume,
   deleteResume,
@@ -29,6 +32,17 @@ const router = Router();
 // ==========================================
 router.get('/profile', authenticateToken, getProfile);
 router.put('/profile', authenticateToken, validateUpdateProfile, updateProfile);
+
+// Profile Picture (Avatar) Upload, Download, and Delete
+router.post(
+  '/profile/avatar',
+  authenticateToken,
+  uploadRateLimiter,
+  uploadAvatarFile.single('avatar'),
+  uploadAvatar
+);
+router.delete('/profile/avatar', authenticateToken, deleteAvatar);
+router.get('/profile/avatar/:filename', downloadAvatar);
 
 // Student Resume Upload, Download, and Delete
 router.post(

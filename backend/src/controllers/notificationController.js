@@ -5,6 +5,7 @@ import {
   createAndDispatchNotification,
   createAndDispatchBulkNotifications,
 } from '../services/notificationService.js';
+import { emitNotificationReadToUser } from '../socket.js';
 
 /**
  * Get current user's notifications with pagination and unread filtering
@@ -15,7 +16,13 @@ export const getNotifications = async (req, res, next) => {
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 15));
     const skip = (page - 1) * limit;
 
-    const query = { recipient: req.user.id };
+    const query = {
+      recipient: req.user.id,
+      $or: [
+        { type: { $ne: NOTIFICATION_TYPES.NEW_MESSAGE } },
+        { isRead: false },
+      ],
+    };
 
     if (req.query.isRead !== undefined && req.query.isRead !== 'all') {
       query.isRead = req.query.isRead === 'true';
@@ -92,9 +99,25 @@ export const markAsRead = async (req, res, next) => {
       await notification.save();
     }
 
+    const isChatMsg =
+      notification.type === NOTIFICATION_TYPES.NEW_MESSAGE ||
+      notification.link?.includes('chat');
+
+    // Ephemeral message notifications disappear once checked/read
+    if (isChatMsg) {
+      await Notification.deleteOne({ _id: notification._id });
+    }
+
     const unreadCount = await Notification.countDocuments({
       recipient: req.user.id,
       isRead: false,
+    });
+
+    // Real-time synchronization across all tabs of the recipient
+    emitNotificationReadToUser(req.user.id, {
+      notificationId: notification._id.toString(),
+      unreadCount,
+      deleted: isChatMsg,
     });
 
     res.status(200).json({
@@ -111,14 +134,67 @@ export const markAsRead = async (req, res, next) => {
 };
 
 /**
+ * Mark all notifications for a specific chat conversation as read
+ */
+export const markConversationNotificationsRead = async (req, res, next) => {
+  try {
+    const { conversationId } = req.params;
+    const userId = req.user.id;
+    // Delete message notifications for this conversation since user has checked/read them
+    await Notification.deleteMany({
+      recipient: userId,
+      $or: [
+        { 'metadata.conversationId': conversationId },
+        { link: { $regex: conversationId } },
+      ],
+    });
+
+    const unreadCount = await Notification.countDocuments({
+      recipient: userId,
+      isRead: false,
+    });
+
+    // Broadcast update to all user sockets/tabs
+    emitNotificationReadToUser(userId, {
+      conversationId: conversationId.toString(),
+      unreadCount,
+      deleted: true,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Conversation notifications cleared.',
+      data: { conversationId, unreadCount },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * Mark all notifications as read for current user
  */
 export const markAllAsRead = async (req, res, next) => {
   try {
+    // Message notifications disappear when marked read
+    await Notification.deleteMany({
+      recipient: req.user.id,
+      $or: [
+        { type: NOTIFICATION_TYPES.NEW_MESSAGE },
+        { link: { $regex: 'chat' } },
+      ],
+    });
+
     const result = await Notification.updateMany(
       { recipient: req.user.id, isRead: false },
       { $set: { isRead: true, readAt: new Date() } }
     );
+
+    // Sync all tabs immediately
+    emitNotificationReadToUser(req.user.id, {
+      all: true,
+      unreadCount: 0,
+    });
 
     res.status(200).json({
       success: true,
@@ -155,10 +231,15 @@ export const deleteNotification = async (req, res, next) => {
       isRead: false,
     });
 
+    emitNotificationReadToUser(req.user.id, {
+      deletedId: req.params.id,
+      unreadCount,
+    });
+
     res.status(200).json({
       success: true,
       message: 'Notification deleted successfully.',
-      data: { unreadCount },
+      data: { id: req.params.id, unreadCount },
     });
   } catch (err) {
     next(err);
@@ -180,6 +261,12 @@ export const clearAllNotifications = async (req, res, next) => {
     const unreadCount = await Notification.countDocuments({
       recipient: req.user.id,
       isRead: false,
+    });
+
+    // Real-time synchronization across all tabs
+    emitNotificationReadToUser(req.user.id, {
+      all: req.query.onlyRead !== 'true',
+      unreadCount,
     });
 
     res.status(200).json({

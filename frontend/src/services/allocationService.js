@@ -43,6 +43,45 @@ export const allocationService = {
     });
     return response.data;
   },
+
+  /**
+   * Retrieve completion eligibility and tasks breakdown
+   */
+  async getCompletionEligibility(id) {
+    const response = await apiClient.get(`/api/allocations/${id}/completion-eligibility`);
+    return response.data;
+  },
+
+  /**
+   * Student requests completion
+   */
+  async requestCompletion(id, { studentNotes, preferredDeliveryEmail } = {}) {
+    const response = await apiClient.post(`/api/allocations/${id}/request-completion`, {
+      studentNotes,
+      preferredDeliveryEmail,
+    });
+    return response.data;
+  },
+
+  /**
+   * Mentor / Authorized Reviewer reviews completion
+   */
+  async reviewCompletion(id, { decision, feedback, deliveryEmail } = {}) {
+    const response = await apiClient.post(`/api/allocations/${id}/review-completion`, {
+      decision,
+      feedback,
+      deliveryEmail,
+    });
+    return response.data;
+  },
+
+  /**
+   * Seed demo intern allocations for testing workflow
+   */
+  async seedDemo() {
+    const response = await apiClient.post('/api/allocations/seed-demo');
+    return response.data;
+  },
 };
 
 export default allocationService;

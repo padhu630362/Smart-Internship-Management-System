@@ -105,8 +105,8 @@ export const validateCreateConversation = async (req, res, next) => {
         ...new Set([userId, ...rawParticipants.map((id) => id.toString())]),
       ];
 
-      if (distinctMembers.length < 2) {
-        const error = new Error('Group conversation requires at least 2 distinct members.');
+      if (distinctMembers.length < 1) {
+        const error = new Error('Group conversation requires at least 1 member.');
         error.statusCode = 400;
         error.code = 'INSUFFICIENT_PARTICIPANTS';
         return next(error);

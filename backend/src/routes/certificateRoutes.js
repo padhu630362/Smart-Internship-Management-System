@@ -6,8 +6,12 @@ import {
   getCertificateById,
   downloadCertificatePdf,
   verifyCertificate,
+  getCertificatePreview,
   issueAllocationCertificate,
   resendCertificateEmail,
+  getAdminCertificateAudit,
+  getAdminMentorIssuanceStats,
+  seedDemoAdminEndpoint,
 } from '../controllers/certificateController.js';
 
 const router = Router();
@@ -18,7 +22,49 @@ const router = Router();
 router.get('/verify/:code', verifyCertificate);
 
 // ==========================================
-// Protected Student & Reviewer Endpoints
+// Admin & Coordinator Audit / Reporting / Demo
+// (Must be defined before /:id routes)
+// ==========================================
+router.get(
+  '/admin/audit',
+  authenticateToken,
+  requireRoles(ROLES.ADMIN, ROLES.COORDINATOR),
+  getAdminCertificateAudit
+);
+
+router.get(
+  '/admin/mentor-stats',
+  authenticateToken,
+  requireRoles(ROLES.ADMIN, ROLES.COORDINATOR),
+  getAdminMentorIssuanceStats
+);
+
+router.post(
+  '/admin/seed-demo',
+  authenticateToken,
+  requireRoles(ROLES.ADMIN),
+  seedDemoAdminEndpoint
+);
+
+// ==========================================
+// Allocation Certificate Preview & Issuance
+// ==========================================
+router.get(
+  '/allocation/:allocationId/preview',
+  authenticateToken,
+  requireRoles(ROLES.ADMIN, ROLES.COORDINATOR, ROLES.MENTOR, ROLES.COMPANY),
+  getCertificatePreview
+);
+
+router.post(
+  '/allocation/:allocationId/issue',
+  authenticateToken,
+  requireRoles(ROLES.ADMIN, ROLES.COORDINATOR, ROLES.MENTOR, ROLES.COMPANY),
+  issueAllocationCertificate
+);
+
+// ==========================================
+// Student Certificates
 // ==========================================
 router.get(
   '/my',
@@ -27,6 +73,9 @@ router.get(
   getMyCertificates
 );
 
+// ==========================================
+// Parameterized Certificate ID Endpoints
+// ==========================================
 router.get(
   '/:id',
   authenticateToken,
@@ -39,16 +88,6 @@ router.get(
   downloadCertificatePdf
 );
 
-// ==========================================
-// Authorized Management Endpoints (Admin, Coordinator, Mentor, Company)
-// ==========================================
-router.post(
-  '/allocation/:allocationId/issue',
-  authenticateToken,
-  requireRoles(ROLES.ADMIN, ROLES.COORDINATOR, ROLES.MENTOR, ROLES.COMPANY),
-  issueAllocationCertificate
-);
-
 router.post(
   '/:id/resend-email',
   authenticateToken,
@@ -57,4 +96,3 @@ router.post(
 );
 
 export default router;
-
