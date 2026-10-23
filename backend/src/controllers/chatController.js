@@ -14,6 +14,8 @@ import {
   emitReadReceipt,
   emitNotificationReadToUser,
   emitMessageReaction,
+  emitMessagePinned,
+  emitMessageUnpinned,
   getOnlineUserIds,
 } from '../socket.js';
 import { Notification } from '../models/Notification.js';
@@ -40,6 +42,12 @@ export const getConversations = async (req, res, next) => {
         select: 'content sender createdAt isDeleted attachments',
         populate: { path: 'sender', select: 'name email role' },
       })
+      .populate({
+        path: 'pinnedMessage.message',
+        select: 'content attachments sender isEdited editedAt isDeleted createdAt deletedFor',
+        populate: { path: 'sender', select: 'name email role avatar' },
+      })
+      .populate('pinnedMessage.pinnedBy', 'name email role avatar')
       .sort({ lastMessageAt: -1 })
       .lean();
 
@@ -218,14 +226,185 @@ export const getConversationById = async (req, res, next) => {
 };
 
 /**
+ * Safely escape RegExp special characters to prevent ReDoS and regex syntax errors
+ */
+const escapeRegex = (str) => {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+};
+
+/**
+ * Search messages within a specific conversation across full history
+ */
+export const searchConversationMessages = async (req, res, next) => {
+  try {
+    const conversationId = req.conversation._id;
+    const userId = req.user.id;
+    const rawQuery = req.query.q ?? req.query.query;
+
+    if (typeof rawQuery !== 'string' || !rawQuery.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Search query is required and cannot be empty.',
+      });
+    }
+
+    const trimmedQuery = rawQuery.trim();
+    if (trimmedQuery.length > 100) {
+      return res.status(400).json({
+        success: false,
+        message: 'Search query cannot exceed 100 characters.',
+      });
+    }
+
+    const safeRegex = new RegExp(escapeRegex(trimmedQuery), 'i');
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const skip = (page - 1) * limit;
+
+    // Isolate strictly to this conversation, exclude soft-deleted messages
+    // (both deleted for everyone and deleted for current user)
+    const query = {
+      conversation: conversationId,
+      isDeleted: { $ne: true },
+      deletedFor: { $ne: userId },
+      content: { $regex: safeRegex },
+    };
+
+    const [matchingMessages, total] = await Promise.all([
+      Message.find(query)
+        .select('_id conversation sender content createdAt isEdited replyTo')
+        .populate('sender', 'name email role profile')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Message.countDocuments(query),
+    ]);
+
+    const totalPages = Math.ceil(total / limit) || 1;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        messages: matchingMessages,
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages,
+          hasMore: page < totalPages,
+        },
+        query: trimmedQuery,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * Get paginated messages for a conversation with populated replies & sender info
+ * Supports jumping to a target message with context window via aroundMessageId
  */
 export const getMessages = async (req, res, next) => {
   try {
     const conversationId = req.conversation._id;
     const userId = req.user.id;
-    const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 40));
+    const aroundMessageId = req.query.aroundMessageId;
+
+    // Support jumping to a target message with context window
+    if (aroundMessageId) {
+      if (!mongoose.Types.ObjectId.isValid(aroundMessageId)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid aroundMessageId format.',
+        });
+      }
+
+      const targetMsg = await Message.findOne({
+        _id: aroundMessageId,
+        conversation: conversationId,
+        deletedFor: { $ne: userId },
+      })
+        .populate('sender', 'name email role profile')
+        .populate('reactions.user', 'name role profile')
+        .populate({
+          path: 'replyTo',
+          select: 'content sender attachments isDeleted replySnapshot',
+          populate: { path: 'sender', select: 'name email role profile' },
+        })
+        .lean();
+
+      if (!targetMsg) {
+        return res.status(404).json({
+          success: false,
+          message: 'Target message not found or has been deleted.',
+        });
+      }
+
+      const halfLimit = Math.floor(limit / 2);
+
+      const [olderMessages, newerMessages, total] = await Promise.all([
+        Message.find({
+          conversation: conversationId,
+          deletedFor: { $ne: userId },
+          createdAt: { $lt: targetMsg.createdAt },
+        })
+          .populate('sender', 'name email role profile')
+          .populate('reactions.user', 'name role profile')
+          .populate({
+            path: 'replyTo',
+            select: 'content sender attachments isDeleted replySnapshot',
+            populate: { path: 'sender', select: 'name email role profile' },
+          })
+          .sort({ createdAt: -1 })
+          .limit(halfLimit)
+          .lean(),
+        Message.find({
+          conversation: conversationId,
+          deletedFor: { $ne: userId },
+          createdAt: { $gt: targetMsg.createdAt },
+        })
+          .populate('sender', 'name email role profile')
+          .populate('reactions.user', 'name role profile')
+          .populate({
+            path: 'replyTo',
+            select: 'content sender attachments isDeleted replySnapshot',
+            populate: { path: 'sender', select: 'name email role profile' },
+          })
+          .sort({ createdAt: 1 })
+          .limit(halfLimit)
+          .lean(),
+        Message.countDocuments({
+          conversation: conversationId,
+          deletedFor: { $ne: userId },
+        }),
+      ]);
+
+      const chronological = [
+        ...olderMessages.reverse(),
+        targetMsg,
+        ...newerMessages,
+      ];
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          messages: chronological,
+          targetMessageId: targetMsg._id,
+          pagination: {
+            total,
+            limit,
+            hasOlder: olderMessages.length >= halfLimit,
+            hasNewer: newerMessages.length >= halfLimit,
+          },
+        },
+      });
+    }
+
+    // Standard pagination
+    const page = Math.max(1, parseInt(req.query.page) || 1);
     const skip = (page - 1) * limit;
 
     // Exclude messages deleted specifically for current user
@@ -240,8 +419,8 @@ export const getMessages = async (req, res, next) => {
         .populate('reactions.user', 'name role profile')
         .populate({
           path: 'replyTo',
-          select: 'content sender attachments isDeleted',
-          populate: { path: 'sender', select: 'name email role' },
+          select: 'content sender attachments isDeleted replySnapshot',
+          populate: { path: 'sender', select: 'name email role profile' },
         })
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -353,12 +532,80 @@ export const sendMessage = async (req, res, next) => {
       }
     }
 
+    // Validate reply reference and generate server-verified replySnapshot
+    let validatedReplyTo = null;
+    let replySnapshot = null;
+
+    if (replyToId) {
+      if (!mongoose.Types.ObjectId.isValid(replyToId)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid reply message ID format.',
+        });
+      }
+
+      const originalMsg = await Message.findById(replyToId)
+        .populate('sender', 'name role profile')
+        .lean();
+
+      if (!originalMsg) {
+        return res.status(404).json({
+          success: false,
+          message: 'Referenced original message not found.',
+        });
+      }
+
+      // Prevent cross-conversation reply references
+      if (originalMsg.conversation.toString() !== conversation._id.toString()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot reply to a message from a different conversation.',
+        });
+      }
+
+      // Check if original message was deleted specifically for current user
+      const isDeletedForUser = (originalMsg.deletedFor || []).some(
+        (id) => (id._id || id).toString() === userId.toString()
+      );
+      if (isDeletedForUser) {
+        return res.status(404).json({
+          success: false,
+          message: 'Referenced original message has been deleted and is unavailable.',
+        });
+      }
+
+      let attachmentSummary = '';
+      if (originalMsg.attachments && originalMsg.attachments.length > 0) {
+        if (originalMsg.attachments.length === 1) {
+          attachmentSummary = originalMsg.attachments[0].fileName || 'Attachment';
+        } else {
+          attachmentSummary = `${originalMsg.attachments.length} attachments`;
+        }
+      }
+
+      replySnapshot = {
+        messageId: originalMsg._id,
+        senderName: originalMsg.sender?.name || 'User',
+        senderRole: originalMsg.sender?.role || '',
+        contentPreview: originalMsg.isDeleted
+          ? 'This message was deleted'
+          : (originalMsg.content || '').slice(0, 150),
+        hasAttachments: (originalMsg.attachments || []).length > 0,
+        attachmentSummary,
+        isDeleted: Boolean(originalMsg.isDeleted),
+      };
+
+      validatedReplyTo = originalMsg._id;
+    }
+
     const newMessage = await Message.create({
       conversation: conversation._id,
       sender: userId,
       content,
       attachments,
-      replyTo: replyToId || null,
+      replyTo: validatedReplyTo,
+      replyToMessageId: validatedReplyTo,
+      replySnapshot,
       clientMsgId: clientMsgId || null,
       status: 'sent',
       readBy: [userId],
@@ -369,8 +616,8 @@ export const sendMessage = async (req, res, next) => {
       .populate('reactions.user', 'name role profile')
       .populate({
         path: 'replyTo',
-        select: 'content sender attachments isDeleted',
-        populate: { path: 'sender', select: 'name email role' },
+        select: 'content sender attachments isDeleted replySnapshot',
+        populate: { path: 'sender', select: 'name email role profile' },
       })
       .lean();
 
@@ -589,6 +836,25 @@ export const editMessage = async (req, res, next) => {
     const conversation = await Conversation.findById(message.conversation);
     if (conversation) {
       emitMessageEdited(conversation._id, populated, conversation.participants);
+
+      if (
+        conversation.pinnedMessage &&
+        conversation.pinnedMessage.message &&
+        conversation.pinnedMessage.message.toString() === message._id.toString()
+      ) {
+        emitMessagePinned(
+          conversation._id,
+          {
+            conversationId: conversation._id.toString(),
+            pinnedMessage: {
+              message: populated,
+              pinnedBy: conversation.pinnedMessage.pinnedBy,
+              pinnedAt: conversation.pinnedMessage.pinnedAt,
+            },
+          },
+          conversation.participants
+        );
+      }
     }
 
     res.status(200).json({
@@ -660,6 +926,26 @@ export const deleteMessage = async (req, res, next) => {
         },
         conversation.participants
       );
+
+      // If the deleted message was pinned, clear pin and notify participants
+      if (
+        conversation.pinnedMessage &&
+        conversation.pinnedMessage.message &&
+        conversation.pinnedMessage.message.toString() === message._id.toString()
+      ) {
+        conversation.pinnedMessage = null;
+        await conversation.save();
+
+        emitMessageUnpinned(
+          conversation._id,
+          {
+            conversationId: conversation._id.toString(),
+            messageId: message._id.toString(),
+            reason: 'deleted',
+          },
+          conversation.participants
+        );
+      }
 
       return res.status(200).json({
         success: true,
@@ -1224,3 +1510,207 @@ export const toggleMessageReaction = async (req, res, next) => {
     next(err);
   }
 };
+
+/**
+ * Pin a message in a conversation (1 pinned message per conversation, replaces previous pin)
+ */
+export const pinMessage = async (req, res, next) => {
+  try {
+    let conversation = req.conversation;
+    const userId = req.user.id || req.user._id.toString();
+    const rawMessageId = req.body?.messageId || req.params?.messageId;
+
+    if (!rawMessageId || !mongoose.Types.ObjectId.isValid(rawMessageId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'A valid message ID is required to pin a message.',
+      });
+    }
+
+    const message = await Message.findById(rawMessageId);
+    if (!message) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message not found.',
+      });
+    }
+
+    // Resolve conversation if accessed directly via /messages/:messageId/pin
+    if (!conversation) {
+      conversation = await Conversation.findById(message.conversation)
+        .populate('participants', 'name email role profile')
+        .populate('creator', 'name email role')
+        .populate('groupAdmins', 'name email role');
+
+      if (!conversation) {
+        return res.status(404).json({
+          success: false,
+          message: 'Conversation not found.',
+        });
+      }
+
+      const isMember = conversation.participants.some(
+        (p) => (p._id || p).toString() === userId
+      );
+      const isPrivileged = req.user.role === ROLES.ADMIN || req.user.role === ROLES.COORDINATOR;
+      if (!isMember && !isPrivileged) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied: You are not a member of this conversation.',
+        });
+      }
+    }
+
+    // Reject cross-conversation pinning
+    if (message.conversation.toString() !== conversation._id.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot pin a message belonging to a different conversation.',
+      });
+    }
+
+    // Cannot pin deleted messages
+    if (message.isDeleted) {
+      return res.status(400).json({
+        success: false,
+        message: 'Deleted messages cannot be pinned.',
+      });
+    }
+
+    // Check if deleted for this user
+    const isDeletedForUser = (message.deletedFor || []).some(
+      (id) => (id._id || id).toString() === userId
+    );
+    if (isDeletedForUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'Cannot pin a message that is deleted or unavailable to you.',
+      });
+    }
+
+    // Update conversation pinnedMessage (replaces previous pin atomically)
+    conversation.pinnedMessage = {
+      message: message._id,
+      pinnedBy: userId,
+      pinnedAt: new Date(),
+    };
+    await conversation.save();
+
+    // Populate for response and real-time broadcast
+    const populatedConv = await Conversation.findById(conversation._id)
+      .populate('participants', 'name email role profile lastSeen')
+      .populate('creator', 'name email role')
+      .populate('groupAdmins', 'name email role')
+      .populate({
+        path: 'pinnedMessage.message',
+        select: 'content attachments sender isEdited editedAt isDeleted createdAt deletedFor',
+        populate: { path: 'sender', select: 'name email role avatar' },
+      })
+      .populate('pinnedMessage.pinnedBy', 'name email role avatar');
+
+    emitMessagePinned(
+      conversation._id,
+      {
+        conversationId: conversation._id.toString(),
+        pinnedMessage: populatedConv.pinnedMessage,
+      },
+      conversation.participants
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'Message pinned successfully.',
+      data: {
+        conversation: populatedConv,
+        pinnedMessage: populatedConv.pinnedMessage,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Unpin the currently pinned message in a conversation
+ */
+export const unpinMessage = async (req, res, next) => {
+  try {
+    let conversation = req.conversation;
+    const userId = req.user.id || req.user._id.toString();
+    const rawMessageId = req.body?.messageId || req.params?.messageId;
+
+    if (!conversation && rawMessageId && mongoose.Types.ObjectId.isValid(rawMessageId)) {
+      const msg = await Message.findById(rawMessageId);
+      if (msg) {
+        conversation = await Conversation.findById(msg.conversation)
+          .populate('participants', 'name email role profile')
+          .populate('creator', 'name email role')
+          .populate('groupAdmins', 'name email role');
+      }
+    }
+
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Conversation not found.',
+      });
+    }
+
+    const isMember = conversation.participants.some(
+      (p) => (p._id || p).toString() === userId
+    );
+    const isPrivileged = req.user.role === ROLES.ADMIN || req.user.role === ROLES.COORDINATOR;
+    if (!isMember && !isPrivileged) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You are not a member of this conversation.',
+      });
+    }
+
+    if (!conversation.pinnedMessage || !conversation.pinnedMessage.message) {
+      return res.status(400).json({
+        success: false,
+        message: 'No message is currently pinned in this conversation.',
+      });
+    }
+
+    const currentPinnedId = (
+      conversation.pinnedMessage.message._id ||
+      conversation.pinnedMessage.message
+    ).toString();
+
+    // If specific messageId passed, verify it matches
+    if (rawMessageId && currentPinnedId !== rawMessageId.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: 'The requested message is not currently pinned in this conversation.',
+      });
+    }
+
+    const unpinnedId = currentPinnedId;
+
+    conversation.pinnedMessage = null;
+    await conversation.save();
+
+    emitMessageUnpinned(
+      conversation._id,
+      {
+        conversationId: conversation._id.toString(),
+        messageId: unpinnedId,
+      },
+      conversation.participants
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'Message unpinned successfully.',
+      data: {
+        conversationId: conversation._id.toString(),
+        unpinnedMessageId: unpinnedId,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+

@@ -34,10 +34,24 @@ export const chatService = {
   /**
    * Fetch paginated message history for a conversation
    * @param {string} id - Conversation ID
-   * @param {Object} params - { page, limit }
+   * @param {Object} params - { page, limit, aroundMessageId }
    */
   async getMessages(id, params = {}) {
     const response = await apiClient.get(`/api/chat/conversations/${id}/messages`, { params });
+    return response.data;
+  },
+
+  /**
+   * Search full persisted message history for a conversation
+   * @param {string} id - Conversation ID
+   * @param {Object} params - { q, page, limit }
+   * @param {AbortSignal} [signal] - Optional AbortController signal
+   */
+  async searchMessages(id, params = {}, signal) {
+    const response = await apiClient.get(`/api/chat/conversations/${id}/messages/search`, {
+      params,
+      signal,
+    });
     return response.data;
   },
 
@@ -193,6 +207,30 @@ export const chatService = {
    */
   async toggleReaction(messageId, emoji) {
     const response = await apiClient.patch(`/api/chat/messages/${messageId}/react`, { emoji });
+    return response.data;
+  },
+
+  /**
+   * Pin a message in a conversation
+   * @param {string} conversationId
+   * @param {string} messageId
+   */
+  async pinMessage(conversationId, messageId) {
+    const response = await apiClient.patch(`/api/chat/conversations/${conversationId}/pin`, {
+      messageId,
+    });
+    return response.data;
+  },
+
+  /**
+   * Unpin currently pinned message in a conversation
+   * @param {string} conversationId
+   * @param {string} [messageId]
+   */
+  async unpinMessage(conversationId, messageId) {
+    const response = await apiClient.patch(`/api/chat/conversations/${conversationId}/unpin`, {
+      messageId,
+    });
     return response.data;
   },
 };

@@ -28,7 +28,9 @@ import {
   ExternalLink,
   Copy,
   ChevronRight,
+  ChevronLeft,
   ChevronDown,
+  History,
   Smile,
   SmilePlus,
   Paperclip,
@@ -46,6 +48,7 @@ import {
   RefreshCw,
   Bell,
   BellOff,
+  Pin,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -159,10 +162,37 @@ const groupReactions = (reactions = [], currentUserId = '') => {
   return Array.from(map.values());
 };
 
+/**
+ * Safely highlights matching query text without using dangerouslySetInnerHTML
+ */
+const SafeHighlight = ({ text = '', highlight = '' }) => {
+  if (!highlight || !highlight.trim() || !text) return <>{text}</>;
+  const query = highlight.trim();
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const parts = text.split(new RegExp(`(${escaped})`, 'gi'));
+  return (
+    <span>
+      {parts.map((part, idx) =>
+        part.toLowerCase() === query.toLowerCase() ? (
+          <mark
+            key={idx}
+            className="bg-amber-200 dark:bg-amber-400/30 text-amber-950 dark:text-amber-100 font-semibold px-0.5 rounded-xs"
+          >
+            {part}
+          </mark>
+        ) : (
+          <span key={idx}>{part}</span>
+        )
+      )}
+    </span>
+  );
+};
+
 export const ChatPage = () => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const urlConversationId = searchParams.get('conversationId');
+  const urlMessageId = searchParams.get('messageId');
 
   const {
     socket,
@@ -205,8 +235,25 @@ export const ChatPage = () => {
   const [forwarding, setForwarding] = useState(false);
   const [showInChatSearch, setShowInChatSearch] = useState(false);
   const [inChatSearchQuery, setInChatSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState(null);
+  const [searchPagination, setSearchPagination] = useState({
+    total: 0,
+    page: 1,
+    limit: 10,
+    totalPages: 1,
+    hasMore: false,
+  });
+  const [searchPage, setSearchPage] = useState(1);
+  const [jumpingMessageId, setJumpingMessageId] = useState(null);
+  const [isViewingSearchContext, setIsViewingSearchContext] = useState(false);
+  const searchAbortControllerRef = useRef(null);
+  const searchDebounceRef = useRef(null);
+  const searchInputRef = useRef(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [unreadWhileScrolled, setUnreadWhileScrolled] = useState(0);
+  const [pinningMessageId, setPinningMessageId] = useState(null);
 
   // Modals state
   const [showNewChatModal, setShowNewChatModal] = useState(false);
@@ -339,18 +386,191 @@ export const ChatPage = () => {
     }
   }, []);
 
-  // Scroll to a specific message (for quoted replies)
-  const scrollToMessage = (msgId) => {
+  // Scroll to a specific message and briefly highlight it
+  const scrollToMessage = useCallback((msgId) => {
     if (!msgId) return;
     const el = document.getElementById(`msg-${msgId}`);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      el.classList.add('ring-2', 'ring-brand-500', 'ring-offset-2');
+      el.classList.add(
+        'ring-2',
+        'ring-brand-500',
+        'ring-offset-2',
+        'bg-brand-50/70',
+        'dark:bg-brand-950/40',
+        'transition-all',
+        'duration-300'
+      );
       setTimeout(() => {
-        el.classList.remove('ring-2', 'ring-brand-500', 'ring-offset-2');
-      }, 1800);
+        el.classList.remove(
+          'ring-2',
+          'ring-brand-500',
+          'ring-offset-2',
+          'bg-brand-50/70',
+          'dark:bg-brand-950/40'
+        );
+      }, 2500);
     }
-  };
+  }, []);
+
+  // Jump directly to a searched or targeted message
+  const handleJumpToMessage = useCallback(
+    async (targetMsgId) => {
+      if (!targetMsgId || !activeConversation?._id) return;
+
+      const targetStr = targetMsgId.toString();
+      const isAlreadyLoaded = messages.some(
+        (m) => (m._id || m.id || '').toString() === targetStr
+      );
+
+      if (isAlreadyLoaded) {
+        scrollToMessage(targetStr);
+        return;
+      }
+
+      // Message is not in currently loaded history: fetch context window around target message
+      try {
+        setJumpingMessageId(targetStr);
+        const res = await chatService.getMessages(activeConversation._id, {
+          aroundMessageId: targetStr,
+          limit: 50,
+        });
+
+        if (res?.data?.messages && res.data.messages.length > 0) {
+          setMessages(res.data.messages);
+          setIsViewingSearchContext(true);
+          // Wait for DOM to render loaded messages, then scroll and highlight
+          setTimeout(() => {
+            scrollToMessage(targetStr);
+          }, 120);
+        } else {
+          setErrorBanner('The target message could not be loaded.');
+        }
+      } catch (err) {
+        console.error('Failed to load message context for jump:', err);
+        const msg =
+          err.response?.status === 404
+            ? 'This message is no longer available or was deleted.'
+            : (err.response?.data?.message || 'Could not jump to message.');
+        setErrorBanner(msg);
+      } finally {
+        setJumpingMessageId(null);
+      }
+    },
+    [activeConversation?._id, messages, scrollToMessage]
+  );
+
+  // Perform conversation message search
+  const executeMessageSearch = useCallback(
+    async (query, pageNum = 1) => {
+      const trimmed = query ? query.trim() : '';
+      if (!trimmed || !activeConversation?._id) {
+        setSearchResults([]);
+        setSearchLoading(false);
+        setSearchError(null);
+        setSearchPagination({
+          total: 0,
+          page: 1,
+          limit: 10,
+          totalPages: 1,
+          hasMore: false,
+        });
+        return;
+      }
+
+      // Cancel previous in-flight request
+      if (searchAbortControllerRef.current) {
+        searchAbortControllerRef.current.abort();
+      }
+      const controller = new AbortController();
+      searchAbortControllerRef.current = controller;
+
+      try {
+        setSearchLoading(true);
+        setSearchError(null);
+
+        const res = await chatService.searchMessages(
+          activeConversation._id,
+          { q: trimmed, page: pageNum, limit: 10 },
+          controller.signal
+        );
+
+        if (res?.data) {
+          setSearchResults(res.data.messages || []);
+          setSearchPagination(
+            res.data.pagination || {
+              total: 0,
+              page: pageNum,
+              limit: 10,
+              totalPages: 1,
+              hasMore: false,
+            }
+          );
+        }
+      } catch (err) {
+        if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
+          return; // Ignore canceled requests
+        }
+        console.error('In-chat message search error:', err);
+        setSearchError(err.response?.data?.message || 'Failed to search messages. Please try again.');
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    },
+    [activeConversation?._id]
+  );
+
+  // Close and reset in-chat search
+  const handleCloseSearch = useCallback(() => {
+    setShowInChatSearch(false);
+    setInChatSearchQuery('');
+    setSearchResults([]);
+    setSearchError(null);
+    setSearchPage(1);
+    if (searchAbortControllerRef.current) {
+      searchAbortControllerRef.current.abort();
+    }
+  }, []);
+
+  // Debounced search trigger on inChatSearchQuery or searchPage change
+  useEffect(() => {
+    if (!showInChatSearch) {
+      if (searchAbortControllerRef.current) {
+        searchAbortControllerRef.current.abort();
+      }
+      return;
+    }
+
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+
+    if (!inChatSearchQuery.trim()) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      setSearchError(null);
+      return;
+    }
+
+    setSearchLoading(true);
+    searchDebounceRef.current = setTimeout(() => {
+      executeMessageSearch(inChatSearchQuery, searchPage);
+    }, 300);
+
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+    };
+  }, [inChatSearchQuery, searchPage, showInChatSearch, executeMessageSearch]);
+
+  // Focus search input when search opens
+  useEffect(() => {
+    if (showInChatSearch) {
+      setTimeout(() => searchInputRef.current?.focus(), 50);
+    }
+  }, [showInChatSearch]);
 
   // Scroll listener for floating scroll-to-bottom button
   const handleScroll = (e) => {
@@ -446,6 +666,11 @@ export const ChatPage = () => {
       setSelectedFile(null);
       setShowInChatSearch(false);
       setInChatSearchQuery('');
+      setSearchResults([]);
+      setSearchError(null);
+      setSearchPage(1);
+      setIsViewingSearchContext(false);
+      setJumpingMessageId(null);
 
       setSearchParams({ conversationId: conv._id }, { replace: true });
       joinConversation(conv._id);
@@ -488,6 +713,13 @@ export const ChatPage = () => {
         });
     }
   }, [urlConversationId, conversations, loadingConversations, activeConversation, selectConversation]);
+
+  // Handle URL messageId jump
+  useEffect(() => {
+    if (urlMessageId && activeConversation?._id && messages.length > 0 && !loadingMessages) {
+      handleJumpToMessage(urlMessageId);
+    }
+  }, [urlMessageId, activeConversation?._id, messages.length, loadingMessages, handleJumpToMessage]);
 
   // Ensure active conversation room is joined
   useEffect(() => {
@@ -574,6 +806,25 @@ export const ChatPage = () => {
               : m
           )
         );
+        setActiveConversation((prev) => {
+          if (
+            prev?.pinnedMessage?.message &&
+            ((prev.pinnedMessage.message._id || prev.pinnedMessage.message).toString() ===
+              (message._id || message.id).toString())
+          ) {
+            return {
+              ...prev,
+              pinnedMessage: {
+                ...prev.pinnedMessage,
+                message: {
+                  ...(typeof prev.pinnedMessage.message === 'object' ? prev.pinnedMessage.message : {}),
+                  ...message,
+                },
+              },
+            };
+          }
+          return prev;
+        });
       }
     };
 
@@ -590,11 +841,59 @@ export const ChatPage = () => {
                 : m
             )
           );
+          setActiveConversation((prev) => {
+            if (
+              prev?.pinnedMessage?.message &&
+              ((prev.pinnedMessage.message._id || prev.pinnedMessage.message).toString() ===
+                messageId.toString())
+            ) {
+              return { ...prev, pinnedMessage: null };
+            }
+            return prev;
+          });
         } else if (deletedForUserId && deletedForUserId.toString() === currentUserId?.toString()) {
           setMessages((prev) =>
             prev.filter((m) => (m._id || m.id || '').toString() !== messageId.toString())
           );
         }
+      }
+    };
+
+    // Message pinned in real time
+    const handleMessagePinned = ({ conversationId, pinnedMessage }) => {
+      const activeId = (activeConversation?._id || '').toString();
+      const incId = (conversationId || '').toString();
+
+      setConversations((prev) =>
+        prev.map((c) =>
+          (c._id || '').toString() === incId ? { ...c, pinnedMessage } : c
+        )
+      );
+
+      if (activeId && incId && activeId === incId) {
+        setActiveConversation((prev) => ({
+          ...prev,
+          pinnedMessage,
+        }));
+      }
+    };
+
+    // Message unpinned in real time
+    const handleMessageUnpinned = ({ conversationId }) => {
+      const activeId = (activeConversation?._id || '').toString();
+      const incId = (conversationId || '').toString();
+
+      setConversations((prev) =>
+        prev.map((c) =>
+          (c._id || '').toString() === incId ? { ...c, pinnedMessage: null } : c
+        )
+      );
+
+      if (activeId && incId && activeId === incId) {
+        setActiveConversation((prev) => ({
+          ...prev,
+          pinnedMessage: null,
+        }));
       }
     };
 
@@ -704,6 +1003,10 @@ export const ChatPage = () => {
     socket.on('chat:message_edited', handleMessageEdited);
     socket.on('chat:message_deleted', handleMessageDeleted);
     socket.on('chat:message_reaction', handleChatMessageReaction);
+    socket.on('chat:message_pinned', handleMessagePinned);
+    socket.on('message_pinned', handleMessagePinned);
+    socket.on('chat:message_unpinned', handleMessageUnpinned);
+    socket.on('message_unpinned', handleMessageUnpinned);
     socket.on('conversation:updated', handleConversationUpdated);
     socket.on('chat:read_update', handleReadUpdate);
     socket.on('chat:typing', handleTyping);
@@ -715,6 +1018,10 @@ export const ChatPage = () => {
       socket.off('chat:message_edited', handleMessageEdited);
       socket.off('chat:message_deleted', handleMessageDeleted);
       socket.off('chat:message_reaction', handleChatMessageReaction);
+      socket.off('chat:message_pinned', handleMessagePinned);
+      socket.off('message_pinned', handleMessagePinned);
+      socket.off('chat:message_unpinned', handleMessageUnpinned);
+      socket.off('message_unpinned', handleMessageUnpinned);
       socket.off('conversation:updated', handleConversationUpdated);
       socket.off('chat:read_update', handleReadUpdate);
       socket.off('chat:typing', handleTyping);
@@ -1103,6 +1410,103 @@ export const ChatPage = () => {
     }
   };
 
+  // Toggle message pin state
+  const handleTogglePinMessage = async (msg) => {
+    if (!activeConversation?._id || !msg?._id || pinningMessageId) return;
+
+    const convId = activeConversation._id;
+    const msgId = msg._id.toString();
+    const currentPinnedMsgId = (
+      activeConversation.pinnedMessage?.message?._id ||
+      activeConversation.pinnedMessage?.message ||
+      ''
+    ).toString();
+    const isCurrentlyPinned = currentPinnedMsgId === msgId;
+
+    try {
+      setPinningMessageId(msgId);
+      setActiveActionsMsgId(null);
+
+      if (isCurrentlyPinned) {
+        // Optimistic unpin update
+        const prevPinned = activeConversation.pinnedMessage;
+        setActiveConversation((prev) => ({ ...prev, pinnedMessage: null }));
+        setConversations((prev) =>
+          prev.map((c) => (c._id === convId ? { ...c, pinnedMessage: null } : c))
+        );
+
+        try {
+          await chatService.unpinMessage(convId, msgId);
+          setCopiedField('Message unpinned');
+          setTimeout(() => setCopiedField(null), 2000);
+        } catch (err) {
+          // Rollback on failure
+          setActiveConversation((prev) => ({ ...prev, pinnedMessage: prevPinned }));
+          setConversations((prev) =>
+            prev.map((c) => (c._id === convId ? { ...c, pinnedMessage: prevPinned } : c))
+          );
+          throw err;
+        }
+      } else {
+        // Pin new message (replaces previous pin)
+        try {
+          const res = await chatService.pinMessage(convId, msgId);
+          if (res?.data?.conversation) {
+            const updatedPinned = res.data.conversation.pinnedMessage;
+            setActiveConversation((prev) => ({
+              ...prev,
+              pinnedMessage: updatedPinned,
+            }));
+            setConversations((prev) =>
+              prev.map((c) => (c._id === convId ? { ...c, pinnedMessage: updatedPinned } : c))
+            );
+          }
+          setCopiedField('Message pinned');
+          setTimeout(() => setCopiedField(null), 2000);
+        } catch (err) {
+          throw err;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to pin/unpin message:', err);
+      const errMsg = err?.response?.data?.message || 'Failed to update pinned message.';
+      setErrorBanner(errMsg);
+      setTimeout(() => setErrorBanner(null), 4000);
+    } finally {
+      setPinningMessageId(null);
+    }
+  };
+
+  // Unpin currently pinned message from header banner
+  const handleUnpinCurrentMessage = async () => {
+    if (!activeConversation?._id || pinningMessageId) return;
+    const convId = activeConversation._id;
+    const prevPinned = activeConversation.pinnedMessage;
+    if (!prevPinned) return;
+
+    try {
+      setPinningMessageId('unpinning');
+      setActiveConversation((prev) => ({ ...prev, pinnedMessage: null }));
+      setConversations((prev) =>
+        prev.map((c) => (c._id === convId ? { ...c, pinnedMessage: null } : c))
+      );
+
+      await chatService.unpinMessage(convId);
+      setCopiedField('Message unpinned');
+      setTimeout(() => setCopiedField(null), 2000);
+    } catch (err) {
+      console.error('Failed to unpin message:', err);
+      setActiveConversation((prev) => ({ ...prev, pinnedMessage: prevPinned }));
+      setConversations((prev) =>
+        prev.map((c) => (c._id === convId ? { ...c, pinnedMessage: prevPinned } : c))
+      );
+      setErrorBanner(err?.response?.data?.message || 'Failed to unpin message.');
+      setTimeout(() => setErrorBanner(null), 4000);
+    } finally {
+      setPinningMessageId(null);
+    }
+  };
+
   // Secure attachment download
   const handleDownloadFile = async (fileKey, fileName) => {
     try {
@@ -1335,6 +1739,22 @@ export const ChatPage = () => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  const formatSearchDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (isToday) return timeStr;
+    const sameYear = date.getFullYear() === now.getFullYear();
+    const dateStr = date.toLocaleDateString([], {
+      month: 'short',
+      day: 'numeric',
+      ...(sameYear ? {} : { year: 'numeric' }),
+    });
+    return `${dateStr}, ${timeStr}`;
+  };
+
   const getConversationDetails = (conv) => {
     if (!conv) return { title: '', subtitle: '', partner: null, isOnline: false };
     if (conv.type === CONVERSATION_TYPES.GROUP) {
@@ -1421,19 +1841,62 @@ export const ChatPage = () => {
     );
   });
 
-  // Filter messages in current conversation for in-chat search
-  const displayedMessages = useMemo(() => {
-    if (!inChatSearchQuery.trim()) return messages;
-    const q = inChatSearchQuery.toLowerCase();
-    return messages.filter((m) => {
-      if (m.isDeleted) return false;
-      const textMatch = (m.content || '').toLowerCase().includes(q);
-      const attMatch = (m.attachments || []).some((a) => (a.fileName || '').toLowerCase().includes(q));
-      return textMatch || attMatch;
-    });
-  }, [messages, inChatSearchQuery]);
+  // Active conversation timeline messages
+  const displayedMessages = messages;
 
   const activeDetails = getConversationDetails(activeConversation);
+
+  // Compute normalized pinned message metadata for conversation banner and message badges
+  const pinnedData = useMemo(() => {
+    if (!activeConversation?.pinnedMessage?.message) return null;
+    const pMsg = activeConversation.pinnedMessage.message;
+    const isObj = typeof pMsg === 'object' && pMsg !== null;
+    const msgId = (isObj ? (pMsg._id || pMsg.id) : pMsg)?.toString();
+
+    let senderName = 'User';
+    if (isObj && pMsg.sender) {
+      if (typeof pMsg.sender === 'object') {
+        const sId = (pMsg.sender._id || pMsg.sender.id)?.toString();
+        senderName = sId === currentUserId?.toString() ? 'You' : (pMsg.sender.name || 'User');
+      } else {
+        senderName = pMsg.sender.toString() === currentUserId?.toString() ? 'You' : 'User';
+      }
+    }
+
+    let preview = '';
+    if (isObj) {
+      if (pMsg.isDeleted) {
+        preview = 'This message was deleted';
+      } else if (pMsg.content) {
+        preview = pMsg.content;
+      } else if (pMsg.attachments && pMsg.attachments.length > 0) {
+        const att = pMsg.attachments[0];
+        preview = att.fileName ? `📎 ${att.fileName}` : '📎 Attachment';
+      } else {
+        preview = 'Message';
+      }
+    } else {
+      const foundInMessages = messages.find((m) => (m._id || m.id)?.toString() === msgId);
+      if (foundInMessages) {
+        const sId = (foundInMessages.sender?._id || foundInMessages.sender)?.toString();
+        senderName = sId === currentUserId?.toString() ? 'You' : (foundInMessages.sender?.name || 'User');
+        if (foundInMessages.isDeleted) preview = 'This message was deleted';
+        else if (foundInMessages.content) preview = foundInMessages.content;
+        else if (foundInMessages.attachments?.length > 0) preview = `📎 ${foundInMessages.attachments[0].fileName || 'Attachment'}`;
+        else preview = 'Message';
+      } else {
+        preview = 'Pinned message';
+      }
+    }
+
+    return {
+      messageId: msgId,
+      senderName,
+      preview,
+      pinnedAt: activeConversation.pinnedMessage.pinnedAt,
+      pinnedBy: activeConversation.pinnedMessage.pinnedBy,
+    };
+  }, [activeConversation?.pinnedMessage, currentUserId, messages]);
 
   return (
     <div className="h-[calc(100vh-64px)] w-full flex bg-slate-50 dark:bg-slate-900 overflow-hidden font-sans">
@@ -1746,13 +2209,23 @@ export const ChatPage = () => {
                 {/* Search in chat toggle */}
                 <button
                   type="button"
-                  onClick={() => setShowInChatSearch((prev) => !prev)}
+                  onClick={() => {
+                    setShowInChatSearch((prev) => {
+                      const next = !prev;
+                      if (!next) {
+                        handleCloseSearch();
+                      }
+                      return next;
+                    });
+                  }}
                   className={`p-2 rounded-xl text-xs font-semibold transition-all ${
                     showInChatSearch
-                      ? 'bg-brand-50 dark:bg-brand-950/60 text-brand-700 dark:text-brand-300'
+                      ? 'bg-brand-50 dark:bg-brand-950/60 text-brand-700 dark:text-brand-300 ring-1 ring-brand-300 dark:ring-brand-800'
                       : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                   }`}
-                  title="Search messages"
+                  title="Search messages in this conversation"
+                  aria-label="Search messages in this conversation"
+                  aria-expanded={showInChatSearch}
                 >
                   <Search className="w-4 h-4" />
                 </button>
@@ -1816,32 +2289,262 @@ export const ChatPage = () => {
               </div>
             )}
 
-            {/* In-Chat Search Bar Drawer */}
+            {/* Compact Pinned Message Banner */}
+            {pinnedData && (
+              <div
+                role="region"
+                aria-label="Pinned message"
+                className="px-3.5 py-2 bg-gradient-to-r from-amber-50/95 via-amber-50/75 to-orange-50/90 dark:from-amber-950/40 dark:via-slate-800/80 dark:to-orange-950/30 border-b border-amber-200/80 dark:border-amber-800/60 flex items-center justify-between gap-2.5 text-xs shadow-2xs animate-in fade-in slide-in-from-top-1 duration-150 shrink-0 z-10"
+              >
+                <button
+                  type="button"
+                  onClick={() => handleJumpToMessage(pinnedData.messageId)}
+                  className="flex-1 min-w-0 flex items-center gap-2.5 text-left group focus:outline-hidden focus-visible:ring-2 focus-visible:ring-amber-500 rounded-lg p-0.5 cursor-pointer"
+                  title="Click to view pinned message in history"
+                  aria-label={`Jump to pinned message from ${pinnedData.senderName}`}
+                >
+                  <div className="w-6 h-6 rounded-md bg-amber-100 dark:bg-amber-900/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <Pin className="w-3.5 h-3.5 fill-amber-500/30" />
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold text-slate-800 dark:text-slate-100 text-[11px] truncate">
+                        {pinnedData.senderName}
+                      </span>
+                      <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                        • Pinned
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-300 truncate group-hover:text-amber-700 dark:group-hover:text-amber-300 transition-colors">
+                      {pinnedData.preview}
+                    </p>
+                  </div>
+                </button>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleJumpToMessage(pinnedData.messageId)}
+                    className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-100/70 dark:hover:bg-amber-900/50 transition-colors cursor-pointer"
+                    aria-label="Jump to pinned message"
+                  >
+                    <span>View</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleUnpinCurrentMessage}
+                    disabled={pinningMessageId === 'unpinning'}
+                    className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-amber-100/60 dark:hover:bg-amber-900/40 transition-colors cursor-pointer"
+                    title="Unpin message"
+                    aria-label="Unpin message"
+                  >
+                    {pinningMessageId === 'unpinning' ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                    ) : (
+                      <X className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* In-Chat Search Bar & Results Drawer */}
             {showInChatSearch && (
-              <div className="px-4 py-2 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-150 shrink-0">
-                <Search className="w-4 h-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search in this conversation..."
-                  value={inChatSearchQuery}
-                  onChange={(e) => setInChatSearchQuery(e.target.value)}
-                  className="flex-1 py-1 px-2 text-xs bg-transparent border-none outline-none text-slate-900 dark:text-white"
-                  autoFocus
-                />
-                {inChatSearchQuery && (
-                  <span className="text-[11px] text-slate-400 font-medium">
-                    {displayedMessages.length} match{displayedMessages.length === 1 ? '' : 'es'}
-                  </span>
+              <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-md animate-in fade-in slide-in-from-top-2 duration-150 shrink-0 z-20">
+                {/* Search Input Bar */}
+                <div className="px-4 py-2.5 flex items-center gap-2 border-b border-slate-100 dark:border-slate-800">
+                  <Search className="w-4 h-4 text-slate-400 shrink-0" />
+                  <input
+                    ref={searchInputRef}
+                    type="search"
+                    role="searchbox"
+                    placeholder="Search message history..."
+                    aria-label="Search messages in this conversation"
+                    value={inChatSearchQuery}
+                    onChange={(e) => {
+                      setInChatSearchQuery(e.target.value);
+                      setSearchPage(1);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        handleCloseSearch();
+                      }
+                    }}
+                    className="flex-1 py-1 px-1.5 text-xs bg-transparent border-none outline-none text-slate-900 dark:text-white placeholder-slate-400"
+                    autoFocus
+                  />
+                  {inChatSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInChatSearchQuery('');
+                        setSearchResults([]);
+                        setSearchError(null);
+                        setSearchPage(1);
+                        searchInputRef.current?.focus();
+                      }}
+                      className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                      title="Clear search"
+                      aria-label="Clear search input"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+
+                  {/* Match count and pagination controls in header */}
+                  {searchPagination.total > 0 && !searchLoading && (
+                    <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 shrink-0">
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">
+                        {searchPagination.total} {searchPagination.total === 1 ? 'match' : 'matches'}
+                      </span>
+                      {searchPagination.totalPages > 1 && (
+                        <div className="flex items-center gap-0.5 ml-1">
+                          <button
+                            type="button"
+                            disabled={searchPage <= 1 || searchLoading}
+                            onClick={() => setSearchPage((p) => Math.max(1, p - 1))}
+                            className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none text-slate-600 dark:text-slate-400"
+                            title="Previous results page"
+                            aria-label="Previous page"
+                          >
+                            <ChevronLeft className="w-3.5 h-3.5" />
+                          </button>
+                          <span className="px-1 text-[10px] font-medium text-slate-400">
+                            {searchPage}/{searchPagination.totalPages}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={!searchPagination.hasMore || searchLoading}
+                            onClick={() => setSearchPage((p) => p + 1)}
+                            className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none text-slate-600 dark:text-slate-400"
+                            title="Next results page"
+                            aria-label="Next page"
+                          >
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Close button */}
+                  <button
+                    type="button"
+                    onClick={handleCloseSearch}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ml-1"
+                    title="Close search (Esc)"
+                    aria-label="Close search"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Search Results / Status Body */}
+                {inChatSearchQuery.trim() && (
+                  <div className="max-h-72 overflow-y-auto bg-slate-50/50 dark:bg-slate-900/50 divide-y divide-slate-100 dark:divide-slate-800">
+                    {searchLoading ? (
+                      <div className="py-6 flex items-center justify-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                        <Loader2 className="w-4 h-4 animate-spin text-brand-600" />
+                        <span>Searching conversation history...</span>
+                      </div>
+                    ) : searchError ? (
+                      <div className="p-4 bg-red-50/80 dark:bg-red-950/30 text-xs text-red-600 dark:text-red-400 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+                          <span className="truncate">{searchError}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => executeMessageSearch(inChatSearchQuery, searchPage)}
+                          className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded-md font-semibold text-[11px] shrink-0 transition-colors cursor-pointer"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    ) : searchResults.length === 0 ? (
+                      <div className="py-6 px-4 text-center text-xs text-slate-500 dark:text-slate-400 space-y-1">
+                        <p className="font-semibold text-slate-700 dark:text-slate-300">
+                          No matching messages found
+                        </p>
+                        <p className="text-[11px] text-slate-400">
+                          Try a different keyword or check your spelling.
+                        </p>
+                      </div>
+                    ) : (
+                      searchResults.map((result) => {
+                        const sender = result.sender || {};
+                        const senderName = sender.name || 'Unknown';
+                        const senderRole = sender.role || '';
+                        const isJumpingThis = jumpingMessageId === result._id;
+
+                        return (
+                          <button
+                            key={result._id}
+                            type="button"
+                            onClick={() => handleJumpToMessage(result._id)}
+                            disabled={isJumpingThis}
+                            className="w-full text-left px-4 py-2.5 hover:bg-brand-50/70 dark:hover:bg-slate-800 transition-colors flex flex-col gap-1 focus:outline-hidden focus:bg-brand-50 dark:focus:bg-slate-800 group cursor-pointer"
+                          >
+                            <div className="flex items-center justify-between text-xs w-full">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="font-semibold text-slate-800 dark:text-slate-200 truncate group-hover:text-brand-600 dark:group-hover:text-brand-400">
+                                  {senderName}
+                                </span>
+                                {senderRole && (
+                                  <span className="px-1.5 py-0.5 text-[9px] font-semibold rounded uppercase tracking-wider bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                                    {senderRole}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[11px] text-slate-400 shrink-0">
+                                {formatSearchDate(result.createdAt)}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed">
+                              <SafeHighlight text={result.content} highlight={inChatSearchQuery} />
+                            </p>
+                            <div className="flex items-center gap-1 text-[11px] font-medium text-brand-600 dark:text-brand-400 opacity-80 group-hover:opacity-100 transition-opacity pt-0.5">
+                              {isJumpingThis ? (
+                                <>
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                  <span>Jumping to message...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span>Jump to message in timeline</span>
+                                  <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
+                                </>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
                 )}
+              </div>
+            )}
+
+            {/* Context View Banner (when viewing older window around jump target) */}
+            {isViewingSearchContext && (
+              <div className="bg-brand-50/90 dark:bg-brand-950/40 border-b border-brand-200/80 dark:border-brand-800/80 px-4 py-2 flex items-center justify-between gap-3 text-xs text-brand-900 dark:text-brand-200 shrink-0 animate-in fade-in duration-200">
+                <div className="flex items-center gap-2 min-w-0">
+                  <History className="w-4 h-4 text-brand-600 dark:text-brand-400 shrink-0" />
+                  <span className="truncate">Viewing conversation history around search result.</span>
+                </div>
                 <button
                   type="button"
                   onClick={() => {
-                    setInChatSearchQuery('');
-                    setShowInChatSearch(false);
+                    setIsViewingSearchContext(false);
+                    if (activeConversation?._id) {
+                      fetchMessages(activeConversation._id);
+                    }
                   }}
-                  className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  className="px-2.5 py-1 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-semibold text-[11px] shadow-xs transition-colors cursor-pointer shrink-0"
                 >
-                  <X className="w-4 h-4" />
+                  Return to latest
                 </button>
               </div>
             )}
@@ -1879,12 +2582,10 @@ export const ChatPage = () => {
                     <Sparkles className="w-6 h-6" />
                   </div>
                   <p className="font-semibold text-slate-700 dark:text-slate-300 text-sm">
-                    {inChatSearchQuery ? 'No matching messages found' : 'No messages yet'}
+                    No messages yet
                   </p>
                   <p className="text-slate-500 max-w-xs mt-1">
-                    {inChatSearchQuery
-                      ? 'Try another keyword or clear the search filter.'
-                      : 'Send a message or attach a file to get started.'}
+                    Send a message or attach a file to get started.
                   </p>
                 </div>
               ) : (
@@ -1986,6 +2687,15 @@ export const ChatPage = () => {
                             <div className="flex items-center gap-0.5 opacity-0 group-hover/bubble:opacity-100 transition-opacity shrink-0">
                               <button
                                 type="button"
+                                onClick={() => handleStartReply(msg)}
+                                className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
+                                title="Reply to message"
+                                aria-label="Reply to message"
+                              >
+                                <Reply className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => setActiveReactionMsgId(activeReactionMsgId === msgId ? null : msgId)}
                                 className="reaction-trigger-btn p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
                                 title="React"
@@ -2011,27 +2721,62 @@ export const ChatPage = () => {
                                 : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-tl-xs border border-slate-200/90 dark:border-slate-700/80'
                             }`}
                           >
-                            {/* Quoted Parent Reply (if this message is a reply) */}
-                            {msg.replyTo && (
+                            {/* Pinned Indicator on Bubble */}
+                            {pinnedData?.messageId?.toString() === msgId && (
                               <div
-                                onClick={() => scrollToMessage((msg.replyTo._id || msg.replyTo).toString())}
-                                className={`mb-2 p-2 rounded-xl text-xs cursor-pointer border-l-4 transition-opacity hover:opacity-90 ${
+                                className={`flex items-center gap-1.5 text-[10px] font-semibold mb-1.5 ${
                                   isSender
-                                    ? 'bg-brand-700/70 border-white/90 text-white'
-                                    : 'bg-slate-100 dark:bg-slate-700 border-brand-500 text-slate-800 dark:text-slate-200'
+                                    ? 'text-amber-200'
+                                    : 'text-amber-600 dark:text-amber-400'
                                 }`}
                               >
-                                <div className="font-bold text-[10px] uppercase flex items-center gap-1 opacity-90">
+                                <Pin className="w-3 h-3 fill-amber-500/40" />
+                                <span>Pinned message</span>
+                              </div>
+                            )}
+
+                            {/* Quoted Parent Reply (if this message is a reply) */}
+                            {(msg.replyTo || msg.replySnapshot || msg.replyToMessageId) && (
+                              <div
+                                onClick={() => {
+                                  const parentId = (
+                                    msg.replyTo?._id ||
+                                    msg.replyToMessageId ||
+                                    msg.replyTo ||
+                                    msg.replySnapshot?.messageId
+                                  )?.toString();
+                                  if (parentId) {
+                                    handleJumpToMessage(parentId);
+                                  }
+                                }}
+                                className={`mb-2 p-2.5 rounded-xl text-xs cursor-pointer border-l-4 transition-all hover:opacity-95 ${
+                                  isSender
+                                    ? 'bg-brand-700/80 border-white/90 text-white hover:bg-brand-700'
+                                    : 'bg-slate-100 dark:bg-slate-700/80 border-brand-500 text-slate-800 dark:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-700'
+                                }`}
+                                title="Click to jump to original message"
+                                role="button"
+                                tabIndex={0}
+                              >
+                                <div className="font-bold text-[10px] uppercase flex items-center gap-1.5 opacity-90 mb-0.5">
                                   <Reply className="w-3 h-3" />
-                                  <span>{msg.replyTo.sender?.name || 'User'}</span>
+                                  <span>
+                                    {msg.replyTo?.sender?.name || msg.replySnapshot?.senderName || 'User'}
+                                  </span>
+                                  {(msg.replyTo?.sender?.role || msg.replySnapshot?.senderRole) && (
+                                    <span className="px-1 text-[9px] font-semibold rounded uppercase tracking-wider bg-black/10 dark:bg-white/10">
+                                      {msg.replyTo?.sender?.role || msg.replySnapshot?.senderRole}
+                                    </span>
+                                  )}
                                 </div>
-                                <p className="line-clamp-1 italic text-[11px] opacity-80 mt-0.5">
-                                  {msg.replyTo.isDeleted
-                                    ? 'This message was deleted'
-                                    : msg.replyTo.content ||
-                                      (msg.replyTo.attachments?.length > 0
+                                <p className="line-clamp-1 italic text-[11px] opacity-85">
+                                  {msg.replyTo?.isDeleted || msg.replySnapshot?.isDeleted
+                                    ? '🚫 This message was deleted'
+                                    : msg.replyTo?.content ||
+                                      msg.replySnapshot?.contentPreview ||
+                                      (msg.replyTo?.attachments?.length > 0
                                         ? `📎 ${msg.replyTo.attachments[0].fileName}`
-                                        : 'Message')}
+                                        : (msg.replySnapshot?.attachmentSummary ? `📎 ${msg.replySnapshot.attachmentSummary}` : 'Quoted message'))}
                                 </p>
                               </div>
                             )}
@@ -2111,6 +2856,15 @@ export const ChatPage = () => {
                           {/* If Receiver: Action Trigger Buttons on Right of bubble */}
                           {!isSender && !msg.isDeleted && (
                             <div className="flex items-center gap-0.5 opacity-0 group-hover/bubble:opacity-100 transition-opacity shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => handleStartReply(msg)}
+                                className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
+                                title="Reply to message"
+                                aria-label="Reply to message"
+                              >
+                                <Reply className="w-3.5 h-3.5" />
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => setActiveReactionMsgId(activeReactionMsgId === msgId ? null : msgId)}
@@ -2243,6 +2997,38 @@ export const ChatPage = () => {
                                 <span>Forward</span>
                               </button>
 
+                              {/* Pin / Unpin Message Action */}
+                              {!msg.isDeleted && (
+                                <button
+                                  type="button"
+                                  disabled={pinningMessageId === msgId}
+                                  onClick={() => handleTogglePinMessage(msg)}
+                                  className="w-full px-3 py-2 flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 cursor-pointer"
+                                  aria-label={
+                                    pinnedData?.messageId?.toString() === msgId
+                                      ? 'Unpin message'
+                                      : 'Pin message'
+                                  }
+                                >
+                                  {pinningMessageId === msgId ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />
+                                  ) : (
+                                    <Pin
+                                      className={`w-3.5 h-3.5 ${
+                                        pinnedData?.messageId?.toString() === msgId
+                                          ? 'text-amber-500 fill-amber-500/40'
+                                          : 'text-amber-500'
+                                      }`}
+                                    />
+                                  )}
+                                  <span>
+                                    {pinnedData?.messageId?.toString() === msgId
+                                      ? 'Unpin Message'
+                                      : 'Pin Message'}
+                                  </span>
+                                </button>
+                              )}
+
                               {isSender && (
                                 <button
                                   type="button"
@@ -2370,25 +3156,38 @@ export const ChatPage = () => {
             <div className="relative p-3 sm:p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
               {/* Replying Banner */}
               {replyingTo && (
-                <div className="mb-2 px-3 py-2 rounded-xl bg-brand-50/80 dark:bg-brand-950/40 border border-brand-200 dark:border-brand-800 flex items-center justify-between text-xs animate-in fade-in slide-in-from-bottom-2 duration-150">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Reply className="w-4 h-4 text-brand-600 shrink-0" />
+                <div className="mb-2 px-3 py-2.5 rounded-xl bg-brand-50/90 dark:bg-brand-950/50 border border-brand-200/90 dark:border-brand-800/90 flex items-center justify-between text-xs animate-in fade-in slide-in-from-bottom-2 duration-150">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-6 h-6 rounded-lg bg-brand-600 text-white flex items-center justify-center shrink-0">
+                      <Reply className="w-3.5 h-3.5" />
+                    </div>
                     <div className="min-w-0">
-                      <span className="font-semibold text-brand-700 dark:text-brand-300">
-                        Replying to {replyingTo.sender?.name || 'message'}:
-                      </span>
-                      <span className="text-slate-600 dark:text-slate-400 truncate ml-1">
-                        {replyingTo.content ||
-                          (replyingTo.attachments?.length > 0
-                            ? `📎 ${replyingTo.attachments[0].fileName}`
-                            : 'Attachment')}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-brand-700 dark:text-brand-300">
+                          Replying to {replyingTo.sender?.name || 'User'}
+                        </span>
+                        {replyingTo.sender?.role && (
+                          <span className="px-1 text-[9px] font-semibold rounded uppercase tracking-wider bg-brand-100 dark:bg-brand-900/60 text-brand-700 dark:text-brand-300">
+                            {replyingTo.sender.role}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-slate-600 dark:text-slate-400 truncate max-w-md sm:max-w-xl text-[11px] mt-0.5">
+                        {replyingTo.isDeleted
+                          ? 'This message was deleted'
+                          : replyingTo.content ||
+                            (replyingTo.attachments?.length > 0
+                              ? `📎 [${replyingTo.attachments[0].fileType?.toUpperCase() || 'FILE'}] ${replyingTo.attachments[0].fileName}`
+                              : 'Attachment message')}
+                      </p>
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={handleCancelReply}
-                    className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
+                    title="Cancel reply"
+                    aria-label="Cancel reply"
                   >
                     <X className="w-4 h-4" />
                   </button>

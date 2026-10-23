@@ -20,6 +20,26 @@ const readReceiptSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const pinnedMessageSchema = new mongoose.Schema(
+  {
+    message: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Message',
+      default: null,
+    },
+    pinnedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    pinnedAt: {
+      type: Date,
+      default: null,
+    },
+  },
+  { _id: false }
+);
+
 const conversationSchema = new mongoose.Schema(
   {
     type: {
@@ -69,6 +89,10 @@ const conversationSchema = new mongoose.Schema(
       index: true,
     },
     readReceipts: [readReceiptSchema],
+    pinnedMessage: {
+      type: pinnedMessageSchema,
+      default: null,
+    },
   },
   {
     timestamps: true,

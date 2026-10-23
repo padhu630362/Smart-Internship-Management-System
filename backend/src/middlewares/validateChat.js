@@ -43,7 +43,8 @@ export const chatRateLimiter = (req, res, next) => {
  * Validates text or attachment message payload
  */
 export const validateSendMessage = (req, res, next) => {
-  const { content, replyTo, clientMsgId } = req.body;
+  const { content, clientMsgId } = req.body;
+  const replyTo = req.body.replyToMessageId || req.body.replyTo;
 
   let hasFiles = Boolean(req.file);
   if (req.files) {
@@ -246,7 +247,13 @@ export const requireConversationMember = async (req, res, next) => {
     const conversation = await Conversation.findById(conversationId)
       .populate('participants', 'name email role profile')
       .populate('creator', 'name email role')
-      .populate('groupAdmins', 'name email role');
+      .populate('groupAdmins', 'name email role')
+      .populate({
+        path: 'pinnedMessage.message',
+        select: 'content attachments sender isEdited editedAt isDeleted createdAt deletedFor',
+        populate: { path: 'sender', select: 'name email role avatar' },
+      })
+      .populate('pinnedMessage.pinnedBy', 'name email role avatar');
 
     if (!conversation) {
       const error = new Error('Conversation not found.');

@@ -14,6 +14,7 @@ import {
   createConversation,
   getConversationById,
   getMessages,
+  searchConversationMessages,
   sendMessage,
   uploadAttachment,
   downloadAttachment,
@@ -26,6 +27,8 @@ import {
   getOnlineUsers,
   simulatePartnerReply,
   toggleMessageReaction,
+  pinMessage,
+  unpinMessage,
 } from '../controllers/chatController.js';
 
 const router = Router();
@@ -44,6 +47,13 @@ router.post('/upload', uploadChatAttachment.single('file'), uploadAttachment);
 // Secure authenticated attachment stream download
 router.get('/attachments/:fileKey', downloadAttachment);
 
+// Search messages within a conversation (full persisted history)
+router.get(
+  '/conversations/:id/messages/search',
+  requireConversationMember,
+  searchConversationMessages
+);
+
 // Messages in conversation (supports multipart attachments or JSON)
 router.get('/conversations/:id/messages', requireConversationMember, getMessages);
 router.post(
@@ -60,6 +70,12 @@ router.patch('/messages/:messageId', validateEditMessage, editMessage);
 router.delete('/messages/:messageId', validateDeleteMessage, deleteMessage);
 router.post('/messages/:messageId/forward', forwardMessage);
 router.patch('/messages/:messageId/react', toggleMessageReaction);
+router.patch('/messages/:messageId/pin', pinMessage);
+router.patch('/messages/:messageId/unpin', unpinMessage);
+
+// Conversation-level pin and unpin
+router.patch('/conversations/:id/pin', requireConversationMember, pinMessage);
+router.patch('/conversations/:id/unpin', requireConversationMember, unpinMessage);
 
 // Real-time live exchange simulation endpoint
 router.post(

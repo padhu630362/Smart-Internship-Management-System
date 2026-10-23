@@ -25,6 +25,46 @@ const attachmentSchema = new mongoose.Schema(
   { _id: true, timestamps: true }
 );
 
+const replySnapshotSchema = new mongoose.Schema(
+  {
+    messageId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Message',
+      default: null,
+    },
+    senderName: {
+      type: String,
+      default: 'User',
+      trim: true,
+    },
+    senderRole: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    contentPreview: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: 300,
+    },
+    hasAttachments: {
+      type: Boolean,
+      default: false,
+    },
+    attachmentSummary: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  { _id: false }
+);
+
 const messageSchema = new mongoose.Schema(
   {
     conversation: {
@@ -49,6 +89,16 @@ const messageSchema = new mongoose.Schema(
     replyTo: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Message',
+      default: null,
+    },
+    replyToMessageId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Message',
+      default: null,
+      index: true,
+    },
+    replySnapshot: {
+      type: replySnapshotSchema,
       default: null,
     },
     clientMsgId: {
@@ -114,6 +164,7 @@ const messageSchema = new mongoose.Schema(
 // Performance compound index for fast chat history retrieval
 messageSchema.index({ conversation: 1, createdAt: -1 });
 messageSchema.index({ conversation: 1, deletedFor: 1 });
+messageSchema.index({ conversation: 1, isDeleted: 1, createdAt: -1 });
 
 export const Message = mongoose.model('Message', messageSchema);
 export default Message;

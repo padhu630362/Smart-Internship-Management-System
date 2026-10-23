@@ -341,6 +341,40 @@ export const emitMessageReaction = (conversationId, payload, participantIds = []
 };
 
 /**
+ * Dispatch real-time message pinned update to conversation room and participants
+ */
+export const emitMessagePinned = (conversationId, payload, participantIds = []) => {
+  if (io && conversationId) {
+    const room = `conversation:${conversationId.toString()}`;
+    io.to(room).emit('chat:message_pinned', payload);
+    io.to(room).emit('message_pinned', payload);
+
+    for (const participantId of participantIds) {
+      const pid = (participantId._id || participantId).toString();
+      io.to(`user:${pid}`).emit('chat:message_pinned', payload);
+      io.to(`user:${pid}`).emit('message_pinned', payload);
+    }
+  }
+};
+
+/**
+ * Dispatch real-time message unpinned update to conversation room and participants
+ */
+export const emitMessageUnpinned = (conversationId, payload, participantIds = []) => {
+  if (io && conversationId) {
+    const room = `conversation:${conversationId.toString()}`;
+    io.to(room).emit('chat:message_unpinned', payload);
+    io.to(room).emit('message_unpinned', payload);
+
+    for (const participantId of participantIds) {
+      const pid = (participantId._id || participantId).toString();
+      io.to(`user:${pid}`).emit('chat:message_unpinned', payload);
+      io.to(`user:${pid}`).emit('message_unpinned', payload);
+    }
+  }
+};
+
+/**
  * Broadcast notification or generic event to all connected users
  */
 export const broadcastNotification = (event, payload) => {
@@ -348,3 +382,4 @@ export const broadcastNotification = (event, payload) => {
     io.emit(event, payload);
   }
 };
+
