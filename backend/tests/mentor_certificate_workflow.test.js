@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 process.env.NODE_ENV = 'test';
 
 import request from 'supertest';
+import mongoose from 'mongoose';
 import app from '../src/app.js';
 import { connectDB } from '../src/config/db.js';
 import { User, ROLES } from '../src/models/User.js';

@@ -459,8 +459,27 @@ describe('Phase 9: Analytics, Reports & Internship Evaluations Integration Tests
   });
 
   after(async () => {
-    if (httpServer) {
-      await new Promise((resolve) => httpServer.close(resolve));
+    try {
+      if (httpServer) {
+        await new Promise((resolve) => httpServer.close(resolve));
+      }
+      if (allocation1?._id) {
+        await Evaluation.deleteMany({ allocationId: allocation1._id });
+        await Allocation.deleteOne({ _id: allocation1._id });
+      }
+      if (application1?._id) await Application.deleteOne({ _id: application1._id });
+      if (internship?._id) await Internship.deleteOne({ _id: internship._id });
+
+      await User.deleteMany({
+        $or: [
+          { _id: { $in: [coordinatorUser?._id, companyUser?._id, mentorUser?._id, studentUser1?._id, studentUser2?._id].filter(Boolean) } },
+          { email: { $regex: new RegExp(`_p9_${timestamp}@`) } },
+        ],
+      });
+    } catch {
+      // Ignore cleanup error
+    } finally {
+      await mongoose.disconnect();
     }
   });
 });

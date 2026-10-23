@@ -47,6 +47,7 @@ export const env = {
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '500s',
   GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
   FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID || 'sims-d9539',
   SMTP_HOST: process.env.SMTP_HOST || '',
   SMTP_PORT: parseInt(process.env.SMTP_PORT, 10) || 587,
@@ -54,6 +55,9 @@ export const env = {
   SMTP_PASS: process.env.SMTP_PASS || '',
   SMTP_SECURE: process.env.SMTP_SECURE === 'true',
   EMAIL_FROM: process.env.EMAIL_FROM || 'InternHub Support <no-reply@internhub.edu>',
+  VAPID_PUBLIC_KEY: process.env.VAPID_PUBLIC_KEY || 'BMgu139zeJmt43gNWDBJ53nVP6OhG6BfY0lS-kXcsOxSDDveQpoBM2hrr9l20-voK1zbwc4Fq73rQ2UAOZ6Hx58',
+  VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY || 'FTQxRjuS16erssgd4YsvbUtFKi0EytPdbU-jbzCVBms',
+  VAPID_SUBJECT: process.env.VAPID_SUBJECT || 'mailto:support@internhub.edu',
 };
 
 // Fail fast in production if security secrets are weak or missing

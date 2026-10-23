@@ -75,7 +75,9 @@ export const getCertificateById = async (req, res, next) => {
  */
 export const downloadCertificatePdf = async (req, res, next) => {
   try {
-    const certificate = await Certificate.findById(req.params.id);
+    const certificate = await Certificate.findById(req.params.id)
+      .populate('issuedBy', 'name email role')
+      .populate('mentor', 'name email');
 
     if (!certificate) {
       const error = new Error('Certificate document not found.');
@@ -101,7 +103,7 @@ export const downloadCertificatePdf = async (req, res, next) => {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `${disposition}; filename="${filename}"`);
 
-    streamCertificatePdf(certificate, res);
+    await streamCertificatePdf(certificate, res);
   } catch (err) {
     next(err);
   }
@@ -360,7 +362,14 @@ export const issueAllocationCertificate = async (req, res, next) => {
     }
 
     // Deliver email safely
-    const emailDelivery = await deliverCertificateEmail(certificate._id);
+    // If student registered email was updated in profile, ensure certificate reflects latest email if deliveryEmail was failing
+    if (certificate.student?.email && (!certificate.deliveryEmail || certificate.emailDeliveryStatus === 'failed')) {
+      certificate.deliveryEmail = certificate.student.email.trim().toLowerCase();
+      certificate.studentEmail = certificate.student.email.trim().toLowerCase();
+      await certificate.save();
+    }
+
+    const emailDelivery = await deliverCertificateEmail(certificate._id, { force: true });
 
     // Notify student of certificate issuance
     createAndDispatchNotification({
@@ -426,7 +435,7 @@ export const resendCertificateEmail = async (req, res, next) => {
       return next(error);
     }
 
-    const certificate = await Certificate.findById(id);
+    const certificate = await Certificate.findById(id).populate('student', 'name email');
     if (!certificate) {
       const error = new Error('Certificate not found.');
       error.statusCode = 404;

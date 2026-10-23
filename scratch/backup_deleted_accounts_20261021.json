@@ -1,0 +1,523 @@
+{
+  "timestamp": "2026-10-21T12:58:58.896Z",
+  "usersCount": 9,
+  "allocationsCount": 2,
+  "tasksCount": 6,
+  "notificationsCount": 1,
+  "users": [
+    {
+      "_id": "6ad84360d9925d5dd03446e3",
+      "email": "aux_coord_1792557918073@university.edu",
+      "name": "Auxiliary Coordinator",
+      "role": "student",
+      "status": "inactive",
+      "profile": {
+        "coordinatorDetails": {
+          "department": "Information Systems"
+        },
+        "studentDetails": {
+          "skills": []
+        },
+        "companyDetails": {
+          "isVerified": false
+        },
+        "mentorDetails": {
+          "expertise": []
+        }
+      },
+      "googleId": null,
+      "authProvider": "local",
+      "createdBy": "6ad8435ed9925d5dd0344664",
+      "twoFactorEnabled": false,
+      "createdAt": "2026-10-21T04:45:20.627Z",
+      "updatedAt": "2026-10-21T04:47:53.510Z",
+      "__v": 0
+    },
+    {
+      "_id": "6ad84c174364372d2a03cba9",
+      "email": "aux_coord_1792560149409@university.edu",
+      "name": "Auxiliary Coordinator",
+      "role": "student",
+      "status": "inactive",
+      "profile": {
+        "coordinatorDetails": {
+          "department": "Information Systems"
+        },
+        "studentDetails": {
+          "skills": []
+        },
+        "companyDetails": {
+          "isVerified": false
+        },
+        "mentorDetails": {
+          "expertise": []
+        }
+      },
+      "googleId": null,
+      "authProvider": "local",
+      "createdBy": "6ad84c154364372d2a03cb25",
+      "twoFactorEnabled": false,
+      "createdAt": "2026-10-21T05:22:31.988Z",
+      "updatedAt": "2026-10-21T05:22:48.685Z",
+      "__v": 0
+    },
+    {
+      "_id": "6ad84ca86290547dddae892c",
+      "email": "demo.mentor@sims-demo.local",
+      "name": "Demo Mentor",
+      "role": "mentor",
+      "status": "active",
+      "profile": {
+        "bio": "Senior Engineering Mentor at NovaTech Demo Labs.",
+        "department": "Cloud Applications Group",
+        "studentDetails": {
+          "skills": []
+        },
+        "companyDetails": {
+          "isVerified": false
+        },
+        "mentorDetails": {
+          "expertise": []
+        }
+      },
+      "googleId": null,
+      "authProvider": "local",
+      "twoFactorEnabled": false,
+      "createdAt": "2026-10-21T05:24:56.170Z",
+      "updatedAt": "2026-10-21T05:24:56.170Z",
+      "__v": 0
+    },
+    {
+      "_id": "6ad84ca86290547dddae8932",
+      "email": "demo.student@sims-demo.local",
+      "name": "Demo Student",
+      "role": "student",
+      "status": "active",
+      "profile": {
+        "bio": "Computer Science candidate enrolled in the NovaTech Demo program.",
+        "department": "Computer Science & Engineering",
+        "studentDetails": {
+          "studentId": "DEMO-CS-2026",
+          "university": "SIMS Institute of Technology",
+          "graduationYear": 2026,
+          "cgpa": 9.2,
+          "skills": []
+        },
+        "companyDetails": {
+          "isVerified": false
+        },
+        "mentorDetails": {
+          "expertise": []
+        }
+      },
+      "googleId": null,
+      "authProvider": "local",
+      "twoFactorEnabled": false,
+      "createdAt": "2026-10-21T05:24:56.237Z",
+      "updatedAt": "2026-10-21T05:24:56.237Z",
+      "__v": 0
+    },
+    {
+      "_id": "6ad84368d9925d5dd0344812",
+      "email": "disabled_1792557918073@test.edu",
+      "name": "Disabled User",
+      "role": "student",
+      "status": "inactive",
+      "profile": {
+        "studentDetails": {
+          "skills": []
+        },
+        "companyDetails": {
+          "isVerified": false
+        },
+        "mentorDetails": {
+          "expertise": []
+        }
+      },
+      "googleId": null,
+      "authProvider": "local",
+      "twoFactorEnabled": false,
+      "createdAt": "2026-10-21T04:45:28.416Z",
+      "updatedAt": "2026-10-21T04:45:28.416Z",
+      "__v": 0
+    },
+    {
+      "_id": "6ad84c204364372d2a03ccd7",
+      "email": "disabled_1792560149409@test.edu",
+      "name": "Disabled User",
+      "role": "student",
+      "status": "inactive",
+      "profile": {
+        "studentDetails": {
+          "skills": []
+        },
+        "companyDetails": {
+          "isVerified": false
+        },
+        "mentorDetails": {
+          "expertise": []
+        }
+      },
+      "googleId": null,
+      "authProvider": "local",
+      "twoFactorEnabled": false,
+      "createdAt": "2026-10-21T05:22:40.627Z",
+      "updatedAt": "2026-10-21T05:22:40.627Z",
+      "__v": 0
+    },
+    {
+      "_id": "6ad84ca86290547dddae8926",
+      "email": "novatech@sims-demo.local",
+      "name": "NovaTech Demo Labs",
+      "role": "company",
+      "status": "active",
+      "profile": {
+        "bio": "Official demo organization for SIMS end-to-end verification and testing.",
+        "companyDetails": {
+          "companyName": "NovaTech Demo Labs",
+          "industry": "Software & Cloud Engineering",
+          "website": "https://novatech-demo.local",
+          "isVerified": false
+        },
+        "studentDetails": {
+          "skills": []
+        },
+        "mentorDetails": {
+          "expertise": []
+        }
+      },
+      "googleId": null,
+      "authProvider": "local",
+      "twoFactorEnabled": false,
+      "createdAt": "2026-10-21T05:24:56.076Z",
+      "updatedAt": "2026-10-21T05:24:56.076Z",
+      "__v": 0
+    },
+    {
+      "_id": "6ad84368d9925d5dd0344818",
+      "email": "rival_1792557918073@rival.com",
+      "name": "Rival Tech Inc",
+      "role": "company",
+      "status": "active",
+      "profile": {
+        "studentDetails": {
+          "skills": []
+        },
+        "companyDetails": {
+          "isVerified": false
+        },
+        "mentorDetails": {
+          "expertise": []
+        }
+      },
+      "googleId": null,
+      "authProvider": "local",
+      "twoFactorEnabled": false,
+      "createdAt": "2026-10-21T04:45:28.638Z",
+      "updatedAt": "2026-10-21T04:45:28.638Z",
+      "__v": 0
+    },
+    {
+      "_id": "6ad84c204364372d2a03ccdd",
+      "email": "rival_1792560149409@rival.com",
+      "name": "Rival Tech Inc",
+      "role": "company",
+      "status": "active",
+      "profile": {
+        "studentDetails": {
+          "skills": []
+        },
+        "companyDetails": {
+          "isVerified": false
+        },
+        "mentorDetails": {
+          "expertise": []
+        }
+      },
+      "googleId": null,
+      "authProvider": "local",
+      "twoFactorEnabled": false,
+      "createdAt": "2026-10-21T05:22:40.838Z",
+      "updatedAt": "2026-10-21T05:22:40.838Z",
+      "__v": 0
+    }
+  ],
+  "allocations": [
+    {
+      "_id": "6ad8502e2413deba3cf8bd63",
+      "student": "6ad84ca86290547dddae8932",
+      "internship": "6ad8502e2413deba3cf8bd61",
+      "company": "6ad84ca86290547dddae8926",
+      "mentor": "6ad84ca86290547dddae892c",
+      "application": null,
+      "startDate": "2026-09-21T05:39:58.424Z",
+      "endDate": "2026-10-20T05:39:58.424Z",
+      "status": "active",
+      "allocatedBy": "6ad84ca86290547dddae8926",
+      "notes": "Demonstration allocation for NovaTech Demo Labs evaluation and certificate issuance.",
+      "completionRequest": {
+        "status": "none",
+        "requestedAt": null,
+        "studentNotes": "",
+        "preferredDeliveryEmail": "demo.student@sims-demo.local",
+        "reviewedAt": null,
+        "reviewedBy": null,
+        "feedback": ""
+      },
+      "isDemo": true,
+      "statusHistory": [
+        {
+          "status": "active",
+          "changedBy": "6ad84ca86290547dddae8926",
+          "changedByName": "NovaTech Demo Labs",
+          "changedAt": "2026-09-21T05:39:58.424Z",
+          "note": "Candidate placed into demo allocation.",
+          "reason": ""
+        }
+      ],
+      "createdAt": "2026-10-21T05:39:58.427Z",
+      "updatedAt": "2026-10-21T05:39:58.427Z",
+      "__v": 0
+    },
+    {
+      "_id": "6ad88469acb8f0575e4e0ec4",
+      "student": "6ad84ca86290547dddae8932",
+      "internship": "6ad84cd2b65dbf1ddd01ae8f",
+      "company": "6ad88469acb8f0575e4e0ea8",
+      "mentor": "6ad6371dd240a82da5aa77a2",
+      "application": null,
+      "startDate": "2026-05-01T00:00:00.000Z",
+      "endDate": "2026-08-15T00:00:00.000Z",
+      "status": "active",
+      "allocatedBy": "6ad6371dd240a82da5aa77a2",
+      "notes": "Completed all milestone tasks with high distinction. Pre-approved for certificate generation.",
+      "completionRequest": {
+        "status": "approved",
+        "requestedAt": "2026-10-19T09:22:49.564Z",
+        "studentNotes": "All 3 milestone deliverables completed, tested, and reviewed.",
+        "preferredDeliveryEmail": "demo.student@sims-demo.local",
+        "reviewedAt": "2026-10-21T09:22:49.565Z",
+        "reviewedBy": "6ad6371dd240a82da5aa77a2",
+        "feedback": "Outstanding performance throughout the 14-week internship tenure."
+      },
+      "isDemo": true,
+      "statusHistory": [],
+      "createdAt": "2026-10-21T09:22:49.566Z",
+      "updatedAt": "2026-10-21T09:22:49.566Z",
+      "__v": 0
+    }
+  ],
+  "tasks": [
+    {
+      "_id": "6ad8502e2413deba3cf8bd68",
+      "title": "Build a responsive login page",
+      "description": "Implement an accessible, mobile-friendly login screen with client-side form validation.",
+      "allocation": "6ad8502e2413deba3cf8bd63",
+      "internship": "6ad8502e2413deba3cf8bd61",
+      "assignedTo": "6ad84ca86290547dddae8932",
+      "assignedBy": "6ad84ca86290547dddae892c",
+      "dueDate": "2026-10-01T05:39:58.424Z",
+      "priority": "high",
+      "status": "completed",
+      "progressPercentage": 100,
+      "submissionNotes": "Login form implemented with email/password validation, responsive design, and error alerts.",
+      "submissionLink": "https://github.com/novatech-demo/login-feature",
+      "submittedAt": "2026-09-30T05:39:58.424Z",
+      "reviewedBy": "6ad84ca86290547dddae892c",
+      "reviewedAt": "2026-10-01T05:39:58.424Z",
+      "reviewerFeedback": "Excellent responsive layout, clean accessibility labels, and validated edge cases.",
+      "history": [
+        {
+          "action": "TASK_CREATED",
+          "changedBy": "6ad84ca86290547dddae892c",
+          "changedByName": "Demo Mentor",
+          "timestamp": "2026-09-21T05:39:58.424Z",
+          "status": "todo",
+          "note": "Task initially created."
+        },
+        {
+          "action": "TASK_REVIEWED",
+          "changedBy": "6ad84ca86290547dddae892c",
+          "changedByName": "Demo Mentor",
+          "timestamp": "2026-10-01T05:39:58.424Z",
+          "status": "completed",
+          "note": "Approved by mentor."
+        }
+      ],
+      "createdAt": "2026-10-21T05:39:58.470Z",
+      "updatedAt": "2026-10-21T05:39:58.470Z",
+      "__v": 0
+    },
+    {
+      "_id": "6ad8502e2413deba3cf8bd6c",
+      "title": "Implement a sample REST API endpoint",
+      "description": "Develop secure Express endpoints for resource CRUD operations with JWT authentication.",
+      "allocation": "6ad8502e2413deba3cf8bd63",
+      "internship": "6ad8502e2413deba3cf8bd61",
+      "assignedTo": "6ad84ca86290547dddae8932",
+      "assignedBy": "6ad84ca86290547dddae892c",
+      "dueDate": "2026-10-11T05:39:58.424Z",
+      "priority": "high",
+      "status": "completed",
+      "progressPercentage": 100,
+      "submissionNotes": "Full CRUD REST API endpoints implemented with validation and JWT auth headers.",
+      "submissionLink": "https://github.com/novatech-demo/api-feature",
+      "submittedAt": "2026-10-10T05:39:58.424Z",
+      "reviewedBy": "6ad84ca86290547dddae892c",
+      "reviewedAt": "2026-10-11T05:39:58.424Z",
+      "reviewerFeedback": "Solid RESTful design, proper HTTP status codes, and thorough error handling.",
+      "history": [
+        {
+          "action": "TASK_CREATED",
+          "changedBy": "6ad84ca86290547dddae892c",
+          "changedByName": "Demo Mentor",
+          "timestamp": "2026-09-21T05:39:58.424Z",
+          "status": "todo",
+          "note": "Task initially created."
+        },
+        {
+          "action": "TASK_REVIEWED",
+          "changedBy": "6ad84ca86290547dddae892c",
+          "changedByName": "Demo Mentor",
+          "timestamp": "2026-10-11T05:39:58.424Z",
+          "status": "completed",
+          "note": "Approved by mentor."
+        }
+      ],
+      "createdAt": "2026-10-21T05:39:58.512Z",
+      "updatedAt": "2026-10-21T05:39:58.512Z",
+      "__v": 0
+    },
+    {
+      "_id": "6ad8502e2413deba3cf8bd6f",
+      "title": "Submit the final project and documentation",
+      "description": "Package the application code, provide an architecture README, and submit live deploy link.",
+      "allocation": "6ad8502e2413deba3cf8bd63",
+      "internship": "6ad8502e2413deba3cf8bd61",
+      "assignedTo": "6ad84ca86290547dddae8932",
+      "assignedBy": "6ad84ca86290547dddae892c",
+      "dueDate": "2026-10-21T05:39:58.424Z",
+      "priority": "medium",
+      "status": "in_progress",
+      "progressPercentage": 85,
+      "submissionNotes": "Final full-stack app bundle prepared with comprehensive README architecture diagram.",
+      "submissionLink": "https://github.com/novatech-demo/final-showcase",
+      "submittedAt": null,
+      "reviewedBy": null,
+      "reviewedAt": null,
+      "reviewerFeedback": "",
+      "history": [
+        {
+          "action": "TASK_CREATED",
+          "changedBy": "6ad84ca86290547dddae892c",
+          "changedByName": "Demo Mentor",
+          "timestamp": "2026-09-21T05:39:58.424Z",
+          "status": "todo",
+          "note": "Task initially created."
+        }
+      ],
+      "createdAt": "2026-10-21T05:39:58.554Z",
+      "updatedAt": "2026-10-21T05:39:58.554Z",
+      "__v": 0
+    },
+    {
+      "_id": "6ad88469acb8f0575e4e0ec9",
+      "title": "Responsive UI Architecture & Design System",
+      "description": "Implement dark/light mode responsive design components with modern UX standards.",
+      "allocation": "6ad88469acb8f0575e4e0ec4",
+      "internship": "6ad84cd2b65dbf1ddd01ae8f",
+      "assignedTo": "6ad84ca86290547dddae8932",
+      "assignedBy": "6ad6371dd240a82da5aa77a2",
+      "dueDate": "2026-05-21T00:00:00.000Z",
+      "priority": "medium",
+      "status": "completed",
+      "progressPercentage": 100,
+      "submissionNotes": "All Figma design specs implemented and responsive across mobile and desktop.",
+      "submissionLink": "https://github.com/sims-demo/frontend-showcase",
+      "submittedAt": "2026-05-20T00:00:00.000Z",
+      "reviewedBy": "6ad6371dd240a82da5aa77a2",
+      "reviewedAt": "2026-10-21T09:52:52.989Z",
+      "reviewerFeedback": "Great work",
+      "history": [
+        {
+          "action": "TASK_REVIEWED",
+          "changedBy": "6ad6371dd240a82da5aa77a2",
+          "changedByName": "Jaya",
+          "timestamp": "2026-10-21T09:52:52.989Z",
+          "status": "completed",
+          "note": "Great work"
+        }
+      ],
+      "createdAt": "2026-10-21T09:22:49.602Z",
+      "updatedAt": "2026-10-21T09:52:52.991Z",
+      "__v": 1
+    },
+    {
+      "_id": "6ad88469acb8f0575e4e0eca",
+      "title": "RESTful API & OAuth2 Authentication Service",
+      "description": "Develop secure JWT and session management with unit tests.",
+      "allocation": "6ad88469acb8f0575e4e0ec4",
+      "internship": "6ad84cd2b65dbf1ddd01ae8f",
+      "assignedTo": "6ad84ca86290547dddae8932",
+      "assignedBy": "6ad6371dd240a82da5aa77a2",
+      "dueDate": "2026-06-20T00:00:00.000Z",
+      "priority": "medium",
+      "status": "completed",
+      "progressPercentage": 100,
+      "submissionNotes": "Full API suite with 95% unit test coverage and JWT refresh rotation.",
+      "submissionLink": "https://github.com/sims-demo/auth-api-suite",
+      "submittedAt": "2026-06-19T00:00:00.000Z",
+      "reviewedBy": "6ad6371dd240a82da5aa77a2",
+      "reviewedAt": "2026-06-20T00:00:00.000Z",
+      "reviewerFeedback": "Secure, clean code, with high test coverage.",
+      "history": [],
+      "createdAt": "2026-10-21T09:22:49.602Z",
+      "updatedAt": "2026-10-21T09:22:49.602Z",
+      "__v": 0
+    },
+    {
+      "_id": "6ad88469acb8f0575e4e0ecb",
+      "title": "System Deployment & Comprehensive Documentation",
+      "description": "Deploy production service, OpenAPI specifications, and final project demo video.",
+      "allocation": "6ad88469acb8f0575e4e0ec4",
+      "internship": "6ad84cd2b65dbf1ddd01ae8f",
+      "assignedTo": "6ad84ca86290547dddae8932",
+      "assignedBy": "6ad6371dd240a82da5aa77a2",
+      "dueDate": "2026-08-15T00:00:00.000Z",
+      "priority": "medium",
+      "status": "completed",
+      "progressPercentage": 100,
+      "submissionNotes": "Cloud deployment live, OpenAPI 3.0 docs published.",
+      "submissionLink": "https://github.com/sims-demo/final-deployment",
+      "submittedAt": "2026-08-13T00:00:00.000Z",
+      "reviewedBy": "6ad6371dd240a82da5aa77a2",
+      "reviewedAt": "2026-08-15T00:00:00.000Z",
+      "reviewerFeedback": "Ready for official completion and certificate issuance.",
+      "history": [],
+      "createdAt": "2026-10-21T09:22:49.602Z",
+      "updatedAt": "2026-10-21T09:22:49.602Z",
+      "__v": 0
+    }
+  ],
+  "notifications": [
+    {
+      "_id": "6ad88b75fdb4fd4aad97a5aa",
+      "eventKey": "task_reviewed:6ad88469acb8f0575e4e0ec9:completed",
+      "recipient": "6ad84ca86290547dddae8932",
+      "sender": "6ad6371dd240a82da5aa77a2",
+      "type": "task_feedback",
+      "title": "Task Review Completed",
+      "message": "Your task \"Responsive UI Architecture & Design System\" has been reviewed and marked as \"completed\".",
+      "link": "/tasks",
+      "isRead": false,
+      "readAt": null,
+      "metadata": {
+        "taskId": "6ad88469acb8f0575e4e0ec9",
+        "status": "completed"
+      },
+      "createdAt": "2026-10-21T09:52:53.056Z",
+      "updatedAt": "2026-10-21T09:52:53.056Z",
+      "__v": 0
+    }
+  ]
+}

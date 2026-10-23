@@ -5,7 +5,13 @@ import {
   createAndDispatchNotification,
   createAndDispatchBulkNotifications,
 } from '../services/notificationService.js';
+import {
+  addPushSubscription,
+  removePushSubscription,
+  sendPushNotification,
+} from '../services/pushNotificationService.js';
 import { emitNotificationReadToUser } from '../socket.js';
+import { env } from '../config/env.js';
 
 /**
  * Get current user's notifications with pagination and unread filtering
@@ -348,6 +354,119 @@ export const createAnnouncement = async (req, res, next) => {
         recipientCount: recipientIds.length,
         dispatchedCount: dispatched.length,
       },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Retrieve VAPID public key for Web Push subscription
+ */
+export const getVapidPublicKey = async (req, res, next) => {
+  try {
+    res.status(200).json({
+      success: true,
+      publicKey: env.VAPID_PUBLIC_KEY || '',
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Register or update browser Web Push subscription for authenticated user
+ */
+export const subscribePush = async (req, res, next) => {
+  try {
+    const { subscription } = req.body;
+    if (!subscription || !subscription.endpoint) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid subscription object: endpoint is required.',
+      });
+    }
+
+    await addPushSubscription(req.user.id, subscription);
+
+    res.status(200).json({
+      success: true,
+      message: 'Push subscription registered successfully.',
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Remove a browser Web Push subscription
+ */
+export const unsubscribePush = async (req, res, next) => {
+  try {
+    const { endpoint } = req.body;
+    if (!endpoint) {
+      return res.status(400).json({
+        success: false,
+        message: 'Endpoint is required to unsubscribe.',
+      });
+    }
+
+    await removePushSubscription(req.user.id, endpoint);
+
+    res.status(200).json({
+      success: true,
+      message: 'Push subscription removed successfully.',
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Dispatch an on-demand test desktop notification to authenticated user
+ */
+export const sendTestNotification = async (req, res, next) => {
+  try {
+    const testNotification = await createAndDispatchNotification({
+      recipientId: req.user.id,
+      senderId: req.user.id, // bypass self check by passing null in helper if needed
+      type: NOTIFICATION_TYPES.SYSTEM_ANNOUNCEMENT,
+      title: 'InternHub Desktop Notification Test',
+      message: 'Real-time desktop system alerts are active and working on your device!',
+      link: '/notifications',
+      metadata: { isTest: true },
+    });
+
+    // If self-check returned null, manually dispatch for test purposes
+    if (!testNotification) {
+      const manualDoc = {
+        _id: `test_${Date.now()}`,
+        recipient: req.user.id,
+        type: NOTIFICATION_TYPES.SYSTEM_ANNOUNCEMENT,
+        title: 'InternHub Desktop Notification Test',
+        message: 'Real-time desktop system alerts are active and working on your device!',
+        link: '/notifications',
+        isRead: false,
+        createdAt: new Date(),
+        metadata: { isTest: true },
+      };
+
+      // Emit via socket
+      const { emitNotificationToUser } = await import('../socket.js');
+      emitNotificationToUser(req.user.id, manualDoc);
+
+      // Emit via push
+      await sendPushNotification(req.user.id, {
+        title: manualDoc.title,
+        message: manualDoc.message,
+        link: manualDoc.link,
+        tag: `test_notification_${Date.now()}`,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Test desktop notification dispatched via Socket.IO and Web Push.',
     });
   } catch (err) {
     next(err);

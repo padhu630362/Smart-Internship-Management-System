@@ -903,4 +903,39 @@ describe('Phase 11: Full System Integration & Regression Testing Suite', () => {
       assert.ok(healthRes.body.data.uptimeSeconds >= 0);
     });
   });
+
+  after(async () => {
+    try {
+      if (fs.existsSync(testPdfPath)) fs.unlinkSync(testPdfPath);
+      if (fs.existsSync(testExePath)) fs.unlinkSync(testExePath);
+
+      if (createdAttendance?._id) await Attendance.deleteOne({ _id: createdAttendance._id });
+      if (createdTask?._id) await Task.deleteOne({ _id: createdTask._id });
+      if (createdAllocation?._id) await Allocation.deleteOne({ _id: createdAllocation._id });
+      if (createdApplication?._id) await Application.deleteOne({ _id: createdApplication._id });
+      if (createdOpportunity?._id) await Internship.deleteOne({ _id: createdOpportunity._id });
+      if (directConversation?._id) await Conversation.deleteOne({ _id: directConversation._id });
+      if (groupConversation?._id) await Conversation.deleteOne({ _id: groupConversation._id });
+
+      await Notification.deleteMany({
+        $or: [
+          { recipient: { $in: [adminUser?._id, coordinatorUser?._id, companyUser?._id, mentorUser?._id, student1User?._id, student2User?._id, outsiderUser?._id].filter(Boolean) } },
+          { sender: { $in: [adminUser?._id, coordinatorUser?._id, companyUser?._id, mentorUser?._id, student1User?._id, student2User?._id, outsiderUser?._id].filter(Boolean) } },
+        ],
+      });
+
+      await User.deleteMany({
+        $or: [
+          { _id: { $in: [adminUser?._id, coordinatorUser?._id, companyUser?._id, mentorUser?._id, student1User?._id, student2User?._id, outsiderUser?._id].filter(Boolean) } },
+          { email: { $regex: new RegExp(`_${timestamp}@`) } },
+        ],
+      });
+    } catch {
+      // Ignore cleanup error
+    } finally {
+      if (mongoose.connection.readyState !== 0) {
+        await mongoose.connection.close();
+      }
+    }
+  });
 });

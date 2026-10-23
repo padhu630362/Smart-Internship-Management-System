@@ -154,6 +154,9 @@ describe('Phase 8: Secure Real-Time Chat & Group Messaging Tests', () => {
       await Notification.deleteMany({
         recipient: { $in: [coordinatorUser?._id, student1User?._id, student2User?._id, outsiderUser?._id].filter(Boolean) },
       });
+      await User.deleteMany({
+        _id: { $in: [coordinatorUser?._id, student1User?._id, student2User?._id, outsiderUser?._id].filter(Boolean) },
+      });
       await mongoose.disconnect();
     } catch {}
 
@@ -534,6 +537,186 @@ describe('Phase 8: Secure Real-Time Chat & Group Messaging Tests', () => {
     assert.equal(reactRes3.status, 200);
     assert.equal(reactRes3.body.data.reactions.length, 1);
     assert.equal(reactRes3.body.data.reactions[0].emoji, '❤️');
+  });
+
+  
+  let uploadedFileKey = null;
+  let testMsgIdForEdit = null;
+  let testMsgIdForDelete = null;
+
+  it('TC-CHAT-16: Upload attachment & send message with file (PDF)', async () => {
+    const dummyPdf = Buffer.from('%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF');
+
+    const res = await request(app)
+      .post(`/api/chat/conversations/${directConversationId}/messages`)
+      .set('Authorization', `Bearer ${student1Token}`)
+      .field('content', 'Here is my internship verification document.')
+      .attach('file', dummyPdf, 'internship_verification.pdf');
+
+    assert.equal(res.status, 201);
+    assert.equal(res.body.success, true);
+    const msg = res.body.data.message;
+    assert.ok(msg.attachments && msg.attachments.length === 1);
+    assert.equal(msg.attachments[0].fileName, 'internship_verification.pdf');
+    assert.equal(msg.attachments[0].fileType, 'pdf');
+    assert.ok(msg.attachments[0].fileKey);
+    uploadedFileKey = msg.attachments[0].fileKey;
+    testMsgIdForEdit = msg._id;
+  });
+
+  it('TC-CHAT-17: Authenticated attachment streaming download', async () => {
+    assert.ok(uploadedFileKey, 'File key must be present from TC-CHAT-16');
+
+    const res = await request(app)
+      .get(`/api/chat/attachments/${uploadedFileKey}`)
+      .set('Authorization', `Bearer ${coordinatorToken}`);
+
+    assert.equal(res.status, 200);
+    assert.match(res.headers['content-type'], /pdf/i);
+  });
+
+  it('TC-CHAT-18: Security - Non-member cannot download attachment', async () => {
+    assert.ok(uploadedFileKey, 'File key must be present from TC-CHAT-16');
+
+    const res = await request(app)
+      .get(`/api/chat/attachments/${uploadedFileKey}`)
+      .set('Authorization', `Bearer ${outsiderToken}`);
+
+    assert.equal(res.status, 403);
+    assert.equal(res.body.success, false);
+    assert.match(res.body.message || res.body.error?.message, /access denied|not authorized/i);
+  });
+
+  it('TC-CHAT-19: Message editing by author', async () => {
+    assert.ok(testMsgIdForEdit, 'Message ID must be present');
+
+    const res = await request(app)
+      .patch(`/api/chat/messages/${testMsgIdForEdit}`)
+      .set('Authorization', `Bearer ${student1Token}`)
+      .send({ content: 'Updated: Document has been verified and signed.' });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.equal(res.body.data.message.content, 'Updated: Document has been verified and signed.');
+    assert.equal(res.body.data.message.isEdited, true);
+    assert.ok(res.body.data.message.editedAt);
+  });
+
+  it('TC-CHAT-20: Security - Non-author cannot edit someone else message', async () => {
+    assert.ok(testMsgIdForEdit, 'Message ID must be present');
+
+    const res = await request(app)
+      .patch(`/api/chat/messages/${testMsgIdForEdit}`)
+      .set('Authorization', `Bearer ${coordinatorToken}`)
+      .send({ content: 'Hacked message edit attempt' });
+
+    assert.equal(res.status, 403);
+    assert.equal(res.body.success, false);
+  });
+
+  it('TC-CHAT-21: Delete message for everyone', async () => {
+    const sendRes = await request(app)
+      .post(`/api/chat/conversations/${directConversationId}/messages`)
+      .set('Authorization', `Bearer ${student1Token}`)
+      .send({ content: 'Message to be retracted completely' });
+
+    assert.equal(sendRes.status, 201);
+    const msgId = sendRes.body.data.message._id;
+
+    const delRes = await request(app)
+      .delete(`/api/chat/messages/${msgId}`)
+      .set('Authorization', `Bearer ${student1Token}`)
+      .send({ mode: 'everyone' });
+
+    assert.equal(delRes.status, 200);
+    assert.equal(delRes.body.success, true);
+    assert.equal(delRes.body.data.mode, 'everyone');
+
+    const inDb = await Message.findById(msgId);
+    assert.equal(inDb.isDeleted, true);
+    assert.equal(inDb.content, 'This message was deleted');
+    assert.equal(inDb.attachments.length, 0);
+  });
+
+  it('TC-CHAT-22: Delete message for me only', async () => {
+    const sendRes = await request(app)
+      .post(`/api/chat/conversations/${directConversationId}/messages`)
+      .set('Authorization', `Bearer ${coordinatorToken}`)
+      .send({ content: 'Message to delete for me only' });
+
+    assert.equal(sendRes.status, 201);
+    const msgId = sendRes.body.data.message._id;
+
+    const delRes = await request(app)
+      .delete(`/api/chat/messages/${msgId}`)
+      .set('Authorization', `Bearer ${student1Token}`)
+      .send({ mode: 'me' });
+
+    assert.equal(delRes.status, 200);
+    assert.equal(delRes.body.data.mode, 'me');
+
+    const stuListRes = await request(app)
+      .get(`/api/chat/conversations/${directConversationId}/messages`)
+      .set('Authorization', `Bearer ${student1Token}`);
+
+    assert.equal(stuListRes.status, 200);
+    const stuMessages = stuListRes.body.data.messages;
+    assert.ok(!stuMessages.some((m) => m._id.toString() === msgId.toString()));
+
+    const coordListRes = await request(app)
+      .get(`/api/chat/conversations/${directConversationId}/messages`)
+      .set('Authorization', `Bearer ${coordinatorToken}`);
+
+    assert.equal(coordListRes.status, 200);
+    const coordMessages = coordListRes.body.data.messages;
+    assert.ok(coordMessages.some((m) => m._id.toString() === msgId.toString()));
+  });
+
+  it('TC-CHAT-23: Reply to message with parent reference', async () => {
+    const parentRes = await request(app)
+      .post(`/api/chat/conversations/${directConversationId}/messages`)
+      .set('Authorization', `Bearer ${coordinatorToken}`)
+      .send({ content: 'What is your current project status?' });
+
+    assert.equal(parentRes.status, 201);
+    const parentId = parentRes.body.data.message._id;
+
+    const replyRes = await request(app)
+      .post(`/api/chat/conversations/${directConversationId}/messages`)
+      .set('Authorization', `Bearer ${student1Token}`)
+      .send({
+        content: 'Milestone 2 is complete and all unit tests pass.',
+        replyTo: parentId,
+      });
+
+    assert.equal(replyRes.status, 201);
+    const replyMsg = replyRes.body.data.message;
+    assert.ok(replyMsg.replyTo);
+    assert.equal((replyMsg.replyTo._id || replyMsg.replyTo).toString(), parentId.toString());
+    testMsgIdForDelete = replyMsg._id;
+  });
+
+  it('TC-CHAT-24: Forward message to another conversation', async () => {
+    assert.ok(testMsgIdForDelete, 'Source message ID must exist');
+
+    const fwdRes = await request(app)
+      .post(`/api/chat/messages/${testMsgIdForDelete}/forward`)
+      .set('Authorization', `Bearer ${student1Token}`)
+      .send({ targetConversationIds: [groupConversationId] });
+
+    assert.equal(fwdRes.status, 201);
+    assert.equal(fwdRes.body.success, true);
+    assert.ok(fwdRes.body.data.forwardedMessages.length === 1);
+    assert.equal(
+      fwdRes.body.data.forwardedMessages[0].content,
+      'Milestone 2 is complete and all unit tests pass.'
+    );
+  });
+
+  it('TC-CHAT-25: Presence and last-seen tracking', async () => {
+    const userInDb = await User.findById(student1User._id);
+    assert.ok(userInDb.lastSeen);
+    assert.ok(userInDb.lastSeen instanceof Date);
   });
 
   after(async () => {

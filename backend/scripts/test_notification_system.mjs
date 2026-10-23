@@ -16,10 +16,10 @@ async function runTests() {
 
   // Find a real test student user
   const student = await User.findOne({ role: ROLES.STUDENT, email: 'padhu@sbit.com' });
-  const admin = await User.findOne({ role: ROLES.ADMIN, email: 'arshadtaiyab010@gmail.com' });
+  const admin = await User.findOne({ role: ROLES.ADMIN, email: 's.v.padmavathi2005@gmail.com' });
 
   if (!student || !admin) {
-    throw new Error('Test users padhu@sbit.com and arshadtaiyab010@gmail.com must exist.');
+    throw new Error('Test users padhu@sbit.com and s.v.padmavathi2005@gmail.com must exist.');
   }
 
   const testEventKey = `test_event_${Date.now()}`;

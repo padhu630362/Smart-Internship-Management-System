@@ -26,7 +26,7 @@ export const TopNavbar = ({ onToggleSidebar, healthStatus, onOpenLogin }) => {
 
   return (
     <header className="sticky top-0 z-30 surface-panel border-b border-slate-200/90 dark:border-slate-800/80 h-16 transition-colors">
-      <div className="h-full px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
+      <div className="h-full px-3.5 sm:px-6 lg:px-8 flex items-center justify-between gap-2.5 sm:gap-4">
         {/* Left Section: Mobile Menu Button & Title */}
         <div className="flex items-center gap-3">
           <button

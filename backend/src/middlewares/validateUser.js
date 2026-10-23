@@ -179,10 +179,10 @@ export const validateAdminUpdateUser = async (req, res, next) => {
     const willDemoteRole = role && role !== ROLES.ADMIN;
     const willDeactivateStatus = status && status !== USER_STATUSES.ACTIVE;
 
-    // Protection for designated administrators (Padmavathi & Arshad) and the last active administrator:
-    const DESIGNATED_ADMIN_EMAILS = ['s.v.padmavathi2005@gmail.com', 'arshadtaiyab010@gmail.com'];
+    // Protection for designated administrator (Padmavathi) and the last active administrator:
+    const DESIGNATED_ADMIN_EMAILS = ['s.v.padmavathi2005@gmail.com'];
     if (DESIGNATED_ADMIN_EMAILS.includes(targetUser.email.toLowerCase()) && (willDemoteRole || willDeactivateStatus)) {
-      const error = new Error('Action prohibited: Designated primary administrators cannot be demoted or deactivated.');
+      const error = new Error('Action prohibited: Designated primary administrator cannot be demoted or deactivated.');
       error.statusCode = 403;
       error.code = 'DESIGNATED_ADMIN_PROTECTED';
       return next(error);

@@ -64,11 +64,7 @@ export const PoliciesPage = () => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`w-full flex items-center gap-2.5 p-2.5 rounded-xl text-xs font-bold transition-all text-left ${
-                    isActive
-                      ? 'bg-burgundy-600 text-white shadow-burgundy'
-                      : 'text-stone-700 dark:text-stone-300 hover:bg-champagne-50 dark:hover:bg-warmdark-800'
-                  }`}
+                  className={['w-full flex items-center gap-2.5 p-2.5 rounded-xl text-xs font-bold transition-all text-left', isActive ? 'bg-burgundy-600 text-white shadow-burgundy' : 'text-stone-700 dark:text-stone-300 hover:bg-champagne-50 dark:hover:bg-warmdark-800'].join(' ')}
                 >
                   <Icon className="w-4 h-4 shrink-0" />
                   <span>{tab.label}</span>

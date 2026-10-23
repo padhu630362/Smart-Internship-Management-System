@@ -2,7 +2,7 @@ import React from 'react';
 
 export const Table = ({ children, className = '' }) => {
   return (
-    <div className="w-full overflow-x-auto rounded-xl border border-slate-200/90 dark:border-slate-800/80 bg-white dark:bg-[#0d1424] shadow-xs">
+    <div className="w-full max-w-full overflow-x-auto rounded-xl border border-slate-200/90 dark:border-slate-800/80 bg-white dark:bg-[#0d1424] shadow-xs">
       <table className={`w-full text-left text-sm text-slate-700 dark:text-slate-300 border-collapse ${className}`}>
         {children}
       </table>
@@ -41,7 +41,7 @@ export const TableRow = ({ children, className = '', hoverable = true, onClick }
 
 export const TableHead = ({ children, className = '' }) => {
   return (
-    <th scope="col" className={`px-4 py-3 sm:px-6 font-semibold whitespace-nowrap ${className}`}>
+    <th scope="col" className={`px-3 py-2.5 sm:px-6 sm:py-3.5 font-semibold whitespace-nowrap text-xs ${className}`}>
       {children}
     </th>
   );
@@ -49,7 +49,7 @@ export const TableHead = ({ children, className = '' }) => {
 
 export const TableCell = ({ children, className = '' }) => {
   return (
-    <td className={`px-4 py-3 sm:px-6 whitespace-nowrap text-slate-700 dark:text-slate-200 ${className}`}>
+    <td className={`px-3 py-2.5 sm:px-6 sm:py-3.5 whitespace-nowrap text-slate-700 dark:text-slate-200 text-xs sm:text-sm ${className}`}>
       {children}
     </td>
   );

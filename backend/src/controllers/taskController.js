@@ -51,7 +51,7 @@ export const createTask = async (req, res, next) => {
       type: NOTIFICATION_TYPES.TASK_ASSIGNED,
       title: 'New Task Assigned',
       message: `You have been assigned: "${task.title}". Priority: ${priority}.`,
-      link: '/tasks',
+      link: '/my-tasks',
       eventKey: `task_assigned:${task._id}`,
       metadata: {
         taskId: task._id,
@@ -227,7 +227,7 @@ export const submitTaskProgress = async (req, res, next) => {
         type: NOTIFICATION_TYPES.TASK_FEEDBACK,
         title: 'Task Deliverable Submitted',
         message: `${req.user.name} submitted deliverables for task: "${task.title}".`,
-        link: '/tasks',
+        link: '/manage/tasks',
         eventKey: `task_submitted:${task._id}:${task.progressPercentage}`,
         metadata: {
           taskId: task._id,
@@ -285,7 +285,7 @@ export const reviewTask = async (req, res, next) => {
         type: NOTIFICATION_TYPES.TASK_FEEDBACK,
         title: 'Task Review Completed',
         message: `Your task "${task.title}" has been reviewed and marked as "${status}".`,
-        link: '/tasks',
+        link: '/my-tasks',
         eventKey: `task_reviewed:${task._id}:${status}`,
         metadata: {
           taskId: task._id,

@@ -1,0 +1,1127 @@
+[
+  {
+    "suite": "ai.test.js",
+    "index": 1,
+    "title": "AI-01: Deterministic matching algorithm accurately calculates overlap and missing skills"
+  },
+  {
+    "suite": "ai.test.js",
+    "index": 2,
+    "title": "AI-02: GET /api/internships/:id/match-score computes live student fit score"
+  },
+  {
+    "suite": "ai.test.js",
+    "index": 3,
+    "title": "AI-03: POST /api/applications/:id/analyze-resume performs on-demand candidate screening"
+  },
+  {
+    "suite": "applications.test.js",
+    "index": 1,
+    "title": "TC-APP-01: Student A should successfully apply to published internship before deadline"
+  },
+  {
+    "suite": "applications.test.js",
+    "index": 2,
+    "title": "TC-APP-02: Duplicate Prevention - Student A applying again to same internship is strictly rejected"
+  },
+  {
+    "suite": "applications.test.js",
+    "index": 3,
+    "title": "TC-APP-03: Deadline Rule - Student cannot apply to an opportunity after deadline has expired"
+  },
+  {
+    "suite": "applications.test.js",
+    "index": 4,
+    "title": "TC-APP-04: Published Check - Student cannot apply to unpublished draft opportunity"
+  },
+  {
+    "suite": "applications.test.js",
+    "index": 5,
+    "title": "TC-APP-05: Student A can retrieve their own application history"
+  },
+  {
+    "suite": "applications.test.js",
+    "index": 6,
+    "title": "TC-APP-06: Security - Student B cannot view or access Student A application details"
+  },
+  {
+    "suite": "applications.test.js",
+    "index": 7,
+    "title": "TC-APP-07: Company A can list applicants for its own opportunities"
+  },
+  {
+    "suite": "applications.test.js",
+    "index": 8,
+    "title": "TC-APP-08: Security - Company B cannot view or modify Company A applications (403 Forbidden)"
+  },
+  {
+    "suite": "applications.test.js",
+    "index": 9,
+    "title": "TC-APP-09: Company A transitions application: submitted -> under_review -> shortlisted -> interview"
+  },
+  {
+    "suite": "applications.test.js",
+    "index": 10,
+    "title": "TC-APP-10: Rejection Reason - Transitioning to rejected without reason is strictly blocked"
+  },
+  {
+    "suite": "applications.test.js",
+    "index": 11,
+    "title": "TC-APP-11: Audit Trail - Status changes are recorded sequentially with timestamps and actor"
+  },
+  {
+    "suite": "applications.test.js",
+    "index": 12,
+    "title": "TC-APP-12: Student Withdrawal & Self-Approval Prevention"
+  },
+  {
+    "suite": "auth.test.js",
+    "index": 1,
+    "title": "TC-AUTH-01: Should successfully register a new student account"
+  },
+  {
+    "suite": "auth.test.js",
+    "index": 2,
+    "title": "TC-AUTH-02: Should successfully register a new company account"
+  },
+  {
+    "suite": "auth.test.js",
+    "index": 3,
+    "title": "TC-AUTH-03: Security - Should strictly block self-registration as Admin (403 Forbidden)"
+  },
+  {
+    "suite": "auth.test.js",
+    "index": 4,
+    "title": "TC-AUTH-04: Security - Should strictly block self-registration as Coordinator (403 Forbidden)"
+  },
+  {
+    "suite": "auth.test.js",
+    "index": 5,
+    "title": "TC-AUTH-05: Should reject duplicate email registration (409 Conflict)"
+  },
+  {
+    "suite": "auth.test.js",
+    "index": 6,
+    "title": "TC-AUTH-05B: Should reject duplicate email registration even with uppercase and leading/trailing whitespace (409 Conflict)"
+  },
+  {
+    "suite": "auth.test.js",
+    "index": 7,
+    "title": "TC-AUTH-06: Should reject registration with weak password (400 Bad Request)"
+  },
+  {
+    "suite": "auth.test.js",
+    "index": 8,
+    "title": "TC-AUTH-07: Should successfully login with valid credentials and return JWT"
+  },
+  {
+    "suite": "auth.test.js",
+    "index": 9,
+    "title": "TC-AUTH-08: Should reject login with invalid password (401 Unauthorized)"
+  },
+  {
+    "suite": "auth.test.js",
+    "index": 10,
+    "title": "TC-AUTH-09: Should reject protected /api/auth/me request without token (401 Unauthorized)"
+  },
+  {
+    "suite": "auth.test.js",
+    "index": 11,
+    "title": "TC-AUTH-10: Should reject protected request with tampered/invalid token (401 Unauthorized)"
+  },
+  {
+    "suite": "auth.test.js",
+    "index": 12,
+    "title": "TC-AUTH-11: Should allow protected /api/auth/me request with valid token"
+  },
+  {
+    "suite": "auth.test.js",
+    "index": 13,
+    "title": "TC-AUTH-12: RBAC - Student should access student-only endpoint (200 OK)"
+  },
+  {
+    "suite": "auth.test.js",
+    "index": 14,
+    "title": "TC-AUTH-13: RBAC - Student accessing admin-only endpoint should be denied (403 Forbidden)"
+  },
+  {
+    "suite": "auth.test.js",
+    "index": 15,
+    "title": "TC-AUTH-14: RBAC - Company accessing company-only endpoint should succeed (200 OK)"
+  },
+  {
+    "suite": "auth.test.js",
+    "index": 16,
+    "title": "TC-AUTH-15: Password Reset Flow - Forgot password and reset with verification token"
+  },
+  {
+    "suite": "auth.test.js",
+    "index": 17,
+    "title": "TC-AUTH-16: Google Sign-In - Should auto-register a new student via Google credential"
+  },
+  {
+    "suite": "auth.test.js",
+    "index": 18,
+    "title": "TC-AUTH-17: Google Sign-In - Should authenticate existing user and preserve role"
+  },
+  {
+    "suite": "auth.test.js",
+    "index": 19,
+    "title": "TC-AUTH-18: Security - Should reject Google Sign-In without credential token (400)"
+  },
+  {
+    "suite": "auth_sessions_2fa.test.js",
+    "index": 1,
+    "title": "TC-SESS-01: User can list active login sessions with device and browser metadata"
+  },
+  {
+    "suite": "auth_sessions_2fa.test.js",
+    "index": 2,
+    "title": "TC-SESS-02: User can selectively revoke a specific active session"
+  },
+  {
+    "suite": "auth_sessions_2fa.test.js",
+    "index": 3,
+    "title": "TC-SESS-03: User can revoke all other sessions at once"
+  },
+  {
+    "suite": "auth_sessions_2fa.test.js",
+    "index": 4,
+    "title": "TC-SESS-04: Authenticated API responses include Cache-Control no-store headers"
+  },
+  {
+    "suite": "auth_sessions_2fa.test.js",
+    "index": 5,
+    "title": "TC-SESS-05: Request with expired token signature returns 401 TOKEN_EXPIRED"
+  },
+  {
+    "suite": "auth_sessions_2fa.test.js",
+    "index": 6,
+    "title": "TC-SESS-06: Request with malformed or tampered token returns 401 INVALID_TOKEN"
+  },
+  {
+    "suite": "auth_sessions_2fa.test.js",
+    "index": 7,
+    "title": "TC-SESS-07: Request with missing Bearer token returns 401 UNAUTHORIZED"
+  },
+  {
+    "suite": "auth_sessions_2fa.test.js",
+    "index": 8,
+    "title": "TC-2FA-01: Initial 2FA status is disabled"
+  },
+  {
+    "suite": "auth_sessions_2fa.test.js",
+    "index": 9,
+    "title": "TC-2FA-02: Requesting 2FA activation generates OTP and enforces verification"
+  },
+  {
+    "suite": "auth_sessions_2fa.test.js",
+    "index": 10,
+    "title": "TC-2FA-03: Login with 2FA enabled returns OTP challenge requiring verification"
+  },
+  {
+    "suite": "auth_sessions_2fa.test.js",
+    "index": 11,
+    "title": "TC-2FA-04: User can disable 2FA with valid password confirmation"
+  },
+  {
+    "suite": "auth_sessions_2fa.test.js",
+    "index": 12,
+    "title": "TC-RBAC-01: Unauthenticated request to protected endpoints is rejected with 401"
+  },
+  {
+    "suite": "auth_sessions_2fa.test.js",
+    "index": 13,
+    "title": "TC-RBAC-02: Student is forbidden from accessing Admin-only routes (403)"
+  },
+  {
+    "suite": "auth_sessions_2fa.test.js",
+    "index": 14,
+    "title": "TC-RBAC-03: Student is forbidden from creating internships (Company-only, 403)"
+  },
+  {
+    "suite": "auth_sessions_2fa.test.js",
+    "index": 15,
+    "title": "TC-RBAC-04: Logout invalidates the active session immediately"
+  },
+  {
+    "suite": "certificates.test.js",
+    "index": 1,
+    "title": "CERT-01: Should issue authentic Certificate with verified dates and generate valid PDF buffer"
+  },
+  {
+    "suite": "certificates.test.js",
+    "index": 2,
+    "title": "CERT-02: Should strictly reject issuance when verified start or end date is missing or invalid"
+  },
+  {
+    "suite": "certificates.test.js",
+    "index": 3,
+    "title": "CERT-03: Repeated issuance request should safely reuse existing certificate without duplicating records"
+  },
+  {
+    "suite": "certificates.test.js",
+    "index": 4,
+    "title": "CERT-04: Student role should be forbidden (403) from calling certificate issuance endpoint"
+  },
+  {
+    "suite": "certificates.test.js",
+    "index": 5,
+    "title": "CERT-05: Student role should be forbidden (403) from calling email resend endpoint"
+  },
+  {
+    "suite": "certificates.test.js",
+    "index": 6,
+    "title": "CERT-06: Authorized mentor/admin can issue certificate and trigger tracked email delivery"
+  },
+  {
+    "suite": "certificates.test.js",
+    "index": 7,
+    "title": "CERT-07: Explicit email resend endpoint by authorized admin dispatches tracked delivery"
+  },
+  {
+    "suite": "certificates.test.js",
+    "index": 8,
+    "title": "CERT-08: GET /api/certificates/my should retrieve student awarded certificates"
+  },
+  {
+    "suite": "certificates.test.js",
+    "index": 9,
+    "title": "CERT-09: GET /api/certificates/verify/:code publicly validates credential and dates without exposing student email/ID"
+  },
+  {
+    "suite": "certificates.test.js",
+    "index": 10,
+    "title": "CERT-10: GET /api/certificates/verify/:code returns invalid envelope for fake credentials"
+  },
+  {
+    "suite": "certificates.test.js",
+    "index": 11,
+    "title": "CERT-11: GET /api/certificates/:id/download dynamically streams PDF certificate"
+  },
+  {
+    "suite": "certificates.test.js",
+    "index": 12,
+    "title": "CERT-12: PATCH /api/allocations/:id/status completed with missing dates should be blocked with 400"
+  },
+  {
+    "suite": "certificates.test.js",
+    "index": 13,
+    "title": "CERT-13: PATCH /api/allocations/:id/status completed triggers certificate generation and email delivery"
+  },
+  {
+    "suite": "chat.test.js",
+    "index": 1,
+    "title": "TC-CHAT-01: Direct conversation creation and idempotency check"
+  },
+  {
+    "suite": "chat.test.js",
+    "index": 2,
+    "title": "TC-CHAT-02: Message persistence in MongoDB"
+  },
+  {
+    "suite": "chat.test.js",
+    "index": 3,
+    "title": "TC-CHAT-03: Security - Non-member cannot access conversation details"
+  },
+  {
+    "suite": "chat.test.js",
+    "index": 4,
+    "title": "TC-CHAT-04: Security - Non-member cannot read conversation messages"
+  },
+  {
+    "suite": "chat.test.js",
+    "index": 5,
+    "title": "TC-CHAT-05: Security - Non-member cannot send messages to conversation"
+  },
+  {
+    "suite": "chat.test.js",
+    "index": 6,
+    "title": "TC-CHAT-06: Security - Students cannot create group conversations"
+  },
+  {
+    "suite": "chat.test.js",
+    "index": 7,
+    "title": "TC-CHAT-07: Coordinator can create group conversation"
+  },
+  {
+    "suite": "chat.test.js",
+    "index": 8,
+    "title": "TC-CHAT-08: Group admin can manage members (add and remove)"
+  },
+  {
+    "suite": "chat.test.js",
+    "index": 9,
+    "title": "TC-CHAT-09: Real-time Socket.IO delivery of direct and group chat messages"
+  },
+  {
+    "suite": "chat.test.js",
+    "index": 10,
+    "title": "TC-CHAT-10: Socket membership check rejects unauthorized socket room join"
+  },
+  {
+    "suite": "chat.test.js",
+    "index": 11,
+    "title": "TC-CHAT-11: Validation - Empty, whitespace, or oversized messages rejected"
+  },
+  {
+    "suite": "chat.test.js",
+    "index": 12,
+    "title": "TC-CHAT-12: Read receipt updates unread counter and emits socket event"
+  },
+  {
+    "suite": "chat.test.js",
+    "index": 13,
+    "title": "TC-CHAT-13: Contacts and online users endpoints return accurate data"
+  },
+  {
+    "suite": "chat.test.js",
+    "index": 14,
+    "title": "TC-CHAT-14: Rate limiting triggers 429 when flood threshold is exceeded"
+  },
+  {
+    "suite": "chat.test.js",
+    "index": 15,
+    "title": "TC-CHAT-15: Message emoji reactions toggle on and off properly"
+  },
+  {
+    "suite": "chat.test.js",
+    "index": 16,
+    "title": "TC-CHAT-16: Upload attachment & send message with file (PDF)"
+  },
+  {
+    "suite": "chat.test.js",
+    "index": 17,
+    "title": "TC-CHAT-17: Authenticated attachment streaming download"
+  },
+  {
+    "suite": "chat.test.js",
+    "index": 18,
+    "title": "TC-CHAT-18: Security - Non-member cannot download attachment"
+  },
+  {
+    "suite": "chat.test.js",
+    "index": 19,
+    "title": "TC-CHAT-19: Message editing by author"
+  },
+  {
+    "suite": "chat.test.js",
+    "index": 20,
+    "title": "TC-CHAT-20: Security - Non-author cannot edit someone else message"
+  },
+  {
+    "suite": "chat.test.js",
+    "index": 21,
+    "title": "TC-CHAT-21: Delete message for everyone"
+  },
+  {
+    "suite": "chat.test.js",
+    "index": 22,
+    "title": "TC-CHAT-22: Delete message for me only"
+  },
+  {
+    "suite": "chat.test.js",
+    "index": 23,
+    "title": "TC-CHAT-23: Reply to message with parent reference"
+  },
+  {
+    "suite": "chat.test.js",
+    "index": 24,
+    "title": "TC-CHAT-24: Forward message to another conversation"
+  },
+  {
+    "suite": "chat.test.js",
+    "index": 25,
+    "title": "TC-CHAT-25: Presence and last-seen tracking"
+  },
+  {
+    "suite": "desktop_notifications.test.js",
+    "index": 1,
+    "title": "TC-DESK-01: VAPID public key endpoint returns configured key"
+  },
+  {
+    "suite": "desktop_notifications.test.js",
+    "index": 2,
+    "title": "TC-DESK-02: Register browser Web Push subscription for authenticated user"
+  },
+  {
+    "suite": "desktop_notifications.test.js",
+    "index": 3,
+    "title": "TC-DESK-03: Remove browser Web Push subscription on unsubscribe"
+  },
+  {
+    "suite": "desktop_notifications.test.js",
+    "index": 4,
+    "title": "TC-DESK-04: Test desktop notification endpoint triggers real-time socket delivery"
+  },
+  {
+    "suite": "desktop_notifications.test.js",
+    "index": 5,
+    "title": "TC-DESK-05: Authenticated isolation - user does not receive another user notifications"
+  },
+  {
+    "suite": "externalJobs.test.js",
+    "index": 1,
+    "title": "TC-EXT-01: Publicly query external jobs with filtering and pagination"
+  },
+  {
+    "suite": "externalJobs.test.js",
+    "index": 2,
+    "title": "TC-EXT-02: Compliant official LinkedIn search links generated with proper encoding"
+  },
+  {
+    "suite": "externalJobs.test.js",
+    "index": 3,
+    "title": "TC-EXT-03: Displays verified provider source attribution for each opportunity"
+  },
+  {
+    "suite": "externalJobs.test.js",
+    "index": 4,
+    "title": "TC-EXT-04: AI Fit matching calculates accurate scores and structured rationale"
+  },
+  {
+    "suite": "externalJobs.test.js",
+    "index": 5,
+    "title": "TC-EXT-05: Authenticated student can bookmark and unbookmark an external job"
+  },
+  {
+    "suite": "externalJobs.test.js",
+    "index": 6,
+    "title": "TC-EXT-06: Authenticated student can mark job as applied and record notes"
+  },
+  {
+    "suite": "externalJobs.test.js",
+    "index": 7,
+    "title": "TC-EXT-07: Student can retrieve their bookmarked and applied job interactions"
+  },
+  {
+    "suite": "externalJobs.test.js",
+    "index": 8,
+    "title": "TC-EXT-08: Job feed deduplication prevents duplicate records by canonical URL or externalId"
+  },
+  {
+    "suite": "externalJobs.test.js",
+    "index": 9,
+    "title": "TC-EXT-09: Real-time Job Alert dispatches via Socket.IO and persists in Notifications"
+  },
+  {
+    "suite": "externalJobs.test.js",
+    "index": 10,
+    "title": "TC-EXT-10: Student can clear all notifications via DELETE /api/notifications"
+  },
+  {
+    "suite": "externalJobs.test.js",
+    "index": 11,
+    "title": "TC-EXT-11: Security - Anonymous and Non-Student users cannot bookmark jobs"
+  },
+  {
+    "suite": "health.test.js",
+    "index": 1,
+    "title": "GET /api should return API root metadata"
+  },
+  {
+    "suite": "health.test.js",
+    "index": 2,
+    "title": "GET /api/health should return 200 and healthy status envelope immediately"
+  },
+  {
+    "suite": "health.test.js",
+    "index": 3,
+    "title": "GET /api/health/db should separately check database connection status with timeout"
+  },
+  {
+    "suite": "health.test.js",
+    "index": 4,
+    "title": "GET /api/unknown-endpoint should return 404 with standardized error envelope"
+  },
+  {
+    "suite": "internships.test.js",
+    "index": 1,
+    "title": "TC-INT-01: Company A should successfully create a new internship opportunity in draft state"
+  },
+  {
+    "suite": "internships.test.js",
+    "index": 2,
+    "title": "TC-INT-02: Company A should create and publish an internship opportunity"
+  },
+  {
+    "suite": "internships.test.js",
+    "index": 3,
+    "title": "TC-INT-03: Validation - Should reject opportunity with past application deadline"
+  },
+  {
+    "suite": "internships.test.js",
+    "index": 4,
+    "title": "TC-INT-04: Validation - Should reject opportunity with invalid or zero openings"
+  },
+  {
+    "suite": "internships.test.js",
+    "index": 5,
+    "title": "TC-INT-05: Students can browse published opportunities in public directory"
+  },
+  {
+    "suite": "internships.test.js",
+    "index": 6,
+    "title": "TC-INT-06: Security - Students cannot access unpublished draft opportunities"
+  },
+  {
+    "suite": "internships.test.js",
+    "index": 7,
+    "title": "TC-INT-07: Company A can list all its own opportunities (drafts + published) in management console"
+  },
+  {
+    "suite": "internships.test.js",
+    "index": 8,
+    "title": "TC-INT-08: Security - Company B cannot edit or delete Company A opportunity (403 Forbidden)"
+  },
+  {
+    "suite": "internships.test.js",
+    "index": 9,
+    "title": "TC-INT-09: Company A can transition opportunity status through its lifecycle"
+  },
+  {
+    "suite": "internships.test.js",
+    "index": 10,
+    "title": "TC-INT-10: Coordinator can edit and manage any company opportunity"
+  },
+  {
+    "suite": "internships.test.js",
+    "index": 11,
+    "title": "TC-INT-11: Public search and filter queries work accurately"
+  },
+  {
+    "suite": "mentor_certificate_workflow.test.js",
+    "index": 1,
+    "title": "TC-MCERT-01: Candidate can query completion eligibility metrics for their allocation"
+  },
+  {
+    "suite": "mentor_certificate_workflow.test.js",
+    "index": 2,
+    "title": "TC-MCERT-02: Student cannot request completion if mandatory tasks are incomplete (400 REQUIREMENTS_NOT_MET)"
+  },
+  {
+    "suite": "mentor_certificate_workflow.test.js",
+    "index": 3,
+    "title": "TC-MCERT-03: Security - Student cannot request completion on another student allocation (403 Forbidden)"
+  },
+  {
+    "suite": "mentor_certificate_workflow.test.js",
+    "index": 4,
+    "title": "TC-MCERT-04: Student successfully submits completion request with preferred delivery email after tasks approved"
+  },
+  {
+    "suite": "mentor_certificate_workflow.test.js",
+    "index": 5,
+    "title": "TC-MCERT-05: Security - Unauthorized mentor cannot review completion request (403 Forbidden)"
+  },
+  {
+    "suite": "mentor_certificate_workflow.test.js",
+    "index": 6,
+    "title": "TC-MCERT-06: Assigned mentor reviews and approves completion request"
+  },
+  {
+    "suite": "mentor_certificate_workflow.test.js",
+    "index": 7,
+    "title": "TC-MCERT-07: Mentor can preview certificate layout and recipient before official issuance"
+  },
+  {
+    "suite": "mentor_certificate_workflow.test.js",
+    "index": 8,
+    "title": "TC-MCERT-08: Security - Student cannot issue their own certificate (403 Forbidden)"
+  },
+  {
+    "suite": "mentor_certificate_workflow.test.js",
+    "index": 9,
+    "title": "TC-MCERT-09: Mentor officially issues certificate with preferred delivery email"
+  },
+  {
+    "suite": "mentor_certificate_workflow.test.js",
+    "index": 10,
+    "title": "TC-MCERT-10: Idempotency guard - Re-issuing for the same allocation returns existing certificate without duplicates"
+  },
+  {
+    "suite": "mentor_certificate_workflow.test.js",
+    "index": 11,
+    "title": "TC-MCERT-11: Public credential verification endpoint validates issued certificate and returns sanitized data"
+  },
+  {
+    "suite": "mentor_certificate_workflow.test.js",
+    "index": 12,
+    "title": "TC-MCERT-12: Admin audit dashboard endpoint /api/certificates/admin/audit computes summary KPIs and filters"
+  },
+  {
+    "suite": "mentor_certificate_workflow.test.js",
+    "index": 13,
+    "title": "TC-MCERT-13: Admin mentor stats endpoint /api/certificates/admin/mentor-stats returns mentor issuance counts"
+  },
+  {
+    "suite": "mentor_certificate_workflow.test.js",
+    "index": 14,
+    "title": "TC-MCERT-14: Admin endpoint /api/certificates/admin/seed-demo seeds NovaTech Demo Labs workflow with 3 tasks"
+  },
+  {
+    "suite": "notifications.test.js",
+    "index": 1,
+    "title": "TC-NOTIF-01: Socket authentication rejects connection without token"
+  },
+  {
+    "suite": "notifications.test.js",
+    "index": 2,
+    "title": "TC-NOTIF-02: Socket authentication rejects invalid or corrupted token"
+  },
+  {
+    "suite": "notifications.test.js",
+    "index": 3,
+    "title": "TC-NOTIF-03: Socket authentication succeeds for valid active users and responds to ping"
+  },
+  {
+    "suite": "notifications.test.js",
+    "index": 4,
+    "title": "TC-NOTIF-04: REST endpoint returns empty notification list initially"
+  },
+  {
+    "suite": "notifications.test.js",
+    "index": 5,
+    "title": "TC-NOTIF-05: Real-time trigger: Student applies -> Company receives live notification"
+  },
+  {
+    "suite": "notifications.test.js",
+    "index": 6,
+    "title": "TC-NOTIF-06: Real-time trigger: Company updates status -> Student receives live notification"
+  },
+  {
+    "suite": "notifications.test.js",
+    "index": 7,
+    "title": "TC-NOTIF-07: Room isolation: Student notification is NOT received by company socket"
+  },
+  {
+    "suite": "notifications.test.js",
+    "index": 8,
+    "title": "TC-NOTIF-08: REST endpoint: Mark single notification as read decrements unread count"
+  },
+  {
+    "suite": "notifications.test.js",
+    "index": 9,
+    "title": "TC-NOTIF-09: REST endpoint: Mark all notifications as read"
+  },
+  {
+    "suite": "notifications.test.js",
+    "index": 10,
+    "title": "TC-NOTIF-10: Security: User cannot modify or delete another user notification"
+  },
+  {
+    "suite": "notifications.test.js",
+    "index": 11,
+    "title": "TC-NOTIF-11: Mentor/Admin announcement broadcasts to target students"
+  },
+  {
+    "suite": "notifications.test.js",
+    "index": 12,
+    "title": "TC-NOTIF-12: REST endpoint: Delete notification cleanly updates collection"
+  },
+  {
+    "suite": "phase10.test.js",
+    "index": 1,
+    "title": "TC-PH10-01: Login rejected with 403 when account is deactivated (status: inactive)"
+  },
+  {
+    "suite": "phase10.test.js",
+    "index": 2,
+    "title": "TC-PH10-02: Authenticated request rejected with 403 when token belongs to deactivated user"
+  },
+  {
+    "suite": "phase10.test.js",
+    "index": 3,
+    "title": "TC-PH10-03: Password reset revokes prior active sessions (old token becomes invalid)"
+  },
+  {
+    "suite": "phase10.test.js",
+    "index": 4,
+    "title": "TC-PH10-04: sanitizeObject strips MongoDB operators ($gt, $ne) and prototype pollution keys"
+  },
+  {
+    "suite": "phase10.test.js",
+    "index": 5,
+    "title": "TC-PH10-05: Regex special characters in search parameters do not crash server"
+  },
+  {
+    "suite": "phase10.test.js",
+    "index": 6,
+    "title": "TC-PH10-06: escapeRegex safely escapes all special characters"
+  },
+  {
+    "suite": "phase10.test.js",
+    "index": 7,
+    "title": "TC-PH10-07: Student cannot download another student\\"
+  },
+  {
+    "suite": "phase10.test.js",
+    "index": 8,
+    "title": "TC-PH10-08: Student cannot override attendance query by passing other studentId"
+  },
+  {
+    "suite": "phase10.test.js",
+    "index": 9,
+    "title": "TC-PH10-09: Student cannot override task query by passing other student assignedTo ID"
+  },
+  {
+    "suite": "phase10.test.js",
+    "index": 10,
+    "title": "TC-PH10-10: Admin role change persists new role in MongoDB"
+  },
+  {
+    "suite": "phase10.test.js",
+    "index": 11,
+    "title": "TC-PH10-11: Attendance correction updates review status and attendance status in MongoDB"
+  },
+  {
+    "suite": "phase10.test.js",
+    "index": 12,
+    "title": "TC-PH10-12: Application decision updates application review status in MongoDB"
+  },
+  {
+    "suite": "phase10.test.js",
+    "index": 13,
+    "title": "TC-PH10-13: Audit logs endpoint is cleanly removed (returns 404)"
+  },
+  {
+    "suite": "phase10.test.js",
+    "index": 14,
+    "title": "TC-PH10-14: Rate limiter returns 429 when max requests exceeded with Retry-After header"
+  },
+  {
+    "suite": "phase10.test.js",
+    "index": 15,
+    "title": "TC-PH10-15: redactSensitive masks passwords, tokens, and authorization secrets"
+  },
+  {
+    "suite": "phase11.test.js",
+    "index": 1,
+    "title": "WF-01: Admin logs in and performs user governance"
+  },
+  {
+    "suite": "phase11.test.js",
+    "index": 2,
+    "title": "WF-02: Coordinator creates and publishes an internship opportunity"
+  },
+  {
+    "suite": "phase11.test.js",
+    "index": 3,
+    "title": "WF-03: Student completes profile with resume and submits application"
+  },
+  {
+    "suite": "phase11.test.js",
+    "index": 4,
+    "title": "WF-04: Company and coordinator review and advance application to selected"
+  },
+  {
+    "suite": "phase11.test.js",
+    "index": 5,
+    "title": "WF-05: Student is allocated to internship with conflict prevention"
+  },
+  {
+    "suite": "phase11.test.js",
+    "index": 6,
+    "title": "WF-06: Mentor assigns task, intern submits progress, mentor completes review"
+  },
+  {
+    "suite": "phase11.test.js",
+    "index": 7,
+    "title": "WF-07: Intern logs daily attendance and supervisor approves record"
+  },
+  {
+    "suite": "phase11.test.js",
+    "index": 8,
+    "title": "WF-08: In-app notifications are persisted, counted, and marked read"
+  },
+  {
+    "suite": "phase11.test.js",
+    "index": 9,
+    "title": "WF-09: Real-time chat direct and group messaging with membership security"
+  },
+  {
+    "suite": "phase11.test.js",
+    "index": 10,
+    "title": "WF-10: Evaluations, analytics dashboards, and institutional reports reflect live data"
+  },
+  {
+    "suite": "phase11.test.js",
+    "index": 11,
+    "title": "NEG-01: Authentication fails on invalid password and non-existent account"
+  },
+  {
+    "suite": "phase11.test.js",
+    "index": 12,
+    "title": "NEG-02: Deactivated or suspended account is strictly blocked from login and API access"
+  },
+  {
+    "suite": "phase11.test.js",
+    "index": 13,
+    "title": "NEG-03: Protected endpoints reject requests with missing or corrupted tokens"
+  },
+  {
+    "suite": "phase11.test.js",
+    "index": 14,
+    "title": "NEG-04: Role & permission checks block unauthorized role operations"
+  },
+  {
+    "suite": "phase11.test.js",
+    "index": 15,
+    "title": "NEG-05: Company B cannot edit or delete Company A opportunity"
+  },
+  {
+    "suite": "phase11.test.js",
+    "index": 16,
+    "title": "NEG-06: Student cannot download another student resume (IDOR protection)"
+  },
+  {
+    "suite": "phase11.test.js",
+    "index": 17,
+    "title": "NEG-07: Duplicate application to the same internship opportunity is rejected"
+  },
+  {
+    "suite": "phase11.test.js",
+    "index": 18,
+    "title": "NEG-08: Duplicate attendance entry on same date is rejected"
+  },
+  {
+    "suite": "phase11.test.js",
+    "index": 19,
+    "title": "NEG-09: Invalid form data and deadline violations are rejected with 400"
+  },
+  {
+    "suite": "phase11.test.js",
+    "index": 20,
+    "title": "NEG-10: Empty search queries return graceful empty collections with pagination metadata"
+  },
+  {
+    "suite": "phase11.test.js",
+    "index": 21,
+    "title": "NEG-11: Health diagnostic endpoint reports live database connectivity and uptime"
+  },
+  {
+    "suite": "phase6.test.js",
+    "index": 1,
+    "title": "TC-ALC-01: Company A successfully allocates student to internship"
+  },
+  {
+    "suite": "phase6.test.js",
+    "index": 2,
+    "title": "TC-ALC-02: Conflict Prevention: Prevent conflicting concurrent active allocation for same student"
+  },
+  {
+    "suite": "phase6.test.js",
+    "index": 3,
+    "title": "TC-ALC-03: Security: Company B cannot allocate student to Company A opportunity"
+  },
+  {
+    "suite": "phase6.test.js",
+    "index": 4,
+    "title": "TC-ALC-04: Security: Student cannot allocate themselves or access allocation creation"
+  },
+  {
+    "suite": "phase6.test.js",
+    "index": 5,
+    "title": "TC-ALC-05: Allocation status update (active -> completed) with audit trail note"
+  },
+  {
+    "suite": "phase6.test.js",
+    "index": 6,
+    "title": "TC-ATT-01: Intern submits daily attendance with check-in/out and work summary"
+  },
+  {
+    "suite": "phase6.test.js",
+    "index": 7,
+    "title": "TC-ATT-02: Duplicate Prevention: Submitting attendance for same student and date returns 409"
+  },
+  {
+    "suite": "phase6.test.js",
+    "index": 8,
+    "title": "TC-ATT-03: Future Date Guard: Submitting attendance for tomorrow returns 400"
+  },
+  {
+    "suite": "phase6.test.js",
+    "index": 9,
+    "title": "TC-ATT-04: Mentor reviews and approves attendance"
+  },
+  {
+    "suite": "phase6.test.js",
+    "index": 10,
+    "title": "TC-ATT-05: Mentor corrects attendance status with mandatory audit reason"
+  },
+  {
+    "suite": "phase6.test.js",
+    "index": 11,
+    "title": "TC-ATT-06: Monthly attendance summary calculation returns accurate rates and counts"
+  },
+  {
+    "suite": "phase6.test.js",
+    "index": 12,
+    "title": "TC-TSK-01: Mentor creates and assigns task to intern with title, due date, priority"
+  },
+  {
+    "suite": "phase6.test.js",
+    "index": 13,
+    "title": "TC-TSK-02: Intern retrieves assigned tasks and checks overdue property"
+  },
+  {
+    "suite": "phase6.test.js",
+    "index": 14,
+    "title": "TC-TSK-03: Intern submits progress notes and deliverable link"
+  },
+  {
+    "suite": "phase6.test.js",
+    "index": 15,
+    "title": "TC-TSK-04: Mentor reviews task, marks completed, and records feedback"
+  },
+  {
+    "suite": "phase9.test.js",
+    "index": 1,
+    "title": "TC-PH9-01: Mentor submits mid-term evaluation with calculated average rating"
+  },
+  {
+    "suite": "phase9.test.js",
+    "index": 2,
+    "title": "TC-PH9-02: Duplicate mid-term evaluation on same allocation is rejected (409 Conflict)"
+  },
+  {
+    "suite": "phase9.test.js",
+    "index": 3,
+    "title": "TC-PH9-03: Security - Students cannot submit internship evaluations (403 Forbidden)"
+  },
+  {
+    "suite": "phase9.test.js",
+    "index": 4,
+    "title": "TC-PH9-04: Security - Student cannot view another student evaluation (403 Forbidden)"
+  },
+  {
+    "suite": "phase9.test.js",
+    "index": 5,
+    "title": "TC-PH9-05: Coordinator can submit final evaluation with recommendation"
+  },
+  {
+    "suite": "phase9.test.js",
+    "index": 6,
+    "title": "TC-PH9-06: Admin/Coordinator dashboard computes accurate aggregations from database"
+  },
+  {
+    "suite": "phase9.test.js",
+    "index": 7,
+    "title": "TC-PH9-07: Student dashboard computes personalized counts and upcoming deadlines"
+  },
+  {
+    "suite": "phase9.test.js",
+    "index": 8,
+    "title": "TC-PH9-08: Company dashboard returns scoped metrics for managed opportunities and interns"
+  },
+  {
+    "suite": "phase9.test.js",
+    "index": 9,
+    "title": "TC-PH9-09: Coordinator can query filtered reports by date range and type"
+  },
+  {
+    "suite": "phase9.test.js",
+    "index": 10,
+    "title": "TC-PH9-10: Security - Student cannot access institutional reports (403 Forbidden)"
+  },
+  {
+    "suite": "phase9.test.js",
+    "index": 11,
+    "title": "TC-PH9-11: Security - Student cannot export CSV reports (403 Forbidden)"
+  },
+  {
+    "suite": "phase9.test.js",
+    "index": 12,
+    "title": "TC-PH9-12: CSV Export generates sanitized CSV file with headers and zero leaked secrets"
+  },
+  {
+    "suite": "users.test.js",
+    "index": 1,
+    "title": "TC-PROF-01: Should allow user to view their own profile"
+  },
+  {
+    "suite": "users.test.js",
+    "index": 2,
+    "title": "TC-PROF-02: Should allow student to update permitted student profile fields"
+  },
+  {
+    "suite": "users.test.js",
+    "index": 3,
+    "title": "TC-PROF-03: Security - Should strictly block student from modifying role, status, or email directly"
+  },
+  {
+    "suite": "users.test.js",
+    "index": 4,
+    "title": "TC-PROF-04: Security - Should block student from injecting unauthorized employer or faculty details"
+  },
+  {
+    "suite": "users.test.js",
+    "index": 5,
+    "title": "TC-PROF-05: Validation - Should reject invalid profile data (invalid CGPA)"
+  },
+  {
+    "suite": "users.test.js",
+    "index": 6,
+    "title": "TC-PROF-06: Should allow student to upload valid PDF resume"
+  },
+  {
+    "suite": "users.test.js",
+    "index": 7,
+    "title": "TC-PROF-07: Security - Should reject executable file uploads (.exe)"
+  },
+  {
+    "suite": "users.test.js",
+    "index": 8,
+    "title": "TC-PROF-08: Should allow user to upload valid avatar picture (PNG/JPG)"
+  },
+  {
+    "suite": "users.test.js",
+    "index": 9,
+    "title": "TC-PROF-09: Security - Should reject executable file for avatar upload"
+  },
+  {
+    "suite": "users.test.js",
+    "index": 10,
+    "title": "TC-PROF-10: Should allow updating profile with avatarUrl preset or direct URL"
+  },
+  {
+    "suite": "users.test.js",
+    "index": 11,
+    "title": "TC-PROF-11: Should allow user to delete their avatar picture"
+  },
+  {
+    "suite": "users.test.js",
+    "index": 12,
+    "title": "TC-ADMIN-01: Security - Should deny non-admin access to user management endpoints"
+  },
+  {
+    "suite": "users.test.js",
+    "index": 13,
+    "title": "TC-ADMIN-02: Should allow admin to list users with pagination, search, and metrics"
+  },
+  {
+    "suite": "users.test.js",
+    "index": 14,
+    "title": "TC-ADMIN-03: Should allow admin to create a new user with elevated role (coordinator)"
+  },
+  {
+    "suite": "users.test.js",
+    "index": 15,
+    "title": "TC-ADMIN-03B: Should reject admin creating duplicate user with existing email (409 Conflict)"
+  },
+  {
+    "suite": "users.test.js",
+    "index": 16,
+    "title": "TC-ADMIN-04: Should allow admin to update a user status and role"
+  },
+  {
+    "suite": "users.test.js",
+    "index": 17,
+    "title": "TC-ADMIN-05: Safety Guard - Should prevent deactivating or demoting the last active administrator"
+  },
+  {
+    "suite": "users.test.js",
+    "index": 18,
+    "title": "TC-ADMIN-06: Safety Guard - Should allow demoting an admin when another active admin exists"
+  }
+]

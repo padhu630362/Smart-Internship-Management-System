@@ -101,7 +101,11 @@ apiClient.interceptors.response.use(
       reqUrl.includes('/auth/login') ||
       reqUrl.includes('/auth/register') ||
       reqUrl.includes('/auth/forgot-password') ||
-      reqUrl.includes('/auth/verify-reset-code');
+      reqUrl.includes('/auth/verify-reset-code') ||
+      reqUrl.includes('/auth/reset-password') ||
+      reqUrl.includes('/auth/login-verify-2fa') ||
+      reqUrl.includes('/auth/resend-2fa') ||
+      reqUrl.includes('/auth/google');
 
     const isSessionInvalid =
       !isAuthPublicEndpoint &&

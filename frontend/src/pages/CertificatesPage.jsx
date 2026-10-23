@@ -251,7 +251,7 @@ export const CertificatesPage = () => {
                     <div>
                       <span className="text-[10px] text-slate-400 block uppercase">Score</span>
                       <span className="font-bold text-slate-900 dark:text-white">
-                        {cert.finalRating ? `${cert.finalRating.toFixed(1)} / 5.0` : '4.5 / 5.0'}
+                        {(cert.finalRating ? cert.finalRating.toFixed(1) : '4.5') + ' / 5.0'}
                       </span>
                     </div>
                     <div>
@@ -271,10 +271,10 @@ export const CertificatesPage = () => {
                   {/* Verification Code Box */}
                   <div className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 flex items-center justify-between gap-2 text-xs">
                     <div className="min-w-0">
-                      <span className="text-[10px] text-slate-400 block uppercase tracking-wider">
+                      <span className="text-xs text-slate-400 block uppercase tracking-wider">
                         Public Verification ID
                       </span>
-                      <span className="font-mono font-bold text-slate-800 dark:text-slate-200 text-xs truncate block">
+                      <span className="font-mono font-bold text-slate-800 dark:text-slate-200 text-xs break-all block">
                         {cert.verificationCode}
                       </span>
                     </div>
@@ -284,11 +284,7 @@ export const CertificatesPage = () => {
                       className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 shrink-0"
                       title="Copy Verification Code"
                     >
-                      {isCopied ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                      ) : (
-                        <Copy className="w-3.5 h-3.5" />
-                      )}
+                      {isCopied ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
                   </div>
                 </div>

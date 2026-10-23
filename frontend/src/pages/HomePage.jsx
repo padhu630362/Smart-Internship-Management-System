@@ -273,7 +273,7 @@ export const HomePage = () => {
     <div className="space-y-24 py-6 sm:py-10 animate-in fade-in duration-300">
       {/* 1. Minimal & Focused Hero Section */}
       <section id="hero" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="relative rounded-3xl overflow-hidden border border-champagne-300/80 dark:border-burgundy-900/60 bg-gradient-to-b from-white via-champagne-50/40 to-white dark:from-[#170d11] dark:via-[#140b0e] dark:to-[#170d11] p-8 sm:p-14 lg:p-20 shadow-xl shadow-burgundy-950/5">
+        <div className="relative rounded-3xl overflow-hidden border border-champagne-300/80 dark:border-burgundy-900/60 bg-gradient-to-b from-white via-champagne-50/40 to-white dark:from-[#170d11] dark:via-[#140b0e] dark:to-[#170d11] p-5 sm:p-14 lg:p-20 shadow-xl shadow-burgundy-950/5">
           {/* Subtle Ambient Radial Lighting */}
           <div className="absolute top-0 right-0 -mr-24 -mt-24 w-96 h-96 bg-burgundy-600/10 dark:bg-burgundy-600/20 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute bottom-0 left-0 -ml-24 -mb-24 w-96 h-96 bg-champagne-400/20 dark:bg-champagne-500/15 rounded-full blur-3xl pointer-events-none" />
@@ -286,7 +286,7 @@ export const HomePage = () => {
             </div>
 
             {/* Headline */}
-            <h1 className="text-4xl sm:text-6xl font-black text-stone-900 dark:text-white tracking-tight leading-[1.1]">
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-stone-900 dark:text-white tracking-tight leading-[1.1]">
               Empowering Careers Through{' '}
               <span className="gradient-brand-text">Intelligent Governance</span>
             </h1>
@@ -349,7 +349,7 @@ export const HomePage = () => {
             </div>
 
             {/* Quick Metrics Strip */}
-            <div className="pt-8 border-t border-champagne-200/80 dark:border-warmdark-800 grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+            <div className="pt-6 sm:pt-8 border-t border-champagne-200/80 dark:border-warmdark-800 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 text-center">
               <div className="group p-2 rounded-xl transition-all hover:bg-champagne-100/50 dark:hover:bg-warmdark-800/50">
                 <div className="text-xl sm:text-2xl font-black text-burgundy-800 dark:text-champagne-300 group-hover:scale-105 transition-transform">
                   4 Roles
@@ -635,7 +635,7 @@ export const HomePage = () => {
 
       {/* 5. Public Certificate Verification Quick Bar */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="rounded-3xl border border-champagne-300 dark:border-burgundy-900/60 p-8 sm:p-10 bg-gradient-to-r from-champagne-50/70 via-white to-burgundy-50/40 dark:from-[#170d11] dark:via-[#150d10] dark:to-[#170d11] shadow-card">
+        <div className="rounded-3xl border border-champagne-300 dark:border-burgundy-900/60 p-5 sm:p-10 bg-gradient-to-r from-champagne-50/70 via-white to-burgundy-50/40 dark:from-[#170d11] dark:via-[#150d10] dark:to-[#170d11] shadow-card">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
             <div className="space-y-2 max-w-xl">
               <div className="inline-flex items-center gap-1.5 text-xs font-bold text-burgundy-800 dark:text-champagne-300">
@@ -657,7 +657,7 @@ export const HomePage = () => {
                 placeholder="e.g. IH-2026-A1B2C3"
                 value={quickCertCode}
                 onChange={(e) => setQuickCertCode(e.target.value)}
-                className="p-3 rounded-2xl border border-champagne-300 dark:border-warmdark-700 bg-white dark:bg-warmdark-900 text-xs font-mono tracking-wider text-stone-900 dark:text-white min-w-[240px] focus:ring-2 focus:ring-burgundy-500 focus:outline-none"
+                className="p-3 rounded-2xl border border-champagne-300 dark:border-warmdark-700 bg-white dark:bg-warmdark-900 text-xs font-mono tracking-wider text-stone-900 dark:text-white w-full sm:w-auto min-w-0 sm:min-w-[240px] focus:ring-2 focus:ring-burgundy-500 focus:outline-none"
               />
               <Button type="submit" variant="gradient" size="md" icon={ShieldCheck} className="text-xs font-semibold whitespace-nowrap shadow-sm">
                 Verify Credential

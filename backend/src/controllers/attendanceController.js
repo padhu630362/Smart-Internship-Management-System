@@ -238,7 +238,7 @@ export const reviewAttendanceRecord = async (req, res, next) => {
       type: NOTIFICATION_TYPES.ATTENDANCE_REVIEWED,
       title: 'Attendance Record Reviewed',
       message: `Your attendance record for ${formattedDate} was marked as '${reviewStatus}'.`,
-      link: '/attendance',
+      link: '/my-attendance',
       eventKey: `attendance_reviewed:${attendance._id}:${reviewStatus}`,
       metadata: {
         attendanceId: attendance._id,

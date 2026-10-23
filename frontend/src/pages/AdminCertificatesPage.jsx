@@ -306,7 +306,7 @@ export const AdminCertificatesPage = () => {
       )}
 
       {/* 6 Key Performance Indicator Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
         {/* Total Issued */}
         <Card className="bg-slate-900 text-white border-slate-800 shadow-sm relative overflow-hidden">
           <div className="absolute top-0 right-0 p-3 opacity-15">
@@ -407,25 +407,17 @@ export const AdminCertificatesPage = () => {
       </div>
 
       {/* Tabs Switcher */}
-      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2 overflow-x-auto no-scrollbar">
         <button
           onClick={() => setActiveTab('audit')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
-            activeTab === 'audit'
-              ? 'bg-primary-600 text-white shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-          }`}
+          className={['flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer', activeTab === 'audit' ? 'bg-primary-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'].join(' ')}
         >
           <Award className="w-4 h-4" />
           Certificate Audit Records ({pagination.total})
         </button>
         <button
           onClick={() => setActiveTab('mentors')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
-            activeTab === 'mentors'
-              ? 'bg-primary-600 text-white shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-          }`}
+          className={['flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer', activeTab === 'mentors' ? 'bg-primary-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'].join(' ')}
         >
           <Users className="w-4 h-4" />
           Mentor Issuance Statistics ({mentorStats.length || summary.totalMentorsIssued})

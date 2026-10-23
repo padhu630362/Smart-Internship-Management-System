@@ -622,15 +622,25 @@ export const googleLogin = async (req, res, next) => {
       // 2. Fallback to standard Google OAuth tokeninfo verification
       if (!verified) {
         try {
-          const response = await fetch(
+          let response = await fetch(
             `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`,
             { signal: AbortSignal.timeout(6000) }
           );
+          if (!response.ok) {
+            response = await fetch(
+              `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(credential)}`,
+              { signal: AbortSignal.timeout(6000) }
+            );
+          }
           if (response.ok) {
             googlePayload = await response.json();
-            if (env.GOOGLE_CLIENT_ID && googlePayload.aud !== env.GOOGLE_CLIENT_ID) {
+            const clientAudience = googlePayload.aud || googlePayload.azp;
+            if (env.GOOGLE_CLIENT_ID && clientAudience && clientAudience !== env.GOOGLE_CLIENT_ID) {
               return next(new AppError('Google token audience mismatch.', 401, 'INVALID_AUDIENCE'));
             }
+            // Populate name and picture from body if tokeninfo payload only had email/sub
+            if (!googlePayload.name && req.body.name) googlePayload.name = req.body.name;
+            if (!googlePayload.picture && req.body.picture) googlePayload.picture = req.body.picture;
             verified = true;
           }
         } catch (fetchErr) {
@@ -715,6 +725,18 @@ export const googleLogin = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+};
+
+/**
+ * Retrieve public Google OAuth Client ID for frontend initialization.
+ */
+export const getGoogleClientId = (req, res) => {
+  res.status(200).json({
+    success: true,
+    data: {
+      clientId: env.GOOGLE_CLIENT_ID || '',
+    },
+  });
 };
 
 /**

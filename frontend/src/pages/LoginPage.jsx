@@ -33,6 +33,8 @@ export const LoginPage = () => {
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const userInteractedRef = useRef(false);
+  const emailInputRef = useRef(null);
+  const passwordInputRef = useRef(null);
 
   // Two-Step Verification state for Login
   const [twoFactorRequired, setTwoFactorRequired] = useState(false);
@@ -46,32 +48,26 @@ export const LoginPage = () => {
 
   const from = location.state?.from?.pathname;
 
-  // Clear email and password on initial mount and prevent browser autofill populating fields
+  // Synchronize browser autofilled credentials into React state if the browser pre-populates them
   useEffect(() => {
-    setEmail('');
-    setPassword('');
-    userInteractedRef.current = false;
-
-    // Defend against browsers that delay-populate password fields 50-300ms after DOM load
-    const timer1 = setTimeout(() => {
-      if (!userInteractedRef.current) {
-        setEmail('');
-        setPassword('');
+    const syncAutofill = () => {
+      if (emailInputRef.current?.value && !email) {
+        setEmail(emailInputRef.current.value);
       }
-    }, 60);
-
-    const timer2 = setTimeout(() => {
-      if (!userInteractedRef.current) {
-        setEmail('');
-        setPassword('');
+      if (passwordInputRef.current?.value && !password) {
+        setPassword(passwordInputRef.current.value);
       }
-    }, 280);
+    };
+
+    // Check after brief intervals as browsers populate autofill asynchronously after layout
+    const timer1 = setTimeout(syncAutofill, 100);
+    const timer2 = setTimeout(syncAutofill, 400);
 
     return () => {
       clearTimeout(timer1);
       clearTimeout(timer2);
     };
-  }, []);
+  }, [email, password]);
 
   // Automatically redirect already authenticated users to their verified dashboard
   useEffect(() => {
@@ -98,22 +94,27 @@ export const LoginPage = () => {
     e.preventDefault();
     setFormError('');
 
-    if (!email || !password) {
+    // Capture values from both React state and DOM inputs to support silent browser autofill
+    const targetEmail = (email || emailInputRef.current?.value || '').trim();
+    const targetPassword = password || passwordInputRef.current?.value || '';
+
+    if (!targetEmail || !targetPassword) {
       setFormError('Please enter both your email address and password.');
       return;
     }
 
     setSubmitting(true);
     try {
-      const res = await login({ email, password });
+      const res = await login({ email: targetEmail, password: targetPassword });
       if (res?.requiresTwoFactor) {
         setTwoFactorRequired(true);
-        setTwoFactorEmail(res.email || email);
+        setTwoFactorEmail(res.email || targetEmail);
         setTwoFactorCode('');
         setTwoFactorCooldown(60);
-        setTwoFactorNotice(res.message || `A 6-digit verification code has been dispatched to ${res.email || email}.`);
+        setTwoFactorNotice(res.message || `A 6-digit verification code has been dispatched to ${res.email || targetEmail}.`);
         return;
       }
+
       const targetRoute =
         from && from !== '/login' && from !== '/register' && from !== '/' && from !== '/admin/login'
           ? from
@@ -138,6 +139,7 @@ export const LoginPage = () => {
     setFormError('');
     try {
       const res = await completeTwoFactor({ email: twoFactorEmail, code: twoFactorCode.trim() });
+
       const targetRoute =
         from && from !== '/login' && from !== '/register' && from !== '/' && from !== '/admin/login'
           ? from
@@ -168,15 +170,13 @@ export const LoginPage = () => {
   };
 
   return (
-    <div className="h-screen w-full grid grid-cols-1 lg:grid-cols-12 bg-white dark:bg-[#12090d] overflow-hidden">
+    <div className="min-h-screen w-full grid grid-cols-1 lg:grid-cols-12 bg-white dark:bg-[#12090d] lg:h-screen lg:overflow-hidden">
       {/* LEFT SIDE: Visual Brand Showcase */}
       <div className="hidden lg:flex lg:col-span-5 relative overflow-hidden bg-stone-900 text-white p-8 lg:p-12 flex-col justify-between select-none">
         {/* Background High-Quality Professional Photo with Overlay */}
         <div
           className="absolute inset-0 bg-cover bg-center transition-transform duration-1000 scale-105"
-          style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1800&q=85')`,
-          }}
+          style={{ backgroundImage: "url('https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1800&q=85')" }}
         />
         {/* Refined Dark Gradient Overlay with Ambient Glow */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#18060f] via-[#18060f]/80 to-[#18060f]/45 backdrop-blur-[0.5px]" />
@@ -236,7 +236,7 @@ export const LoginPage = () => {
       </div>
 
       {/* RIGHT SIDE: Compact, Visually Balanced Login Workspace */}
-      <div className="col-span-1 lg:col-span-7 flex flex-col justify-center items-center p-6 sm:p-10 lg:p-12 bg-[#fcfaf7] dark:bg-[#150d11] overflow-y-auto">
+      <div className="col-span-1 lg:col-span-7 flex flex-col justify-center items-center p-3.5 py-6 sm:p-8 lg:p-12 bg-[#fcfaf7] dark:bg-[#150d11] overflow-y-auto">
         <div className="w-full max-w-md space-y-5">
           {/* Mobile Home Link */}
           <div className="lg:hidden flex items-center justify-between pb-1">
@@ -262,7 +262,7 @@ export const LoginPage = () => {
 
           {/* Credentials Card */}
           <Card className="shadow-lg border-champagne-200/90 dark:border-burgundy-900/60 bg-white dark:bg-[#1a1114]">
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               {/* Form Feedback Alerts */}
               {(formError || authError) && (
                 <div className="mb-4 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-xs text-rose-700 dark:text-rose-400 flex items-start gap-2.5 animate-in fade-in">
@@ -355,29 +355,12 @@ export const LoginPage = () => {
                 </div>
               ) : (
                 <>
-                  {/* Login Form */}
-                  <form onSubmit={handleLoginSubmit} autoComplete="off" className="space-y-3.5">
-                    {/* Hidden decoy fields to divert aggressive browser credential autofill */}
-                    <input
-                      type="text"
-                      name="prevent_autofill_user"
-                      tabIndex={-1}
-                      aria-hidden="true"
-                      className="sr-only absolute -left-[9999px]"
-                      autoComplete="off"
-                      readOnly
-                    />
-                    <input
-                      type="password"
-                      name="prevent_autofill_pwd"
-                      tabIndex={-1}
-                      aria-hidden="true"
-                      className="sr-only absolute -left-[9999px]"
-                      autoComplete="new-password"
-                      readOnly
-                    />
-
+                  {/* Login Form configured for browser password managers (Edge, Chrome, Safari, Firefox) */}
+                  <form onSubmit={handleLoginSubmit} autoComplete="on" method="post" action="#" className="space-y-3.5">
                     <Input
+                      ref={emailInputRef}
+                      id="username"
+                      name="username"
                       label="Email Address"
                       type="email"
                       icon={Mail}
@@ -387,12 +370,18 @@ export const LoginPage = () => {
                         userInteractedRef.current = true;
                         setEmail(e.target.value);
                       }}
-                      autoComplete="off"
-                      name="internhub_login_email"
+                      onInput={(e) => {
+                        userInteractedRef.current = true;
+                        setEmail(e.target.value);
+                      }}
+                      autoComplete="username"
                       required
                     />
 
                     <Input
+                      ref={passwordInputRef}
+                      id="password"
+                      name="password"
                       label="Password"
                       type="password"
                       icon={Key}
@@ -402,8 +391,11 @@ export const LoginPage = () => {
                         userInteractedRef.current = true;
                         setPassword(e.target.value);
                       }}
-                      autoComplete="new-password"
-                      name="internhub_login_password"
+                      onInput={(e) => {
+                        userInteractedRef.current = true;
+                        setPassword(e.target.value);
+                      }}
+                      autoComplete="current-password"
                       required
                     />
 

@@ -69,10 +69,10 @@ export const VerifyCertificatePage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 py-6 sm:py-12 px-3.5 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto space-y-8">
         {/* Navigation & Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <Link
             to="/"
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-brand-600 transition-colors"
@@ -225,8 +225,8 @@ export const VerifyCertificatePage = () => {
 
               {/* Metadata IDs */}
               <div className="pt-2 text-xs font-mono text-slate-500 space-y-1">
-                <div>Certificate Serial: <strong>{certificateData.certificateNumber}</strong></div>
-                <div>Verification Code: <strong>{certificateData.verificationCode}</strong></div>
+                <div className="break-all">Certificate Serial: <strong>{certificateData.certificateNumber}</strong></div>
+                <div className="break-all">Verification Code: <strong>{certificateData.verificationCode}</strong></div>
               </div>
             </div>
           </div>

@@ -26,10 +26,10 @@ export const PolicyModal = ({ isOpen, onClose, initialTab = 'privacy' }) => {
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-      <div className="relative w-full max-w-4xl max-h-[90vh] flex flex-col rounded-3xl surface-card border border-champagne-300 dark:border-burgundy-900/60 shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+      <div className="relative w-full max-w-4xl max-h-[calc(100dvh-2rem)] flex flex-col rounded-3xl surface-card border border-champagne-300 dark:border-burgundy-900/60 shadow-2xl overflow-hidden">
         {/* Modal Header */}
-        <div className="flex items-center justify-between p-6 border-b border-champagne-200/90 dark:border-warmdark-800 bg-champagne-50/50 dark:bg-warmdark-850">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-champagne-200/90 dark:border-warmdark-800 bg-champagne-50/50 dark:bg-warmdark-850 shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-burgundy-50 dark:bg-burgundy-950/60 text-burgundy-700 dark:text-champagne-300 border border-burgundy-200 dark:border-burgundy-800">
               <ShieldCheck className="w-5 h-5" />
@@ -60,11 +60,7 @@ export const PolicyModal = ({ isOpen, onClose, initialTab = 'privacy' }) => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-150 ${
-                  isActive
-                    ? 'bg-burgundy-600 text-white shadow-burgundy'
-                    : 'text-stone-600 dark:text-stone-300 hover:bg-champagne-50 dark:hover:bg-warmdark-800'
-                }`}
+                className={['flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-150', isActive ? 'bg-burgundy-600 text-white shadow-burgundy' : 'text-stone-600 dark:text-stone-300 hover:bg-champagne-50 dark:hover:bg-warmdark-800'].join(' ')}
               >
                 <Icon className="w-4 h-4" />
                 <span>{tab.label}</span>

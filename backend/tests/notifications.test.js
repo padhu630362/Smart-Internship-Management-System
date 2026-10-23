@@ -471,7 +471,14 @@ describe('Phase 7: Real-Time Notifications and Socket.IO Integration Tests', () 
     }
     try {
       await Notification.deleteMany({
-        title: 'Urgent: Midterm Presentation Schedule',
+        $or: [
+          { recipient: { $in: [studentUser?._id, companyUser?._id, mentorUser?._id].filter(Boolean) } },
+          { title: 'Urgent: Midterm Presentation Schedule' },
+        ],
+      });
+      if (internship?._id) await Internship.deleteOne({ _id: internship._id });
+      await User.deleteMany({
+        _id: { $in: [studentUser?._id, companyUser?._id, mentorUser?._id].filter(Boolean) },
       });
     } catch {}
   });

@@ -98,7 +98,7 @@ export const submitApplication = async (req, res, next) => {
       type: NOTIFICATION_TYPES.APPLICATION_SUBMITTED,
       title: 'New Application Received',
       message: `${user.name} submitted an application for "${internship.title}".`,
-      link: '/applications',
+      link: '/manage/applications',
       eventKey: `app_submitted:${newApplication._id}`,
       metadata: {
         applicationId: newApplication._id,
@@ -413,7 +413,7 @@ export const updateApplicationStatus = async (req, res, next) => {
       type: NOTIFICATION_TYPES.APPLICATION_STATUS,
       title: 'Application Status Updated',
       message: `Your application for "${internshipTitle}" has been updated to "${statusLabel}".`,
-      link: '/applications',
+      link: '/my-applications',
       eventKey: `app_status:${application._id}:${targetStatus}`,
       metadata: {
         applicationId: application._id,

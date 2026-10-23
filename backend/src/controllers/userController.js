@@ -635,10 +635,10 @@ export const deleteUser = async (req, res, next) => {
       return next(error);
     }
 
-    // Safety guard: cannot delete designated primary administrators (Padmavathi & Arshad)
-    const DESIGNATED_ADMIN_EMAILS = ['s.v.padmavathi2005@gmail.com', 'arshadtaiyab010@gmail.com'];
+    // Safety guard: cannot delete designated primary administrator (Padmavathi)
+    const DESIGNATED_ADMIN_EMAILS = ['s.v.padmavathi2005@gmail.com'];
     if (DESIGNATED_ADMIN_EMAILS.includes(targetUser.email.toLowerCase())) {
-      const error = new Error('Action prohibited: Designated primary administrators cannot be deleted.');
+      const error = new Error('Action prohibited: Designated primary administrator cannot be deleted.');
       error.statusCode = 403;
       error.code = 'DESIGNATED_ADMIN_PROTECTED';
       return next(error);

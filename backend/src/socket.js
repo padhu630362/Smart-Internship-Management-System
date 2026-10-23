@@ -171,7 +171,7 @@ export const initSocket = (server) => {
     });
 
     // Disconnect handler
-    socket.on('disconnect', (reason) => {
+    socket.on('disconnect', async (reason) => {
       logger.info(`Socket client disconnected: ${socket.id} (${reason})`);
 
       const userSockets = onlineUsers.get(userId);
@@ -179,8 +179,13 @@ export const initSocket = (server) => {
         userSockets.delete(socket.id);
         if (userSockets.size === 0) {
           onlineUsers.delete(userId);
-          // Broadcast offline status
-          io.emit('user:status', { userId, status: 'offline' });
+          const lastSeen = new Date();
+          // Update lastSeen in database
+          User.findByIdAndUpdate(userId, { lastSeen }).catch((err) => {
+            logger.warn(`Failed to update lastSeen for ${userId}: ${err.message}`);
+          });
+          // Broadcast offline status with lastSeen timestamp
+          io.emit('user:status', { userId, status: 'offline', lastSeen });
         }
       }
     });
@@ -238,6 +243,46 @@ export const emitChatMessage = (conversationId, message, participantIds = []) =>
         conversationId: conversationId.toString(),
         message,
       });
+    }
+  }
+};
+
+/**
+ * Dispatch real-time message edited event to conversation room and participants
+ */
+export const emitMessageEdited = (conversationId, message, participantIds = []) => {
+  if (io && conversationId) {
+    io.to(`conversation:${conversationId.toString()}`).emit('chat:message_edited', {
+      conversationId: conversationId.toString(),
+      message,
+    });
+
+    for (const participantId of participantIds) {
+      const pid = (participantId._id || participantId).toString();
+      io.to(`user:${pid}`).emit('chat:message_edited', {
+        conversationId: conversationId.toString(),
+        message,
+      });
+    }
+  }
+};
+
+/**
+ * Dispatch real-time message deleted event to conversation room or specific user room
+ */
+export const emitMessageDeleted = (conversationId, payload, participantIds = []) => {
+  if (io && conversationId) {
+    const { isDeletedForEveryone, deletedForUserId } = payload;
+    if (isDeletedForEveryone) {
+      // Broadcast to entire room and all participant user rooms
+      io.to(`conversation:${conversationId.toString()}`).emit('chat:message_deleted', payload);
+      for (const participantId of participantIds) {
+        const pid = (participantId._id || participantId).toString();
+        io.to(`user:${pid}`).emit('chat:message_deleted', payload);
+      }
+    } else if (deletedForUserId) {
+      // Only emit to the user who requested "Delete for me"
+      io.to(`user:${deletedForUserId.toString()}`).emit('chat:message_deleted', payload);
     }
   }
 };

@@ -508,7 +508,12 @@ describe('Phase 10: Security, Reliability Hardening & Audit Logging Integration 
     await Allocation.deleteMany({ _id: testAllocation?._id });
     await Application.deleteMany({ _id: testApplication?._id });
     await Internship.deleteMany({ _id: testInternship?._id });
-    await User.deleteMany({ _id: { $in: [adminUser?._id, companyUser?._id, mentorUser?._id, student1?._id, student2?._id] } });
+    await User.deleteMany({
+      $or: [
+        { _id: { $in: [adminUser?._id, companyUser?._id, mentorUser?._id, student1?._id, student2?._id].filter(Boolean) } },
+        { email: { $regex: /sec_admin_|hardened_corp_|mentor_sec_|sec_stud1_|sec_stud2_|deactivated_|target_sec_|reset_user_|role_change_/ } },
+      ],
+    });
 
     if (mongoose.connection.readyState !== 0) {
       await mongoose.connection.close();

@@ -10,6 +10,7 @@ import {
   verifyResetCode,
   resetPassword,
   googleLogin,
+  getGoogleClientId,
   getTwoFactorStatus,
   requestEnableTwoFactor,
   confirmEnableTwoFactor,
@@ -37,6 +38,7 @@ router.post('/login', authRateLimiter, validateLogin, login);
 router.post('/login-verify-2fa', authRateLimiter, verifyTwoFactor);
 router.post('/resend-2fa', authRateLimiter, resendTwoFactorCode);
 router.post('/google', authRateLimiter, googleLogin);
+router.get('/google/client-id', getGoogleClientId);
 router.post('/forgot-password', authRateLimiter, validateForgotPassword, forgotPassword);
 router.post('/verify-reset-code', authRateLimiter, validateVerifyResetCode, verifyResetCode);
 router.post('/reset-password', authRateLimiter, validateResetPassword, resetPassword);

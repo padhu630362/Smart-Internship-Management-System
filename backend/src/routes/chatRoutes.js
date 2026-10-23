@@ -3,15 +3,23 @@ import { authenticateToken } from '../middlewares/auth.js';
 import {
   chatRateLimiter,
   validateSendMessage,
+  validateEditMessage,
+  validateDeleteMessage,
   validateCreateConversation,
   requireConversationMember,
 } from '../middlewares/validateChat.js';
+import { uploadChatAttachment } from '../utils/chatFileUpload.js';
 import {
   getConversations,
   createConversation,
   getConversationById,
   getMessages,
   sendMessage,
+  uploadAttachment,
+  downloadAttachment,
+  editMessage,
+  deleteMessage,
+  forwardMessage,
   markConversationRead,
   updateGroupMembers,
   getContacts,
@@ -30,17 +38,27 @@ router.get('/conversations', getConversations);
 router.post('/conversations', validateCreateConversation, createConversation);
 router.get('/conversations/:id', requireConversationMember, getConversationById);
 
-// Messages in conversation
+// Direct attachment upload endpoint
+router.post('/upload', uploadChatAttachment.single('file'), uploadAttachment);
+
+// Secure authenticated attachment stream download
+router.get('/attachments/:fileKey', downloadAttachment);
+
+// Messages in conversation (supports multipart attachments or JSON)
 router.get('/conversations/:id/messages', requireConversationMember, getMessages);
 router.post(
   '/conversations/:id/messages',
   requireConversationMember,
   chatRateLimiter,
+  uploadChatAttachment.any(),
   validateSendMessage,
   sendMessage
 );
 
-// Emoji message reaction toggle
+// Message operations
+router.patch('/messages/:messageId', validateEditMessage, editMessage);
+router.delete('/messages/:messageId', validateDeleteMessage, deleteMessage);
+router.post('/messages/:messageId/forward', forwardMessage);
 router.patch('/messages/:messageId/react', toggleMessageReaction);
 
 // Real-time live exchange simulation endpoint

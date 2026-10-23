@@ -83,7 +83,7 @@ export const AppLayout = ({ children, healthStatus, onOpenLogin }) => {
       />
 
       {/* Main Workspace Area with Sidebar Offset */}
-      <div className="flex-1 flex flex-col lg:pl-64 min-h-0">
+      <div className="flex-1 flex flex-col lg:pl-64 min-h-0 w-full min-w-0">
         {/* Workspace Top Navbar */}
         <TopNavbar
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
@@ -92,7 +92,7 @@ export const AppLayout = ({ children, healthStatus, onOpenLogin }) => {
         />
 
         {/* Dynamic Page Content */}
-        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="flex-1 max-w-7xl w-full mx-auto px-3.5 sm:px-6 lg:px-8 py-5 sm:py-8 min-w-0">
           {children}
         </main>
 
@@ -104,3 +104,4 @@ export const AppLayout = ({ children, healthStatus, onOpenLogin }) => {
 };
 
 export default AppLayout;
+

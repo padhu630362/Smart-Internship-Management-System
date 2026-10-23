@@ -42,12 +42,103 @@ export const chatService = {
   },
 
   /**
-   * Send a safe text message
+   * Send a message (text, file attachment, or reply)
    * @param {string} id - Conversation ID
-   * @param {string} content - Message text content (1-2000 chars)
+   * @param {string|FormData|Object} payload - Message text or payload object/FormData
    */
-  async sendMessage(id, content) {
-    const response = await apiClient.post(`/api/chat/conversations/${id}/messages`, { content });
+  async sendMessage(id, payload) {
+    if (payload instanceof FormData) {
+      const response = await apiClient.post(`/api/chat/conversations/${id}/messages`, payload, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
+    }
+
+    if (typeof payload === 'object' && payload !== null && payload.file) {
+      const formData = new FormData();
+      if (payload.content) formData.append('content', payload.content);
+      if (payload.replyTo) formData.append('replyTo', payload.replyTo);
+      if (payload.clientMsgId) formData.append('clientMsgId', payload.clientMsgId);
+      formData.append('file', payload.file);
+
+      const response = await apiClient.post(`/api/chat/conversations/${id}/messages`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
+    }
+
+    const body = typeof payload === 'string' ? { content: payload } : payload;
+    const response = await apiClient.post(`/api/chat/conversations/${id}/messages`, body);
+    return response.data;
+  },
+
+  /**
+   * Upload an attachment directly
+   * @param {File} file
+   */
+  async uploadAttachment(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post('/api/chat/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  /**
+   * Securely download attachment as blob and trigger browser save
+   * @param {string} fileKey - Filename on server
+   * @param {string} fileName - Original display filename
+   */
+  async downloadAttachment(fileKey, fileName = 'attachment') {
+    const response = await apiClient.get(`/api/chat/attachments/${fileKey}`, {
+      responseType: 'blob',
+    });
+    const blob = new Blob([response.data], {
+      type: response.headers['content-type'] || 'application/octet-stream',
+    });
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => window.URL.revokeObjectURL(downloadUrl), 5000);
+    return true;
+  },
+
+  /**
+   * Edit an existing message
+   * @param {string} messageId - Message ID
+   * @param {string} content - New content
+   */
+  async editMessage(messageId, content) {
+    const response = await apiClient.patch(`/api/chat/messages/${messageId}`, { content });
+    return response.data;
+  },
+
+  /**
+   * Delete a message (for everyone or for me)
+   * @param {string} messageId - Message ID
+   * @param {'everyone'|'me'} mode - Deletion mode
+   */
+  async deleteMessage(messageId, mode = 'everyone') {
+    const response = await apiClient.delete(`/api/chat/messages/${messageId}`, {
+      data: { mode },
+    });
+    return response.data;
+  },
+
+  /**
+   * Forward a message to one or more conversations
+   * @param {string} messageId - Message ID
+   * @param {string[]} targetConversationIds - Target conversation IDs
+   */
+  async forwardMessage(messageId, targetConversationIds) {
+    const response = await apiClient.post(`/api/chat/messages/${messageId}/forward`, {
+      targetConversationIds,
+    });
     return response.data;
   },
 

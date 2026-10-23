@@ -136,6 +136,10 @@ const userSchema = new mongoose.Schema(
     lastLoginAt: {
       type: Date,
     },
+    lastSeen: {
+      type: Date,
+      default: Date.now,
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -186,6 +190,18 @@ const userSchema = new mongoose.Schema(
     passwordChangedAt: {
       type: Date,
     },
+    // Web Push Subscriptions for Desktop / Background Notifications
+    pushSubscriptions: [
+      {
+        endpoint: { type: String, required: true },
+        expirationTime: { type: Number, default: null },
+        keys: {
+          p256dh: { type: String, required: true },
+          auth: { type: String, required: true },
+        },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   {
     timestamps: true,

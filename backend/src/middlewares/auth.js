@@ -85,6 +85,11 @@ export const authenticateToken = async (req, res, next) => {
       }
     }
 
+    // Enforce no-cache on authenticated API responses to prevent sensitive data caching in bfcache or intermediate proxies
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+
     // Attach user and payload to Express request context
     req.user = user;
     req.tokenPayload = payload;

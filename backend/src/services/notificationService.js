@@ -1,5 +1,6 @@
 import { Notification, NOTIFICATION_TYPES } from '../models/Notification.js';
 import { emitNotificationToUser, broadcastNotification } from '../socket.js';
+import { sendPushNotification } from './pushNotificationService.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -82,6 +83,19 @@ export const createAndDispatchNotification = async ({
     // Deliver via Socket.IO to private user room
     emitNotificationToUser(recipientId, populated);
 
+    // Also dispatch Web Push notification (for background / closed browser alerts)
+    const pushTag = populated.type === NOTIFICATION_TYPES.NEW_MESSAGE && populated.metadata?.conversationId
+      ? `chat_${populated.metadata.conversationId}_${populated.metadata?.messageId || populated._id}`
+      : (populated.metadata?.isTest ? `test_notification_${populated._id}` : `notif_${populated._id}`);
+
+    sendPushNotification(recipientId, {
+      title: populated.title,
+      message: populated.message,
+      link: populated.link,
+      tag: pushTag,
+      metadata: populated.metadata,
+    }).catch(() => {});
+
     return populated;
   } catch (error) {
     logger.error('Failed to create and dispatch notification:', error);
@@ -156,9 +170,16 @@ export const createAndDispatchBulkNotifications = async (
       }
     }
 
-    // Emit real-time event to each recipient's private room
+    // Emit real-time event & Web Push to each recipient
     for (const doc of insertedDocs) {
       emitNotificationToUser(doc.recipient, doc);
+      sendPushNotification(doc.recipient, {
+        title: doc.title,
+        message: doc.message,
+        link: doc.link,
+        tag: `notif_${doc._id}`,
+        metadata: doc.metadata,
+      }).catch(() => {});
     }
 
     return insertedDocs;

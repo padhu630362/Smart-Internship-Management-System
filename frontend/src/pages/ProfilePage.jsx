@@ -660,7 +660,7 @@ export const ProfilePage = () => {
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header Profile Banner */}
-      <div className="surface-card rounded-2xl p-6 sm:p-8 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden">
+      <div className="surface-card rounded-2xl p-4 sm:p-8 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-brand-500/5 rounded-full blur-3xl pointer-events-none" />
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 relative z-10">
@@ -687,9 +687,7 @@ export const ProfilePage = () => {
                   />
                 ) : null}
                 <div
-                  className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl gradient-brand text-white flex items-center justify-center font-bold text-2xl ${
-                    profile.avatarUrl ? 'hidden' : 'flex'
-                  }`}
+                  className={['w-16 h-16 sm:w-20 sm:h-20 rounded-2xl gradient-brand text-white flex items-center justify-center font-bold text-2xl', profile.avatarUrl ? 'hidden' : 'flex'].join(' ')}
                 >
                   {profile.name?.charAt(0)?.toUpperCase() || 'U'}
                 </div>
@@ -810,15 +808,11 @@ export const ProfilePage = () => {
       )}
 
       {/* Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2 overflow-x-auto no-scrollbar">
         <button
           type="button"
           onClick={() => setActiveTab('profile')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all ${
-            activeTab === 'profile'
-              ? 'bg-burgundy-700 text-white shadow-xs'
-              : 'text-stone-600 dark:text-stone-400 hover:bg-champagne-50 dark:hover:bg-warmdark-850'
-          }`}
+          className={['flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap', activeTab === 'profile' ? 'bg-burgundy-700 text-white shadow-xs' : 'text-stone-600 dark:text-stone-400 hover:bg-champagne-50 dark:hover:bg-warmdark-850'].join(' ')}
         >
           <UserIcon className="w-4 h-4" />
           <span>Profile Details</span>
@@ -831,11 +825,7 @@ export const ProfilePage = () => {
             fetchSessions();
             fetch2FAStatus();
           }}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all ${
-            activeTab === 'security'
-              ? 'bg-burgundy-700 text-white shadow-xs'
-              : 'text-stone-600 dark:text-stone-400 hover:bg-champagne-50 dark:hover:bg-warmdark-850'
-          }`}
+          className={['flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap', activeTab === 'security' ? 'bg-burgundy-700 text-white shadow-xs' : 'text-stone-600 dark:text-stone-400 hover:bg-champagne-50 dark:hover:bg-warmdark-850'].join(' ')}
         >
           <ShieldCheck className="w-4 h-4" />
           <span>Security & Sessions</span>
@@ -1474,11 +1464,7 @@ export const ProfilePage = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800">
               <div className="flex items-start gap-3.5">
                 <div
-                  className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
-                    twoFactorEnabled
-                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
-                      : 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
-                  }`}
+                  className={['w-11 h-11 rounded-xl flex items-center justify-center shrink-0', twoFactorEnabled ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' : 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800'].join(' ')}
                 >
                   <ShieldCheck className="w-5 h-5" />
                 </div>
@@ -1488,11 +1474,7 @@ export const ProfilePage = () => {
                       Email-Based 2FA Protection
                     </h4>
                     <span
-                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                        twoFactorEnabled
-                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
-                          : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
-                      }`}
+                      className={['px-2.5 py-0.5 rounded-full text-xs font-bold', twoFactorEnabled ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'].join(' ')}
                     >
                       {twoFactorEnabled ? 'Active (Protected)' : 'Inactive'}
                     </span>
@@ -1581,19 +1563,11 @@ export const ProfilePage = () => {
                     return (
                       <div
                         key={sess.id}
-                        className={`p-4 flex items-center justify-between gap-4 transition-colors ${
-                          sess.isCurrent
-                            ? 'bg-champagne-50/40 dark:bg-warmdark-900/30'
-                            : 'hover:bg-slate-50/60 dark:hover:bg-slate-850/40'
-                        }`}
+                        className={['p-4 flex items-center justify-between gap-4 transition-colors', sess.isCurrent ? 'bg-champagne-50/40 dark:bg-warmdark-900/30' : 'hover:bg-slate-50/60 dark:hover:bg-slate-850/40'].join(' ')}
                       >
                         <div className="flex items-center gap-3.5">
                           <div
-                            className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                              sess.isCurrent
-                                ? 'bg-burgundy-100 text-burgundy-700 dark:bg-burgundy-950/60 dark:text-champagne-400'
-                                : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
-                            }`}
+                            className={['w-10 h-10 rounded-xl flex items-center justify-center shrink-0', sess.isCurrent ? 'bg-burgundy-100 text-burgundy-700 dark:bg-burgundy-950/60 dark:text-champagne-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'].join(' ')}
                           >
                             <IconComponent className="w-5 h-5" />
                           </div>
@@ -1881,11 +1855,7 @@ export const ProfilePage = () => {
                 setAvatarTab('upload');
                 setAvatarError('');
               }}
-              className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                avatarTab === 'upload'
-                  ? 'bg-white dark:bg-slate-750 text-brand-600 dark:text-brand-400 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
+              className={['flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer', avatarTab === 'upload' ? 'bg-white dark:bg-slate-750 text-brand-600 dark:text-brand-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'].join(' ')}
             >
               <Upload className="w-3.5 h-3.5" />
               <span>Upload Photo</span>
@@ -1896,11 +1866,7 @@ export const ProfilePage = () => {
                 setAvatarTab('preset');
                 setAvatarError('');
               }}
-              className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                avatarTab === 'preset'
-                  ? 'bg-white dark:bg-slate-750 text-brand-600 dark:text-brand-400 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
+              className={['flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer', avatarTab === 'preset' ? 'bg-white dark:bg-slate-750 text-brand-600 dark:text-brand-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'].join(' ')}
             >
               <Sparkles className="w-3.5 h-3.5" />
               <span>Preset Avatars</span>
@@ -1911,11 +1877,7 @@ export const ProfilePage = () => {
                 setAvatarTab('url');
                 setAvatarError('');
               }}
-              className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                avatarTab === 'url'
-                  ? 'bg-white dark:bg-slate-750 text-brand-600 dark:text-brand-400 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
+              className={['flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer', avatarTab === 'url' ? 'bg-white dark:bg-slate-750 text-brand-600 dark:text-brand-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'].join(' ')}
             >
               <LinkIcon className="w-3.5 h-3.5" />
               <span>Image URL</span>
@@ -1996,11 +1958,7 @@ export const ProfilePage = () => {
                         setAvatarPreview(preset.url);
                         setSelectedAvatarFile(null);
                       }}
-                      className={`group relative flex flex-col items-center p-2 rounded-xl border transition-all text-center cursor-pointer ${
-                        isSelected
-                          ? 'border-brand-500 bg-brand-50/50 dark:bg-brand-950/40 ring-2 ring-brand-500/30'
-                          : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-900'
-                      }`}
+                      className={['group relative flex flex-col items-center p-2 rounded-xl border transition-all text-center cursor-pointer', isSelected ? 'border-brand-500 bg-brand-50/50 dark:bg-brand-950/40 ring-2 ring-brand-500/30' : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-900'].join(' ')}
                     >
                       <img
                         src={preset.url}

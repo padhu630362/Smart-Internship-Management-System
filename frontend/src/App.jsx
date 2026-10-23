@@ -29,6 +29,7 @@ import ExternalJobsPage from './pages/ExternalJobsPage';
 import NotificationsPage from './pages/NotificationsPage';
 import PoliciesPage from './pages/PoliciesPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import RoleRedirect from './components/auth/RoleRedirect';
 import healthService from './services/healthService';
 import NotificationToastContainer from './components/common/NotificationToastContainer';
 
@@ -220,9 +221,67 @@ export const App = () => {
               }
             />
 
-            {/* Notification destination aliases */}
-            <Route path="/allocations" element={<Navigate to="/manage/allocations" replace />} />
-            <Route path="/tasks" element={<Navigate to="/my-tasks" replace />} />
+            {/* Role-Aware Smart Navigation Redirects */}
+            <Route
+              path="/tasks"
+              element={
+                <RoleRedirect
+                  student="/my-tasks"
+                  company="/manage/tasks"
+                  mentor="/manage/tasks"
+                  coordinator="/manage/tasks"
+                  admin="/manage/tasks"
+                />
+              }
+            />
+            <Route
+              path="/applications"
+              element={
+                <RoleRedirect
+                  student="/my-applications"
+                  company="/manage/applications"
+                  mentor="/manage/applications"
+                  coordinator="/manage/applications"
+                  admin="/manage/applications"
+                />
+              }
+            />
+            <Route
+              path="/attendance"
+              element={
+                <RoleRedirect
+                  student="/my-attendance"
+                  company="/manage/attendance"
+                  mentor="/manage/attendance"
+                  coordinator="/manage/attendance"
+                  admin="/manage/attendance"
+                />
+              }
+            />
+            <Route
+              path="/allocations"
+              element={
+                <RoleRedirect
+                  student="/dashboard"
+                  company="/manage/allocations"
+                  mentor="/manage/allocations"
+                  coordinator="/manage/allocations"
+                  admin="/manage/allocations"
+                />
+              }
+            />
+            <Route
+              path="/users"
+              element={
+                <RoleRedirect
+                  student="/dashboard"
+                  company="/dashboard"
+                  mentor="/dashboard"
+                  coordinator="/dashboard"
+                  admin="/admin/users"
+                />
+              }
+            />
 
             {/* 404 Fallback */}
             <Route path="*" element={<NotFoundPage />} />

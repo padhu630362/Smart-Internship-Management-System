@@ -71,7 +71,7 @@ export const PublicNavbar = () => {
           : 'bg-white/85 dark:bg-[#12090d]/85 backdrop-blur-sm border-b border-champagne-200/60 dark:border-burgundy-950/50'
       }`}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-3 sm:gap-4">
         {/* 1. Left Column: Brand Logo (Proportionally balanced) */}
         <div className="flex-1 flex items-center justify-start">
           <Link
@@ -127,7 +127,7 @@ export const PublicNavbar = () => {
               <span className="sm:hidden">Dashboard</span>
             </Link>
           ) : (
-            <div className="flex items-center gap-2.5">
+            <div className="hidden sm:flex items-center gap-2.5">
               {/* Login Button */}
               <Link
                 to="/login"

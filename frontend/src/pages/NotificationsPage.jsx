@@ -19,6 +19,8 @@ import {
   MessageSquare,
   Volume2,
   VolumeX,
+  BellOff,
+  AlertTriangle,
   X,
   ArrowRight,
   Layers,
@@ -48,7 +50,6 @@ export const NotificationsPage = () => {
     deleteNotification,
     clearAllNotifications,
     refreshNotifications,
-    addToast,
   } = useSocket();
 
   const { user } = useAuth();
@@ -247,45 +248,37 @@ export const NotificationsPage = () => {
             {soundEnabled ? 'Chime On' : 'Chime Muted'}
           </Button>
 
-          {pushPermission !== 'granted' && (
+          {pushPermission === 'denied' && (
+            <Button
+              variant="outline"
+              size="sm"
+              icon={BellOff}
+              onClick={() => alert('Desktop notifications are blocked by your browser settings.\n\nTo allow notifications:\n1. Click the lock/tune icon (🔒) in your browser address bar (Chrome or Edge).\n2. Toggle Notifications to "Allow".\n3. Reload the page.')}
+              className="text-xs border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40 font-semibold"
+              title="Desktop notifications are blocked. Click for instructions to unblock."
+            >
+              Alerts Blocked
+            </Button>
+          )}
+
+          {pushPermission === 'unsupported' && (
+            <span className="text-xs px-2.5 py-1 rounded-lg bg-stone-100 dark:bg-stone-800 text-stone-500 font-medium">
+              Alerts Unsupported
+            </span>
+          )}
+
+          {pushPermission === 'default' && (
             <Button
               variant="outline"
               size="sm"
               icon={Bell}
               onClick={requestPushPermission}
-              className="text-xs border-champagne-300 hover:bg-champagne-50"
+              className="text-xs border-champagne-300 hover:bg-champagne-50 font-semibold"
+              title="Enable native desktop system notifications"
             >
-              Desktop Push
+              Enable Desktop Alerts
             </Button>
           )}
-
-          {/* Preview Notification Pop-up Button */}
-          <Button
-            variant="outline"
-            size="sm"
-            icon={Sparkles}
-            onClick={() => {
-              addToast({
-                id: `demo-${Date.now()}`,
-                type: 'new_message',
-                title: 'John Doe',
-                message: 'How can I help you?',
-                link: '/chat',
-                sender: {
-                  name: 'John Doe',
-                  role: 'mentor',
-                  profile: {
-                    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256',
-                  },
-                },
-                createdAt: new Date(),
-              });
-            }}
-            className="text-xs border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 font-semibold"
-            title="Preview live notification popup model"
-          >
-            Preview Pop-up
-          </Button>
 
           {unreadCount > 0 && (
             <Button
@@ -328,6 +321,26 @@ export const NotificationsPage = () => {
           )}
         </div>
       </div>
+
+      {/* Desktop Notification Warning / Instructions Banner */}
+      {pushPermission === 'denied' && (
+        <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex items-start gap-3 text-xs text-amber-900 dark:text-amber-200">
+          <BellOff className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <div className="flex-1 leading-relaxed">
+            <span className="font-bold">Desktop system notifications are blocked: </span>
+            Windows native desktop popups cannot be displayed while notifications are blocked in your browser settings. To receive native alerts, click the lock or site settings icon (🔒) in your browser address bar (Google Chrome or Microsoft Edge), change <strong>Notifications</strong> to <strong>Allow</strong>, and refresh the page.
+          </div>
+        </div>
+      )}
+      {pushPermission === 'unsupported' && (
+        <div className="p-3.5 rounded-xl bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 flex items-start gap-3 text-xs text-stone-700 dark:text-stone-300">
+          <AlertTriangle className="w-4 h-4 text-stone-500 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <span className="font-bold">Desktop Notifications Unsupported: </span>
+            Your browser does not support the Web Notifications API.
+          </div>
+        </div>
+      )}
 
       {/* Filter Tabs & View Mode Switcher */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-champagne-100 dark:border-stone-800 pb-2">

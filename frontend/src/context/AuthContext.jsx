@@ -253,6 +253,13 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setToken(null);
       setError(null);
+      try {
+        if (typeof window !== 'undefined' && window.history?.replaceState) {
+          window.history.replaceState(null, '', '/login');
+        }
+      } catch {
+        // Ignore history replaceState error in non-browser test runners
+      }
     }
   };
 

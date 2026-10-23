@@ -93,15 +93,13 @@ export const RegisterPage = () => {
   };
 
   return (
-    <div className="h-screen w-full grid grid-cols-1 lg:grid-cols-12 bg-white dark:bg-[#12090d] overflow-hidden">
+    <div className="min-h-screen w-full grid grid-cols-1 lg:grid-cols-12 bg-white dark:bg-[#12090d] lg:h-screen lg:overflow-hidden">
       {/* LEFT SIDE: Visual Brand Showcase */}
       <div className="hidden lg:flex lg:col-span-5 relative overflow-hidden bg-stone-900 text-white p-8 lg:p-12 flex-col justify-between select-none">
         {/* Background High-Quality Professional Photo with Overlay */}
         <div
           className="absolute inset-0 bg-cover bg-center transition-transform duration-1000 scale-105"
-          style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=1800&q=85')`,
-          }}
+          style={{ backgroundImage: "url('https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=1800&q=85')" }}
         />
         {/* Refined Dark Gradient Overlay with Ambient Glow */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#18060f] via-[#18060f]/80 to-[#18060f]/45 backdrop-blur-[0.5px]" />
@@ -160,7 +158,7 @@ export const RegisterPage = () => {
       </div>
 
       {/* RIGHT SIDE: Compact, Visually Balanced Registration Workspace */}
-      <div className="col-span-1 lg:col-span-7 flex flex-col justify-center items-center p-5 sm:p-8 lg:p-10 bg-[#fcfaf7] dark:bg-[#150d11] overflow-y-auto">
+      <div className="col-span-1 lg:col-span-7 flex flex-col justify-center items-center p-3.5 py-6 sm:p-8 lg:p-10 bg-[#fcfaf7] dark:bg-[#150d11] overflow-y-auto">
         <div className="w-full max-w-lg space-y-4">
           {/* Mobile Home Link */}
           <div className="lg:hidden flex items-center justify-between pb-1">
@@ -186,7 +184,7 @@ export const RegisterPage = () => {
 
           {/* Credentials Card */}
           <Card className="shadow-lg border-champagne-200/90 dark:border-burgundy-900/60 bg-white dark:bg-[#1a1114]">
-            <CardContent className="p-5 sm:p-6">
+            <CardContent className="p-4 sm:p-6">
               {formError && (
                 <div className="mb-3.5 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-xs text-rose-700 dark:text-rose-400 flex items-start gap-2.5 animate-in fade-in">
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />

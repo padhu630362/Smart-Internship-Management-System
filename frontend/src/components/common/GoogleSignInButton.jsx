@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { auth, googleProvider, signInWithPopup } from '../../config/firebase';
-
+import { apiClient } from '../../api/client';
 import { getRoleDashboardRoute } from '../../utils/navigation';
 
 export const GoogleSignInButton = ({
@@ -17,18 +17,156 @@ export const GoogleSignInButton = ({
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [clientId, setClientId] = useState(
+    () => import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
+  );
+
+  // Fetch clientId from backend if not present in Vite env
+  useEffect(() => {
+    let isMounted = true;
+    if (!clientId) {
+      apiClient
+        .get('/auth/google/client-id')
+        .then((res) => {
+          if (isMounted && res.data?.data?.clientId) {
+            setClientId(res.data.data.clientId);
+          }
+        })
+        .catch(() => {});
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [clientId]);
+
+  // Optional: Initialize Google Identity Services (GIS) One-Tap / ID Token listener
+  useEffect(() => {
+    const effectiveClientId =
+      clientId || import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+
+    if (typeof window !== 'undefined' && window.google?.accounts?.id && effectiveClientId) {
+      try {
+        window.google.accounts.id.initialize({
+          client_id: effectiveClientId,
+          callback: async (response) => {
+            if (response?.credential) {
+              setLoading(true);
+              setErrorMsg('');
+              try {
+                const res = await loginWithGoogle({
+                  credential: response.credential,
+                  role,
+                });
+                if (onSuccess) onSuccess(res);
+                const targetRoute = getRoleDashboardRoute(res?.user?.role || role);
+                navigate(targetRoute, { replace: true });
+              } catch (err) {
+                const msg =
+                  err.response?.data?.error?.message ||
+                  err.response?.data?.message ||
+                  err.message ||
+                  'Google authentication failed.';
+                setErrorMsg(msg);
+                if (onError) onError(err);
+              } finally {
+                setLoading(false);
+              }
+            }
+          },
+          auto_select: false,
+          cancel_on_tap_outside: true,
+        });
+      } catch (initErr) {
+        // Ignore GIS One Tap init warning
+      }
+    }
+  }, [clientId, role, loginWithGoogle, onSuccess, onError, navigate]);
 
   const handleClick = async () => {
     setLoading(true);
     setErrorMsg('');
 
+    const effectiveClientId =
+      clientId || import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+
+    // Strategy 1: Google Identity Services (GIS) OAuth Token Client
+    if (typeof window !== 'undefined' && window.google?.accounts?.oauth2 && effectiveClientId) {
+      try {
+        const tokenClient = window.google.accounts.oauth2.initTokenClient({
+          client_id: effectiveClientId,
+          scope: 'openid email profile',
+          callback: async (tokenResponse) => {
+            if (tokenResponse.error) {
+              setLoading(false);
+              if (
+                tokenResponse.error !== 'popup_closed_by_user' &&
+                tokenResponse.error !== 'access_denied'
+              ) {
+                setErrorMsg(
+                  tokenResponse.error_description ||
+                    `Google sign-in error: ${tokenResponse.error}`
+                );
+              }
+              return;
+            }
+
+            try {
+              let profile = {};
+              try {
+                const userRes = await fetch(
+                  'https://www.googleapis.com/oauth2/v3/userinfo',
+                  {
+                    headers: {
+                      Authorization: `Bearer ${tokenResponse.access_token}`,
+                    },
+                  }
+                );
+                if (userRes.ok) {
+                  profile = await userRes.json();
+                }
+              } catch {
+                // Ignore userinfo fetch failure
+              }
+
+              const res = await loginWithGoogle({
+                credential: tokenResponse.access_token,
+                role,
+                email: profile.email,
+                name: profile.name,
+                picture: profile.picture,
+              });
+
+              if (onSuccess) onSuccess(res);
+              const targetRoute = getRoleDashboardRoute(res?.user?.role || role);
+              navigate(targetRoute, { replace: true });
+            } catch (err) {
+              const msg =
+                err.response?.data?.error?.message ||
+                err.response?.data?.message ||
+                err.message ||
+                'Google authentication failed.';
+              setErrorMsg(msg);
+              if (onError) onError(err);
+            } finally {
+              setLoading(false);
+            }
+          },
+        });
+
+        tokenClient.requestAccessToken({ prompt: 'select_account' });
+        return;
+      } catch (gisErr) {
+        console.warn('Google Identity Services token client error:', gisErr);
+        // Fall through to Firebase strategy
+      }
+    }
+
+    // Strategy 2: Firebase Google Popup Fallback
     try {
-      // 1. Trigger official Firebase Google Popup
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
       const idToken = await user.getIdToken();
 
-      // 2. Transmit verified Firebase ID token to backend
       const res = await loginWithGoogle({
         credential: idToken,
         role,
@@ -41,15 +179,18 @@ export const GoogleSignInButton = ({
       const targetRoute = getRoleDashboardRoute(res?.user?.role || role);
       navigate(targetRoute, { replace: true });
     } catch (err) {
-      // User closed popup without signing in
-      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+      if (
+        err.code === 'auth/popup-closed-by-user' ||
+        err.code === 'auth/cancelled-popup-request'
+      ) {
         setLoading(false);
         return;
       }
 
-      console.error('Firebase Google Authentication Error:', err);
+      console.error('Google Authentication Error:', err);
       const message =
         err.response?.data?.error?.message ||
+        err.response?.data?.message ||
         err.message ||
         'Google authentication failed. Please try again.';
       setErrorMsg(message);

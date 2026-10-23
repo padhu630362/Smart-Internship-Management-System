@@ -4,6 +4,13 @@ import { useAuth } from './AuthContext';
 import notificationService from '../services/notificationService';
 import chatService from '../services/chatService';
 import soundManager from '../utils/audio';
+import {
+  showDesktopNotification,
+  requestDesktopNotificationPermission,
+  registerServiceWorker,
+  syncPushSubscription,
+  getDesktopNotificationPermission,
+} from '../utils/desktopNotification';
 
 const SocketContext = createContext(null);
 
@@ -40,28 +47,41 @@ export const SocketProvider = ({ children }) => {
     });
   }, []);
 
+  const dismissedToastIdsRef = useRef(new Set());
+
   const dismissToast = useCallback((id) => {
+    if (id) {
+      dismissedToastIdsRef.current.add(id.toString());
+    }
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
   const addToast = useCallback((toastData) => {
+    if (!toastData || !toastData.id) return;
+    const idStr = toastData.id.toString();
+    if (dismissedToastIdsRef.current.has(idStr)) return;
     setToasts((prev) => {
       if (prev.some((t) => t.id === toastData.id)) return prev;
       return [toastData, ...prev.slice(0, 3)];
     });
   }, []);
 
-  // Request browser desktop push permission
+  // Request browser desktop system notification permission following user action
   const requestPushPermission = useCallback(async () => {
-    if (typeof window === 'undefined' || !('Notification' in window)) {
-      return 'unsupported';
-    }
     try {
-      const permission = await Notification.requestPermission();
+      const permission = await requestDesktopNotificationPermission();
       setPushPermission(permission);
+      if (permission === 'granted') {
+        showDesktopNotification({
+          title: 'InternHub Desktop Notifications Active',
+          body: 'You are now ready to receive real-time system alerts on your desktop.',
+          link: '/notifications',
+          tag: 'internhub_enabled',
+        }).catch(() => {});
+      }
       return permission;
     } catch (err) {
-      console.warn('Failed to request push notification permission:', err);
+      console.warn('Failed to request desktop notification permission:', err);
       return 'denied';
     }
   }, []);
@@ -98,6 +118,96 @@ export const SocketProvider = ({ children }) => {
     }
   }, [isAuthenticated]);
 
+  // Unified, deduplicated dispatcher for incoming chat message alerts across the app
+  const alertIncomingChatMessage = useCallback(({
+    conversationId,
+    messageId,
+    senderName,
+    content,
+    attachments,
+    sender,
+    createdAt,
+  }) => {
+    if (!conversationId) return;
+    const cidStr = conversationId.toString();
+    const msgIdStr = messageId ? messageId.toString() : null;
+
+    // Check if recipient is actively viewing this open conversation in visible, focused tab
+    const isWindowFocused =
+      typeof document !== 'undefined' &&
+      (typeof document.hasFocus !== 'function' || document.hasFocus() || Boolean(window.__mockWindowFocus));
+    const isDocumentActive =
+      typeof document !== 'undefined' &&
+      document.visibilityState === 'visible' &&
+      isWindowFocused;
+    const isCurrentActiveChat = activeChatConvRef.current === cidStr;
+    const isActivelyViewing = isCurrentActiveChat && isDocumentActive;
+    const isDuplicate = msgIdStr ? recentToastedMessagesRef.current.has(msgIdStr) : false;
+
+    if (import.meta.env.DEV) {
+      console.log('[NOTIF_DEBUG:3_SUPPRESSION]', JSON.stringify({
+        messageId: msgIdStr,
+        conversationId: cidStr,
+        activeChatConvRef: activeChatConvRef.current,
+        isCurrentActiveChat,
+        visibilityState: typeof document !== 'undefined' ? document.visibilityState : 'unknown',
+        isWindowFocused,
+        isActivelyViewing,
+        isDuplicate,
+        action: isActivelyViewing ? 'SUPPRESS_ACTIVELY_VIEWING' : (isDuplicate ? 'SUPPRESS_DUPLICATE' : 'ALLOW_ALERT'),
+      }));
+    }
+
+    if (isActivelyViewing) {
+      // User is actively reading and chatting in this thread; suppress notification
+      return;
+    }
+
+    // Deduplication check: ensure each message ID is alerted only once across both socket events
+    if (msgIdStr) {
+      if (recentToastedMessagesRef.current.has(msgIdStr)) {
+        return;
+      }
+      recentToastedMessagesRef.current.add(msgIdStr);
+      setTimeout(() => {
+        recentToastedMessagesRef.current.delete(msgIdStr);
+      }, 15000);
+    }
+
+    setTotalChatUnread((prev) => prev + 1);
+
+    // Play pleasant notification audio chime
+    soundManager.playNotificationChime();
+
+    const resolvedSenderName = senderName || sender?.name || 'InternHub Contact';
+    const msgPreview = content
+      ? (content.length > 100 ? `${content.slice(0, 100)}...` : content)
+      : (attachments?.length ? `📎 ${attachments[0]?.fileName || 'Attachment'}` : 'Sent you a message.');
+
+    // 1. Dispatch genuine native OS desktop notification (works in Google Chrome & Microsoft Edge on Windows)
+    showDesktopNotification({
+      title: `New message received — ${resolvedSenderName}`,
+      body: msgPreview,
+      link: `/chat?conversationId=${cidStr}`,
+      tag: `chat_${cidStr}_${msgIdStr || Date.now()}`,
+      metadata: { conversationId: cidStr, messageId: msgIdStr },
+    }).catch(() => {});
+
+    // 2. In-app toast appears only when document is visible (if user is in another tab or minimized, in-app toast is suppressed in favor of native OS popup)
+    if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+      addToast({
+        id: `chat-${msgIdStr || Date.now()}`,
+        type: 'new_message',
+        title: `New message from ${resolvedSenderName}`,
+        message: msgPreview,
+        link: `/chat?conversationId=${cidStr}`,
+        sender,
+        metadata: { conversationId: cidStr, messageId: msgIdStr },
+        createdAt: createdAt || new Date(),
+      });
+    }
+  }, [addToast]);
+
   useEffect(() => {
     if (!isAuthenticated || !token) {
       if (socketRef.current) {
@@ -112,6 +222,13 @@ export const SocketProvider = ({ children }) => {
       setTotalChatUnread(0);
       setToasts([]);
       return;
+    }
+
+    // Register Service Worker and sync push subscription if permission already granted
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      registerServiceWorker().then((reg) => {
+        if (reg) syncPushSubscription(reg).catch(() => {});
+      }).catch(() => {});
     }
 
     refreshNotifications();
@@ -134,6 +251,9 @@ export const SocketProvider = ({ children }) => {
 
     newSocket.on('connect', () => {
       setIsConnected(true);
+      if (typeof window !== 'undefined') {
+        window.__simsSocketConnected = true;
+      }
 
       // Automatically join active conversation room if already open
       if (activeChatConvRef.current) {
@@ -150,6 +270,9 @@ export const SocketProvider = ({ children }) => {
 
     newSocket.on('disconnect', () => {
       setIsConnected(false);
+      if (typeof window !== 'undefined') {
+        window.__simsSocketConnected = false;
+      }
     });
 
     newSocket.on('connect_error', () => {
@@ -172,14 +295,48 @@ export const SocketProvider = ({ children }) => {
 
     // Handle incoming real-time notifications with deduplication, in-app toast popup & desktop push
     newSocket.on('notification:new', (notification) => {
-      if (!notification || !notification._id) return;
+      if (import.meta.env.DEV) {
+        console.log('[NOTIF_DEBUG:1_SOCKET_EVENT]', JSON.stringify({
+          event: 'notification:new',
+          type: notification?.type,
+          notifId: notification?._id || notification?.id,
+          conversationId: notification?.metadata?.conversationId?.toString(),
+          messageId: notification?.metadata?.messageId?.toString(),
+        }));
+      }
+      if (!notification) return;
+      const notifId = (notification._id || notification.id)?.toString();
+      if (!notifId) return;
+
+      const isTest = Boolean(notification.metadata?.isTest);
+      if (isTest) {
+        // Dedicated test desktop notification: trigger native OS system alert, bypass in-app toast & unread counter
+        showDesktopNotification({
+          title: notification.title || 'InternHub Desktop Notification Test',
+          body: notification.message || 'Real-time desktop system alerts are active and working on your device!',
+          link: notification.link || '/notifications',
+          tag: `test_notification_${notification._id || Date.now()}`,
+          metadata: notification.metadata,
+        }).catch(() => {});
+        return;
+      }
 
       const isMsg = notification.type === 'new_message';
       const convId = notification.metadata?.conversationId?.toString();
-      const isCurrentActiveChat = isMsg && convId && activeChatConvRef.current === convId;
 
-      if (isCurrentActiveChat) {
-        // Recipient is actively inside this open conversation in ChatPage; auto-mark read and suppress popup
+      // Check if recipient is actively viewing this open conversation in visible, focused tab
+      const isWindowFocused =
+        typeof document !== 'undefined' &&
+        (typeof document.hasFocus !== 'function' || document.hasFocus() || Boolean(window.__mockWindowFocus));
+      const isDocumentActive =
+        typeof document !== 'undefined' &&
+        document.visibilityState === 'visible' &&
+        isWindowFocused;
+      const isCurrentActiveChat = isMsg && convId && activeChatConvRef.current === convId;
+      const isActivelyViewing = isCurrentActiveChat && isDocumentActive;
+
+      if (isActivelyViewing) {
+        // Recipient is actively viewing this open conversation in a focused tab; auto-mark read and suppress alert
         notification.isRead = true;
         setNotifications((prev) => {
           const filtered = prev.filter((n) => n._id !== notification._id);
@@ -197,21 +354,26 @@ export const SocketProvider = ({ children }) => {
 
       setUnreadCount((prev) => prev + 1);
 
-      // Play pleasant audio chime
-      soundManager.playNotificationChime();
-
-      // Record message ID for deduplication against chat:new_message
-      if (notification.metadata?.messageId) {
-        recentToastedMessagesRef.current.add(notification.metadata.messageId.toString());
-        // Clean up set after 10 seconds
-        setTimeout(() => {
-          recentToastedMessagesRef.current.delete(notification.metadata.messageId.toString());
-        }, 10000);
+      // If this is a chat message, route through the unified, deduplicated dispatcher
+      if (isMsg) {
+        alertIncomingChatMessage({
+          conversationId: convId,
+          messageId: notification.metadata?.messageId,
+          senderName: notification.sender?.name || notification.title?.replace(/^New message from\s*/i, ''),
+          content: notification.message,
+          attachments: [],
+          sender: notification.sender,
+          createdAt: notification.createdAt,
+        });
+        return;
       }
 
-      // Show real-time interactive in-app popup toast
+      // Play pleasant audio chime for non-chat notifications
+      soundManager.playNotificationChime();
+
+      // Show real-time interactive in-app popup toast for non-chat platform notifications
       addToast({
-        id: notification._id,
+        id: notifId,
         type: notification.type,
         title: notification.title,
         message: notification.message,
@@ -221,20 +383,14 @@ export const SocketProvider = ({ children }) => {
         createdAt: notification.createdAt || new Date(),
       });
 
-      // Trigger native browser notification if granted
-      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-        try {
-          const title = notification.title || 'InternHub Notification';
-          const options = {
-            body: notification.message || 'A new update is available in your portal.',
-            icon: '/favicon.ico',
-            tag: notification._id,
-          };
-          new Notification(title, options);
-        } catch (e) {
-          console.debug('Browser notification error:', e);
-        }
-      }
+      // Trigger genuine native desktop system notification
+      showDesktopNotification({
+        title: notification.title || 'InternHub Notification',
+        body: notification.message || 'A new update is available in your portal.',
+        link: notification.link || '/notifications',
+        tag: `notif_${notifId}`,
+        metadata: notification.metadata,
+      }).catch(() => {});
     });
 
     // Cross-tab real-time sync when notifications are read or cleared anywhere
@@ -290,39 +446,38 @@ export const SocketProvider = ({ children }) => {
 
     // Handle real-time direct & group chat incoming message alerts across the app
     newSocket.on('chat:new_message', ({ conversationId, message }) => {
+      if (import.meta.env.DEV) {
+        console.log('[NOTIF_DEBUG:1_SOCKET_EVENT]', JSON.stringify({
+          event: 'chat:new_message',
+          conversationId: conversationId?.toString(),
+          hasMessage: Boolean(message),
+        }));
+      }
       if (!conversationId || !message) return;
       const currentUid = (user?.id || user?._id || '').toString();
       const senderId = (message.sender?._id || message.sender)?.toString();
 
-      // Don't toast own sent messages
+      if (import.meta.env.DEV) {
+        console.log('[NOTIF_DEBUG:2_IDENTIFY]', JSON.stringify({
+          messageId: message._id?.toString(),
+          recipientId: currentUid,
+          senderId,
+          isOwnMessage: senderId === currentUid,
+        }));
+      }
+
+      // Don't alert own sent messages
       if (senderId && senderId === currentUid) return;
 
-      const isCurrentActiveChat = activeChatConvRef.current === conversationId.toString();
-
-      if (!isCurrentActiveChat) {
-        setTotalChatUnread((prev) => prev + 1);
-
-        const msgId = (message._id || '').toString();
-        if (msgId && !recentToastedMessagesRef.current.has(msgId)) {
-          recentToastedMessagesRef.current.add(msgId);
-          setTimeout(() => {
-            recentToastedMessagesRef.current.delete(msgId);
-          }, 10000);
-
-          soundManager.playNotificationChime();
-
-          addToast({
-            id: `chat-${msgId || Date.now()}`,
-            type: 'new_message',
-            title: `New message from ${message.sender?.name || 'Someone'}`,
-            message: message.content || 'Sent a new message',
-            link: `/chat?conversationId=${conversationId}`,
-            sender: message.sender,
-            metadata: { conversationId, messageId: message._id },
-            createdAt: message.createdAt || new Date(),
-          });
-        }
-      }
+      alertIncomingChatMessage({
+        conversationId,
+        messageId: message._id,
+        senderName: message.sender?.name,
+        content: message.content,
+        attachments: message.attachments,
+        sender: message.sender,
+        createdAt: message.createdAt,
+      });
     });
 
     // Handle read receipt updates
@@ -336,7 +491,7 @@ export const SocketProvider = ({ children }) => {
       newSocket.disconnect();
       socketRef.current = null;
     };
-  }, [isAuthenticated, token, user, refreshNotifications, refreshChatUnread, addToast]);
+  }, [isAuthenticated, token, user, refreshNotifications, refreshChatUnread, addToast, alertIncomingChatMessage]);
 
   // Chat Socket Helpers
   const joinConversation = useCallback((conversationId, callback) => {

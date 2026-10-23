@@ -9,6 +9,7 @@ import app from '../src/app.js';
 import { connectDB } from '../src/config/db.js';
 import { User, ROLES, USER_STATUSES } from '../src/models/User.js';
 import { Session } from '../src/models/Session.js';
+import { signToken } from '../src/utils/jwt.js';
 
 describe('Phase 12: 2FA, Session Management & RBAC Route Protection Tests', () => {
   const timestamp = Date.now();
@@ -143,6 +144,45 @@ describe('Phase 12: 2FA, Session Management & RBAC Route Protection Tests', () =
       .set('Authorization', `Bearer ${userToken}`);
 
     assert.equal(primaryValidRes.status, 200);
+  });
+
+  it('TC-SESS-04: Authenticated API responses include Cache-Control no-store headers', async () => {
+    const res = await request(app)
+      .get('/api/users/profile')
+      .set('Authorization', `Bearer ${userToken}`);
+
+    assert.equal(res.status, 200);
+    const cacheControl = res.headers['cache-control'] || '';
+    assert.ok(cacheControl.includes('no-store'), 'Must include no-store in Cache-Control');
+    assert.ok(cacheControl.includes('no-cache'), 'Must include no-cache in Cache-Control');
+  });
+
+  it('TC-SESS-05: Request with expired token signature returns 401 TOKEN_EXPIRED', async () => {
+    const expiredToken = signToken({ id: testUser._id, role: ROLES.STUDENT }, -10);
+    const res = await request(app)
+      .get('/api/users/profile')
+      .set('Authorization', `Bearer ${expiredToken}`);
+
+    assert.equal(res.status, 401);
+    assert.equal(res.body.error.code, 'TOKEN_EXPIRED');
+  });
+
+  it('TC-SESS-06: Request with malformed or tampered token returns 401 INVALID_TOKEN', async () => {
+    const malformedToken = `${userToken}tampered`;
+    const res = await request(app)
+      .get('/api/users/profile')
+      .set('Authorization', `Bearer ${malformedToken}`);
+
+    assert.equal(res.status, 401);
+    assert.equal(res.body.error.code, 'INVALID_TOKEN');
+  });
+
+  it('TC-SESS-07: Request with missing Bearer token returns 401 UNAUTHORIZED', async () => {
+    const res = await request(app)
+      .get('/api/users/profile');
+
+    assert.equal(res.status, 401);
+    assert.equal(res.body.error.code, 'UNAUTHORIZED');
   });
 
   // ==========================================

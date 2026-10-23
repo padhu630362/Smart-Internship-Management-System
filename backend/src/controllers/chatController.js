@@ -1,11 +1,15 @@
 import mongoose from 'mongoose';
+import path from 'path';
+import fs from 'fs';
 import { Conversation, CONVERSATION_TYPES } from '../models/Conversation.js';
-import { Message } from '../models/Message.js';
+import { Message, ATTACHMENT_TYPES } from '../models/Message.js';
 import { User, ROLES, USER_STATUSES } from '../models/User.js';
 import { Allocation } from '../models/Allocation.js';
 import { Application } from '../models/Application.js';
 import {
   emitChatMessage,
+  emitMessageEdited,
+  emitMessageDeleted,
   emitConversationUpdated,
   emitReadReceipt,
   emitNotificationReadToUser,
@@ -17,22 +21,23 @@ import {
   createAndDispatchNotification,
   NOTIFICATION_TYPES,
 } from '../services/notificationService.js';
+import { CHAT_UPLOAD_DIR, getAttachmentType } from '../utils/chatFileUpload.js';
 import { logger } from '../utils/logger.js';
 
 /**
- * List all conversations for the authenticated user with unread counts
+ * List all conversations for the authenticated user with unread counts & partner presence
  */
 export const getConversations = async (req, res, next) => {
   try {
     const userId = req.user.id;
 
     const conversations = await Conversation.find({ participants: userId })
-      .populate('participants', 'name email role profile')
+      .populate('participants', 'name email role profile lastSeen')
       .populate('creator', 'name email role')
       .populate('groupAdmins', 'name email role')
       .populate({
         path: 'lastMessage',
-        select: 'content sender createdAt isDeleted',
+        select: 'content sender createdAt isDeleted attachments',
         populate: { path: 'sender', select: 'name email role' },
       })
       .sort({ lastMessageAt: -1 })
@@ -54,6 +59,7 @@ export const getConversations = async (req, res, next) => {
           sender: { $ne: userId },
           createdAt: { $gt: lastReadAt },
           isDeleted: false,
+          deletedFor: { $ne: userId },
         });
 
         // For direct chats, calculate partner's online status
@@ -114,7 +120,7 @@ export const createConversation = async (req, res, next) => {
       });
 
       const populatedGroup = await Conversation.findById(newGroup._id)
-        .populate('participants', 'name email role profile')
+        .populate('participants', 'name email role profile lastSeen')
         .populate('creator', 'name email role')
         .populate('groupAdmins', 'name email role');
 
@@ -136,10 +142,10 @@ export const createConversation = async (req, res, next) => {
       type: CONVERSATION_TYPES.DIRECT,
       participants: { $all: [userId, recipientId], $size: 2 },
     })
-      .populate('participants', 'name email role profile')
+      .populate('participants', 'name email role profile lastSeen')
       .populate({
         path: 'lastMessage',
-        select: 'content sender createdAt',
+        select: 'content sender createdAt isDeleted attachments',
         populate: { path: 'sender', select: 'name email role' },
       });
 
@@ -151,11 +157,10 @@ export const createConversation = async (req, res, next) => {
       });
     }
 
-    // Create new direct conversation
-    const newConv = await Conversation.create({
+    // Create fresh direct conversation
+    const newDirectConv = await Conversation.create({
       type: CONVERSATION_TYPES.DIRECT,
       participants: [userId, recipientId],
-      creator: userId,
       readReceipts: [
         { user: userId, lastReadAt: new Date() },
         { user: recipientId, lastReadAt: new Date(0) },
@@ -163,10 +168,8 @@ export const createConversation = async (req, res, next) => {
       lastMessageAt: new Date(),
     });
 
-    directConv = await Conversation.findById(newConv._id).populate(
-      'participants',
-      'name email role profile'
-    );
+    directConv = await Conversation.findById(newDirectConv._id)
+      .populate('participants', 'name email role profile lastSeen');
 
     emitConversationUpdated(directConv._id, directConv, [userId, recipientId]);
 
@@ -199,6 +202,7 @@ export const getConversationById = async (req, res, next) => {
       sender: { $ne: userId },
       createdAt: { $gt: lastReadAt },
       isDeleted: false,
+      deletedFor: { $ne: userId },
     });
 
     res.status(200).json({
@@ -214,24 +218,31 @@ export const getConversationById = async (req, res, next) => {
 };
 
 /**
- * Get paginated messages for a conversation
+ * Get paginated messages for a conversation with populated replies & sender info
  */
 export const getMessages = async (req, res, next) => {
   try {
     const conversationId = req.conversation._id;
+    const userId = req.user.id;
     const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 30));
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 40));
     const skip = (page - 1) * limit;
 
+    // Exclude messages deleted specifically for current user
     const query = {
       conversation: conversationId,
-      isDeleted: false,
+      deletedFor: { $ne: userId },
     };
 
     const [messagesDesc, total] = await Promise.all([
       Message.find(query)
         .populate('sender', 'name email role profile')
         .populate('reactions.user', 'name role profile')
+        .populate({
+          path: 'replyTo',
+          select: 'content sender attachments isDeleted',
+          populate: { path: 'sender', select: 'name email role' },
+        })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -260,23 +271,107 @@ export const getMessages = async (req, res, next) => {
 };
 
 /**
- * Send a new text message in conversation
+ * Send a new message (text, files, and/or quoted reply) in conversation
  */
 export const sendMessage = async (req, res, next) => {
   try {
     const conversation = req.conversation;
     const userId = req.user.id;
-    const content = req.sanitizedContent;
+    const content = req.sanitizedContent || '';
+    const replyToId = req.replyToMessageId;
+    const clientMsgId = req.clientMsgId;
+
+    // Idempotency check: prevent duplicate message delivery on client network retry
+    if (clientMsgId) {
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+      const existingMsg = await Message.findOne({
+        conversation: conversation._id,
+        sender: userId,
+        clientMsgId,
+        createdAt: { $gte: fiveMinutesAgo },
+      })
+        .populate('sender', 'name email role profile')
+        .populate('reactions.user', 'name role profile')
+        .populate({
+          path: 'replyTo',
+          select: 'content sender attachments isDeleted',
+          populate: { path: 'sender', select: 'name email role' },
+        })
+        .lean();
+
+      if (existingMsg) {
+        return res.status(200).json({
+          success: true,
+          message: 'Message already sent (idempotent response).',
+          data: { message: existingMsg },
+        });
+      }
+    }
+
+    // Process attached files if uploaded via multipart/form-data
+    const attachments = [];
+    const filesToProcess = [];
+
+    if (req.file) {
+      filesToProcess.push(req.file);
+    }
+    if (req.files) {
+      if (Array.isArray(req.files)) {
+        filesToProcess.push(...req.files);
+      } else if (typeof req.files === 'object') {
+        const allFiles = Object.values(req.files).flat().filter(Boolean);
+        filesToProcess.push(...allFiles);
+      }
+    }
+
+    for (const f of filesToProcess) {
+      const ext = path.extname(f.originalname).toLowerCase();
+      const fileType = getAttachmentType(ext, f.mimetype);
+      attachments.push({
+        url: `/api/chat/attachments/${f.filename}`,
+        fileName: f.originalname,
+        fileType,
+        mimeType: f.mimetype,
+        size: f.size,
+        fileKey: f.filename,
+      });
+    }
+
+    // Also support pre-uploaded attachment objects passed via JSON body
+    if (Array.isArray(req.body.attachments)) {
+      for (const att of req.body.attachments) {
+        if (att && att.fileKey && att.fileName) {
+          attachments.push({
+            url: att.url || `/api/chat/attachments/${att.fileKey}`,
+            fileName: att.fileName,
+            fileType: att.fileType || 'other',
+            mimeType: att.mimeType || 'application/octet-stream',
+            size: Number(att.size) || 0,
+            fileKey: att.fileKey,
+          });
+        }
+      }
+    }
 
     const newMessage = await Message.create({
       conversation: conversation._id,
       sender: userId,
       content,
+      attachments,
+      replyTo: replyToId || null,
+      clientMsgId: clientMsgId || null,
+      status: 'sent',
       readBy: [userId],
     });
 
     const populatedMessage = await Message.findById(newMessage._id)
       .populate('sender', 'name email role profile')
+      .populate('reactions.user', 'name role profile')
+      .populate({
+        path: 'replyTo',
+        select: 'content sender attachments isDeleted',
+        populate: { path: 'sender', select: 'name email role' },
+      })
       .lean();
 
     // Update conversation last message timestamp & sender read receipt
@@ -297,6 +392,12 @@ export const sendMessage = async (req, res, next) => {
     // Real-time Socket.IO emission to room and individual user rooms
     emitChatMessage(conversation._id, populatedMessage, conversation.participants);
 
+    // Notification summary text
+    let notifSnippet = content;
+    if (!notifSnippet && attachments.length > 0) {
+      notifSnippet = `Sent an attachment: ${attachments[0].fileName}`;
+    }
+
     // Dispatch real-time in-app notification to all other participants
     for (const participantId of conversation.participants) {
       const pIdStr = (participantId._id || participantId).toString();
@@ -306,7 +407,7 @@ export const sendMessage = async (req, res, next) => {
           senderId: userId,
           type: NOTIFICATION_TYPES.NEW_MESSAGE,
           title: `New message from ${req.user.name}`,
-          message: content.length > 80 ? `${content.substring(0, 77)}...` : content,
+          message: notifSnippet.length > 80 ? `${notifSnippet.substring(0, 77)}...` : notifSnippet,
           link: `/chat?conversationId=${conversation._id}`,
           eventKey: `MSG:${newMessage._id}:${pIdStr}`,
           metadata: {
@@ -321,6 +422,345 @@ export const sendMessage = async (req, res, next) => {
       success: true,
       message: 'Message sent successfully.',
       data: { message: populatedMessage },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Upload single attachment file directly and return metadata
+ */
+export const uploadAttachment = (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({
+      success: false,
+      message: 'No file uploaded or invalid file format.',
+    });
+  }
+
+  const ext = path.extname(req.file.originalname).toLowerCase();
+  const fileType = getAttachmentType(ext, req.file.mimetype);
+
+  const attachment = {
+    url: `/api/chat/attachments/${req.file.filename}`,
+    fileName: req.file.originalname,
+    fileType,
+    mimeType: req.file.mimetype,
+    size: req.file.size,
+    fileKey: req.file.filename,
+  };
+
+  res.status(200).json({
+    success: true,
+    message: 'File uploaded successfully.',
+    data: { attachment },
+  });
+};
+
+/**
+ * Securely stream and download chat attachment with membership authorization check
+ */
+export const downloadAttachment = async (req, res, next) => {
+  try {
+    const { fileKey } = req.params;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    if (!fileKey || typeof fileKey !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid file key.',
+      });
+    }
+
+    // Sanitize filename to prevent directory traversal
+    const safeKey = path.basename(fileKey);
+    const filePath = path.join(CHAT_UPLOAD_DIR, safeKey);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        success: false,
+        message: 'Attachment file not found on server.',
+      });
+    }
+
+    // Locate the message containing this attachment to verify user membership
+    const message = await Message.findOne({
+      'attachments.fileKey': safeKey,
+    });
+
+    if (!message) {
+      return res.status(404).json({
+        success: false,
+        message: 'Attachment record not found.',
+      });
+    }
+
+    // Check conversation membership
+    const conversation = await Conversation.findById(message.conversation);
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Conversation not found.',
+      });
+    }
+
+    const isMember = conversation.participants.some(
+      (p) => (p._id || p).toString() === userId.toString()
+    );
+    const isPrivileged = userRole === ROLES.ADMIN || userRole === ROLES.COORDINATOR;
+
+    if (!isMember && !isPrivileged) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You are not authorized to download files from this conversation.',
+      });
+    }
+
+    const targetAttachment = message.attachments.find((a) => a.fileKey === safeKey);
+    const originalName = targetAttachment?.fileName || safeKey;
+    const mimeType = targetAttachment?.mimeType || 'application/octet-stream';
+
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(originalName)}"`);
+
+    const stream = fs.createReadStream(filePath);
+    stream.pipe(res);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Edit an existing message
+ */
+export const editMessage = async (req, res, next) => {
+  try {
+    const { messageId } = req.params;
+    const userId = req.user.id;
+    const content = req.sanitizedContent;
+
+    if (!mongoose.Types.ObjectId.isValid(messageId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid message ID.',
+      });
+    }
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message not found.',
+      });
+    }
+
+    if (message.isDeleted) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot edit a deleted message.',
+      });
+    }
+
+    // Only the author can edit their own message
+    if (message.sender.toString() !== userId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You can only edit your own messages.',
+      });
+    }
+
+    message.content = content;
+    message.isEdited = true;
+    message.editedAt = new Date();
+    await message.save();
+
+    const populated = await Message.findById(message._id)
+      .populate('sender', 'name email role profile')
+      .populate('reactions.user', 'name role profile')
+      .populate({
+        path: 'replyTo',
+        select: 'content sender attachments isDeleted',
+        populate: { path: 'sender', select: 'name email role' },
+      })
+      .lean();
+
+    const conversation = await Conversation.findById(message.conversation);
+    if (conversation) {
+      emitMessageEdited(conversation._id, populated, conversation.participants);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Message edited successfully.',
+      data: { message: populated },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Delete a message (supports "Delete for me" and "Delete for everyone")
+ */
+export const deleteMessage = async (req, res, next) => {
+  try {
+    const { messageId } = req.params;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const mode = req.deleteMode || 'everyone';
+
+    if (!mongoose.Types.ObjectId.isValid(messageId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid message ID.',
+      });
+    }
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message not found.',
+      });
+    }
+
+    const conversation = await Conversation.findById(message.conversation);
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Conversation not found.',
+      });
+    }
+
+    if (mode === 'everyone') {
+      const isSender = message.sender.toString() === userId.toString();
+      const isPrivileged = userRole === ROLES.ADMIN || userRole === ROLES.COORDINATOR;
+
+      if (!isSender && !isPrivileged) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied: Only the sender or an administrator can delete this message for everyone.',
+        });
+      }
+
+      // Mark message as deleted for everyone and clear attachments
+      message.isDeleted = true;
+      message.content = 'This message was deleted';
+      message.attachments = [];
+      await message.save();
+
+      emitMessageDeleted(
+        conversation._id,
+        {
+          conversationId: conversation._id.toString(),
+          messageId: message._id.toString(),
+          isDeletedForEveryone: true,
+        },
+        conversation.participants
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: 'Message deleted for everyone.',
+        data: { messageId: message._id.toString(), mode: 'everyone' },
+      });
+    }
+
+    // Delete for me only
+    await Message.findByIdAndUpdate(messageId, {
+      $addToSet: { deletedFor: userId },
+    });
+
+    emitMessageDeleted(
+      conversation._id,
+      {
+        conversationId: conversation._id.toString(),
+        messageId: message._id.toString(),
+        isDeletedForEveryone: false,
+        deletedForUserId: userId.toString(),
+      },
+      conversation.participants
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'Message deleted for you.',
+      data: { messageId: message._id.toString(), mode: 'me' },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Forward an existing message to one or multiple conversations
+ */
+export const forwardMessage = async (req, res, next) => {
+  try {
+    const { messageId } = req.params;
+    const userId = req.user.id;
+    const rawTargetIds = req.body.targetConversationIds || [req.body.targetConversationId];
+    const targetConversationIds = Array.isArray(rawTargetIds)
+      ? rawTargetIds.filter((id) => mongoose.Types.ObjectId.isValid(id))
+      : [];
+
+    if (targetConversationIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one valid target conversation ID is required.',
+      });
+    }
+
+    const sourceMessage = await Message.findById(messageId);
+    if (!sourceMessage || sourceMessage.isDeleted) {
+      return res.status(404).json({
+        success: false,
+        message: 'Source message not found or has been deleted.',
+      });
+    }
+
+    const forwardedMessages = [];
+    const now = new Date();
+
+    for (const targetId of targetConversationIds) {
+      const conv = await Conversation.findOne({
+        _id: targetId,
+        participants: userId,
+      });
+
+      if (!conv) continue;
+
+      const newMsg = await Message.create({
+        conversation: conv._id,
+        sender: userId,
+        content: sourceMessage.content,
+        attachments: sourceMessage.attachments,
+        readBy: [userId],
+        status: 'sent',
+      });
+
+      const populated = await Message.findById(newMsg._id)
+        .populate('sender', 'name email role profile')
+        .populate('reactions.user', 'name role profile')
+        .lean();
+
+      await Conversation.findByIdAndUpdate(conv._id, {
+        $set: {
+          lastMessage: newMsg._id,
+          lastMessageAt: now,
+        },
+      });
+
+      emitChatMessage(conv._id, populated, conv.participants);
+      forwardedMessages.push(populated);
+    }
+
+    res.status(201).json({
+      success: true,
+      message: `Message forwarded to ${forwardedMessages.length} conversation(s).`,
+      data: { forwardedMessages },
     });
   } catch (err) {
     next(err);
@@ -370,7 +810,7 @@ export const simulatePartnerReply = async (req, res, next) => {
       sampleReplies[Math.floor(Math.random() * sampleReplies.length)];
 
     // 1. Emit live typing indicator for partner
-    const { getIO, emitChatMessage } = await import('../socket.js');
+    const { getIO } = await import('../socket.js');
     const io = getIO();
     if (io) {
       io.to(`conversation:${conversation._id}`).emit('chat:typing', {
@@ -476,8 +916,7 @@ export const markConversationRead = async (req, res, next) => {
 
     emitReadReceipt(conversationId, userId, now, req.conversation.participants);
 
-    // Also mark all in-app notifications for this conversation as read
-    // Delete in-app message notifications for this conversation since messages have been checked
+    // Delete in-app message notifications for this conversation
     await Notification.deleteMany({
       recipient: userId,
       $or: [
@@ -594,7 +1033,7 @@ export const updateGroupMembers = async (req, res, next) => {
     await conversation.save();
 
     const updatedConv = await Conversation.findById(conversation._id)
-      .populate('participants', 'name email role profile')
+      .populate('participants', 'name email role profile lastSeen')
       .populate('creator', 'name email role')
       .populate('groupAdmins', 'name email role');
 
@@ -626,7 +1065,7 @@ export const getContacts = async (req, res, next) => {
     }).select('_id');
     const staffIds = staff.map((s) => s._id.toString());
 
-    // Fetch all active companies and mentors so users can message all company members
+    // Fetch all active companies and mentors
     const companyAndMentors = await User.find({
       role: { $in: [ROLES.COMPANY, ROLES.MENTOR] },
       status: USER_STATUSES.ACTIVE,
@@ -636,7 +1075,7 @@ export const getContacts = async (req, res, next) => {
     let allowedUserIds = new Set([...staffIds, ...companyAndMentorIds]);
 
     if (user.role === ROLES.STUDENT) {
-      // Students can message all company members, mentors, staff, plus any allocated peers
+      // Students can message company members, mentors, staff, plus allocated peers
       const [allocations, applications] = await Promise.all([
         Allocation.find({ student: userId, status: 'active' }).select('company mentor'),
         Application.find({ student: userId }).select('company'),
@@ -652,24 +1091,21 @@ export const getContacts = async (req, res, next) => {
 
       query._id = { $in: Array.from(allowedUserIds) };
     } else if (user.role === ROLES.COMPANY) {
-      // Companies can message all staff, mentors, and all students
       const allStudents = await User.find({ role: ROLES.STUDENT, status: USER_STATUSES.ACTIVE }).select('_id');
       allStudents.forEach((s) => allowedUserIds.add(s._id.toString()));
 
       query._id = { $in: Array.from(allowedUserIds) };
     } else if (user.role === ROLES.MENTOR) {
-      // Mentors can message all staff, company members, other mentors, and students
       const allStudents = await User.find({ role: ROLES.STUDENT, status: USER_STATUSES.ACTIVE }).select('_id');
       allStudents.forEach((s) => allowedUserIds.add(s._id.toString()));
 
       query._id = { $in: Array.from(allowedUserIds) };
     } else {
-      // Admins and coordinators can message anyone in the system
       query = { _id: { $ne: userId }, status: USER_STATUSES.ACTIVE };
     }
 
     const contacts = await User.find(query)
-      .select('name email role status profile createdAt')
+      .select('name email role status profile lastSeen createdAt')
       .sort({ role: 1, name: 1 })
       .lean();
 
@@ -704,7 +1140,7 @@ export const getOnlineUsers = (req, res) => {
 };
 
 /**
- * Toggle an emoji reaction on a message (add if not present, remove if already reacted)
+ * Toggle an emoji reaction on a message
  */
 export const toggleMessageReaction = async (req, res, next) => {
   try {
@@ -727,7 +1163,6 @@ export const toggleMessageReaction = async (req, res, next) => {
       });
     }
 
-    // Verify user is a member of this conversation
     const conversation = await Conversation.findOne({
       _id: message.conversation,
       participants: userId,
@@ -749,10 +1184,8 @@ export const toggleMessageReaction = async (req, res, next) => {
     );
 
     if (existingIndex > -1) {
-      // User already reacted with this emoji: remove (toggle off)
       message.reactions.splice(existingIndex, 1);
     } else {
-      // Add new reaction
       message.reactions.push({
         emoji: trimmedEmoji,
         user: userId,
@@ -767,7 +1200,6 @@ export const toggleMessageReaction = async (req, res, next) => {
       .populate('reactions.user', 'name role profile')
       .lean();
 
-    // Broadcast reaction live via Socket.IO to room & user rooms
     emitMessageReaction(
       message.conversation,
       {

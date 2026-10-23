@@ -1,0 +1,21 @@
+{
+  "short_name": "InternHub",
+  "name": "InternHub — Smart Internship Management System",
+  "icons": [
+    {
+      "src": "/internhub-icon.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/internhub-icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#090d16",
+  "theme_color": "#722f37",
+  "display": "standalone"
+}
+

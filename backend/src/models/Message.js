@@ -1,5 +1,30 @@
 import mongoose from 'mongoose';
 
+export const ATTACHMENT_TYPES = {
+  IMAGE: 'image',
+  PDF: 'pdf',
+  DOCUMENT: 'document',
+  SPREADSHEET: 'spreadsheet',
+  PRESENTATION: 'presentation',
+  OTHER: 'other',
+};
+
+const attachmentSchema = new mongoose.Schema(
+  {
+    url: { type: String, required: true },
+    fileName: { type: String, required: true, trim: true },
+    fileType: {
+      type: String,
+      enum: Object.values(ATTACHMENT_TYPES),
+      default: ATTACHMENT_TYPES.OTHER,
+    },
+    mimeType: { type: String, required: true },
+    size: { type: Number, required: true },
+    fileKey: { type: String, required: true },
+  },
+  { _id: true, timestamps: true }
+);
+
 const messageSchema = new mongoose.Schema(
   {
     conversation: {
@@ -16,10 +41,25 @@ const messageSchema = new mongoose.Schema(
     },
     content: {
       type: String,
-      required: [true, 'Message content cannot be empty.'],
       trim: true,
-      minlength: [1, 'Message must be at least 1 character long.'],
       maxlength: [2000, 'Message cannot exceed 2000 characters.'],
+      default: '',
+    },
+    attachments: [attachmentSchema],
+    replyTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Message',
+      default: null,
+    },
+    clientMsgId: {
+      type: String,
+      default: null,
+      index: true,
+    },
+    status: {
+      type: String,
+      enum: ['sent', 'delivered', 'read'],
+      default: 'sent',
     },
     readBy: [
       {
@@ -30,6 +70,20 @@ const messageSchema = new mongoose.Schema(
     isDeleted: {
       type: Boolean,
       default: false,
+    },
+    deletedFor: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
+    isEdited: {
+      type: Boolean,
+      default: false,
+    },
+    editedAt: {
+      type: Date,
+      default: null,
     },
     reactions: [
       {
@@ -59,5 +113,7 @@ const messageSchema = new mongoose.Schema(
 
 // Performance compound index for fast chat history retrieval
 messageSchema.index({ conversation: 1, createdAt: -1 });
+messageSchema.index({ conversation: 1, deletedFor: 1 });
 
 export const Message = mongoose.model('Message', messageSchema);
+export default Message;

@@ -10,12 +10,22 @@ import {
   deleteNotification,
   clearAllNotifications,
   createAnnouncement,
+  getVapidPublicKey,
+  subscribePush,
+  unsubscribePush,
+  sendTestNotification,
 } from '../controllers/notificationController.js';
 
 const router = Router();
 
 // All notification routes require authenticated user
 router.use(authenticateToken);
+
+// Web Push & Desktop Notifications
+router.get('/push/vapid-key', getVapidPublicKey);
+router.post('/push/subscribe', subscribePush);
+router.post('/push/unsubscribe', unsubscribePush);
+router.post('/test-desktop', sendTestNotification);
 
 router.get('/', getNotifications);
 router.get('/unread-count', getUnreadCount);

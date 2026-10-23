@@ -59,7 +59,7 @@ export const createAllocation = async (req, res, next) => {
       type: NOTIFICATION_TYPES.INTERN_ALLOCATED,
       title: 'Internship Allocation Confirmed',
       message: `Congratulations! You have been placed into "${internship.title}".`,
-      link: '/allocations',
+      link: '/dashboard',
       eventKey: `allocation_student:${allocation._id}`,
       metadata: {
         allocationId: allocation._id,
@@ -75,7 +75,7 @@ export const createAllocation = async (req, res, next) => {
         type: NOTIFICATION_TYPES.INTERN_ALLOCATED,
         title: 'New Intern Assigned',
         message: `${student.name} has been assigned to your mentorship for "${internship.title}".`,
-        link: '/allocations',
+        link: '/manage/allocations',
         eventKey: `allocation_mentor:${allocation._id}`,
         metadata: {
           allocationId: allocation._id,
@@ -273,6 +273,9 @@ export const updateAllocationStatus = async (req, res, next) => {
           mentor: populated.mentor,
           startDate: populated.startDate,
           endDate: populated.endDate,
+          deliveryEmail: populated.student?.email || populated.completionRequest?.preferredDeliveryEmail,
+          issuedBy: req.user.id,
+          issuedByRole: req.user.role,
         });
 
         // Await tracked email delivery safely

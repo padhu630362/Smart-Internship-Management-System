@@ -3,21 +3,15 @@ import { hashPassword } from '../utils/security.js';
 import { logger } from '../utils/logger.js';
 
 /**
- * Designated Administrators and Coordinators for InternHub.
+ * Designated Platform Administrator for InternHub.
  * Exclusively configured for:
  * 1. s.v.padmavathi2005@gmail.com (Password: Q12345678)
- * 2. arshadtaiyab010@gmail.com (Password: W12345678)
  */
 export const DESIGNATED_ADMINS = [
   {
     name: 'Padmavathi',
     email: 's.v.padmavathi2005@gmail.com',
     password: 'Q12345678',
-  },
-  {
-    name: 'Arshad Taiyab',
-    email: 'arshadtaiyab010@gmail.com',
-    password: 'W12345678',
   },
 ];
 

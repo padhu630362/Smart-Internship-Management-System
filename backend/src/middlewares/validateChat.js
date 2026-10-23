@@ -40,13 +40,63 @@ export const chatRateLimiter = (req, res, next) => {
 };
 
 /**
- * Validates text message payload
+ * Validates text or attachment message payload
  */
 export const validateSendMessage = (req, res, next) => {
+  const { content, replyTo, clientMsgId } = req.body;
+
+  let hasFiles = Boolean(req.file);
+  if (req.files) {
+    if (Array.isArray(req.files) && req.files.length > 0) {
+      hasFiles = true;
+    } else if (typeof req.files === 'object') {
+      const allFiles = Object.values(req.files).flat().filter(Boolean);
+      if (allFiles.length > 0) hasFiles = true;
+    }
+  }
+  if (Array.isArray(req.body.attachments) && req.body.attachments.length > 0) {
+    hasFiles = true;
+  }
+
+  const rawContent = typeof content === 'string' ? content : '';
+  const trimmed = rawContent.trim();
+
+  // If no files attached, content must not be empty
+  if (!hasFiles && !trimmed) {
+    const error = new Error('Message content cannot be empty.');
+    error.statusCode = 400;
+    error.code = 'VALIDATION_ERROR';
+    return next(error);
+  }
+
+  if (trimmed.length > 2000) {
+    const error = new Error('Message length exceeds the 2000 character maximum limit.');
+    error.statusCode = 400;
+    error.code = 'MESSAGE_TOO_LONG';
+    return next(error);
+  }
+
+  if (replyTo && !mongoose.Types.ObjectId.isValid(replyTo)) {
+    const error = new Error('Invalid replyTo message ID format.');
+    error.statusCode = 400;
+    error.code = 'INVALID_ID_FORMAT';
+    return next(error);
+  }
+
+  req.sanitizedContent = trimmed;
+  req.replyToMessageId = replyTo || null;
+  req.clientMsgId = typeof clientMsgId === 'string' ? clientMsgId.trim().slice(0, 100) : null;
+  next();
+};
+
+/**
+ * Validates message edit payload
+ */
+export const validateEditMessage = (req, res, next) => {
   const { content } = req.body;
 
   if (!content || typeof content !== 'string' || !content.trim()) {
-    const error = new Error('Message content cannot be empty.');
+    const error = new Error('Edited message content cannot be empty.');
     error.statusCode = 400;
     error.code = 'VALIDATION_ERROR';
     return next(error);
@@ -61,6 +111,21 @@ export const validateSendMessage = (req, res, next) => {
   }
 
   req.sanitizedContent = trimmed;
+  next();
+};
+
+/**
+ * Validates message delete payload
+ */
+export const validateDeleteMessage = (req, res, next) => {
+  const mode = req.body?.mode || req.query?.mode || 'everyone';
+  if (!['everyone', 'me'].includes(mode)) {
+    const error = new Error("Invalid delete mode. Must be either 'everyone' or 'me'.");
+    error.statusCode = 400;
+    error.code = 'INVALID_DELETE_MODE';
+    return next(error);
+  }
+  req.deleteMode = mode;
   next();
 };
 
