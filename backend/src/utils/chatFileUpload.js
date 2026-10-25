@@ -24,12 +24,19 @@ export const ALLOWED_CHAT_EXTENSIONS = new Set([
   '.jpg',
   '.jpeg',
   '.webp',
+  '.mp4',
+  '.webm',
+  '.mov',
+  '.mkv',
   '.doc',
   '.docx',
   '.xls',
   '.xlsx',
   '.ppt',
   '.pptx',
+  '.txt',
+  '.csv',
+  '.zip',
 ]);
 
 export const ALLOWED_CHAT_MIME_TYPES = new Set([
@@ -37,12 +44,20 @@ export const ALLOWED_CHAT_MIME_TYPES = new Set([
   'image/png',
   'image/jpeg',
   'image/webp',
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
+  'video/x-matroska',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.ms-excel',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/vnd.ms-powerpoint',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain',
+  'text/csv',
+  'application/zip',
+  'application/x-zip-compressed',
   'application/octet-stream', // Some browsers send octet-stream for office files
 ]);
 
@@ -51,20 +66,25 @@ export const getAttachmentType = (ext, mimeType) => {
   if (['.png', '.jpg', '.jpeg', '.webp'].includes(extension) || mimeType?.startsWith('image/')) {
     return 'image';
   }
+  if (['.mp4', '.webm', '.mov', '.mkv'].includes(extension) || mimeType?.startsWith('video/')) {
+    return 'video';
+  }
   if (extension === '.pdf' || mimeType === 'application/pdf') {
     return 'pdf';
   }
   if (
-    ['.doc', '.docx'].includes(extension) ||
+    ['.doc', '.docx', '.txt'].includes(extension) ||
     mimeType?.includes('wordprocessingml') ||
-    mimeType === 'application/msword'
+    mimeType === 'application/msword' ||
+    mimeType === 'text/plain'
   ) {
     return 'document';
   }
   if (
-    ['.xls', '.xlsx'].includes(extension) ||
+    ['.xls', '.xlsx', '.csv'].includes(extension) ||
     mimeType?.includes('spreadsheetml') ||
-    mimeType?.includes('excel')
+    mimeType?.includes('excel') ||
+    mimeType === 'text/csv'
   ) {
     return 'spreadsheet';
   }

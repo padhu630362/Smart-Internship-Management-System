@@ -329,6 +329,7 @@ export const getMessages = async (req, res, next) => {
       })
         .populate('sender', 'name email role profile')
         .populate('reactions.user', 'name role profile')
+        .populate('readBy', 'name email role profile')
         .populate({
           path: 'replyTo',
           select: 'content sender attachments isDeleted replySnapshot',
@@ -353,6 +354,7 @@ export const getMessages = async (req, res, next) => {
         })
           .populate('sender', 'name email role profile')
           .populate('reactions.user', 'name role profile')
+          .populate('readBy', 'name email role profile')
           .populate({
             path: 'replyTo',
             select: 'content sender attachments isDeleted replySnapshot',
@@ -368,6 +370,7 @@ export const getMessages = async (req, res, next) => {
         })
           .populate('sender', 'name email role profile')
           .populate('reactions.user', 'name role profile')
+          .populate('readBy', 'name email role profile')
           .populate({
             path: 'replyTo',
             select: 'content sender attachments isDeleted replySnapshot',
@@ -417,6 +420,7 @@ export const getMessages = async (req, res, next) => {
       Message.find(query)
         .populate('sender', 'name email role profile')
         .populate('reactions.user', 'name role profile')
+        .populate('readBy', 'name email role profile')
         .populate({
           path: 'replyTo',
           select: 'content sender attachments isDeleted replySnapshot',
@@ -614,6 +618,7 @@ export const sendMessage = async (req, res, next) => {
     const populatedMessage = await Message.findById(newMessage._id)
       .populate('sender', 'name email role profile')
       .populate('reactions.user', 'name role profile')
+      .populate('readBy', 'name email role profile')
       .populate({
         path: 'replyTo',
         select: 'content sender attachments isDeleted replySnapshot',
@@ -1200,7 +1205,14 @@ export const markConversationRead = async (req, res, next) => {
       { $addToSet: { readBy: userId } }
     );
 
-    emitReadReceipt(conversationId, userId, now, req.conversation.participants);
+    const userObj = {
+      _id: req.user.id || req.user._id,
+      name: req.user.name,
+      role: req.user.role,
+      profile: req.user.profile,
+    };
+
+    emitReadReceipt(conversationId, userId, now, req.conversation.participants, userObj);
 
     // Delete in-app message notifications for this conversation
     await Notification.deleteMany({
@@ -1713,4 +1725,533 @@ export const unpinMessage = async (req, res, next) => {
     next(err);
   }
 };
+
+/**
+ * Regex for identifying valid URLs in messages
+ */
+const URL_REGEX = /(?:https?:\/\/|www\.)[^\s<>"{}|\\^`]+[^\s<>"{}|\\^`.,;:?!]/gi;
+
+/**
+ * In-memory LRU-like cache for link previews (1-hour TTL)
+ */
+const linkPreviewCache = new Map();
+const CACHE_TTL_MS = 60 * 60 * 1000;
+
+/**
+ * Retrieve conversation-specific shared content (Media, Documents, and Links)
+ * Scoped strictly to the requested conversation, excluding soft-deleted messages
+ */
+export const getConversationSharedContent = async (req, res, next) => {
+  try {
+    const conversation = req.conversation;
+    const userId = req.user.id || req.user._id.toString();
+    const {
+      type = 'all', // 'all' | 'media' | 'documents' | 'links'
+      sort = 'desc', // 'desc' (newest first) | 'asc' (oldest first)
+      search = '',
+      page = 1,
+      limit = 30,
+    } = req.query;
+
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 30));
+    const sortOrder = sort === 'asc' ? 1 : -1;
+    const searchFilter = (search || '').trim().toLowerCase();
+
+    // Base query: scoped strictly to this conversation, excluding deleted messages
+    const baseFilter = {
+      conversation: conversation._id,
+      isDeleted: false,
+      deletedFor: { $ne: userId },
+    };
+
+    // Retrieve messages for this conversation with populated senders
+    const rawMessages = await Message.find(baseFilter)
+      .populate('sender', 'name email role avatar profile')
+      .sort({ createdAt: sortOrder })
+      .lean();
+
+    const allMedia = [];
+    const allDocuments = [];
+    const allLinks = [];
+    const seenLinkKeys = new Set();
+
+    for (const msg of rawMessages) {
+      // 1. Process attachments
+      if (Array.isArray(msg.attachments) && msg.attachments.length > 0) {
+        for (const att of msg.attachments) {
+          const isMedia =
+            att.fileType === 'image' ||
+            att.fileType === 'video' ||
+            (att.mimeType && (att.mimeType.startsWith('image/') || att.mimeType.startsWith('video/')));
+
+          const item = {
+            _id: att._id?.toString() || `${msg._id}_${att.fileKey}`,
+            messageId: msg._id.toString(),
+            conversationId: conversation._id.toString(),
+            fileName: att.fileName || 'file',
+            fileKey: att.fileKey,
+            fileType: isMedia
+              ? (att.fileType === 'video' || att.mimeType?.startsWith('video/') ? 'video' : 'image')
+              : (att.fileType || 'document'),
+            mimeType: att.mimeType || 'application/octet-stream',
+            size: att.size || 0,
+            url: `/api/chat/attachments/${att.fileKey}`,
+            sender: {
+              _id: msg.sender?._id?.toString() || msg.sender?.toString() || '',
+              name: msg.sender?.name || 'User',
+              email: msg.sender?.email || '',
+              role: msg.sender?.role || '',
+              avatar: msg.sender?.avatar || null,
+            },
+            createdAt: msg.createdAt,
+            content: msg.content || '',
+          };
+
+          if (isMedia) {
+            allMedia.push(item);
+          } else {
+            allDocuments.push(item);
+          }
+        }
+      }
+
+      // 2. Extract shared links from message content
+      if (msg.content && typeof msg.content === 'string') {
+        const matches = msg.content.match(URL_REGEX);
+        if (matches && matches.length > 0) {
+          for (const rawUrl of matches) {
+            let normalizedUrl = rawUrl.trim();
+            if (normalizedUrl.startsWith('www.')) {
+              normalizedUrl = `https://${normalizedUrl}`;
+            }
+
+            let hostname = '';
+            try {
+              const parsed = new URL(normalizedUrl);
+              hostname = parsed.hostname.replace(/^www\./, '');
+            } catch {
+              hostname = normalizedUrl;
+            }
+
+            const linkKey = `${msg._id}_${normalizedUrl}`;
+            if (!seenLinkKeys.has(linkKey)) {
+              seenLinkKeys.add(linkKey);
+              allLinks.push({
+                _id: linkKey,
+                messageId: msg._id.toString(),
+                conversationId: conversation._id.toString(),
+                url: normalizedUrl,
+                hostname,
+                domain: hostname,
+                title: hostname,
+                content: msg.content,
+                contentSnippet: (msg.content || '').slice(0, 120),
+                sender: {
+                  _id: msg.sender?._id?.toString() || msg.sender?.toString() || '',
+                  name: msg.sender?.name || 'User',
+                  email: msg.sender?.email || '',
+                  role: msg.sender?.role || '',
+                  avatar: msg.sender?.avatar || null,
+                },
+                createdAt: msg.createdAt,
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // Overall conversation counts
+    const counts = {
+      media: allMedia.length,
+      documents: allDocuments.length,
+      links: allLinks.length,
+      total: allMedia.length + allDocuments.length + allLinks.length,
+    };
+
+    // Apply search filter if provided
+    let filteredMedia = allMedia;
+    let filteredDocuments = allDocuments;
+    let filteredLinks = allLinks;
+
+    if (searchFilter) {
+      filteredMedia = allMedia.filter(
+        (m) =>
+          m.fileName.toLowerCase().includes(searchFilter) ||
+          m.sender.name.toLowerCase().includes(searchFilter)
+      );
+
+      filteredDocuments = allDocuments.filter(
+        (d) =>
+          d.fileName.toLowerCase().includes(searchFilter) ||
+          d.sender.name.toLowerCase().includes(searchFilter)
+      );
+
+      filteredLinks = allLinks.filter(
+        (l) =>
+          l.url.toLowerCase().includes(searchFilter) ||
+          l.hostname.toLowerCase().includes(searchFilter) ||
+          l.title.toLowerCase().includes(searchFilter) ||
+          l.sender.name.toLowerCase().includes(searchFilter)
+      );
+    }
+
+    // Pagination helper
+    const paginateArray = (arr, page, limit) => {
+      const startIndex = (page - 1) * limit;
+      return arr.slice(startIndex, startIndex + limit);
+    };
+
+    if (type === 'media') {
+      const paginated = paginateArray(filteredMedia, pageNum, limitNum);
+      return res.status(200).json({
+        success: true,
+        data: {
+          conversationId: conversation._id.toString(),
+          type: 'media',
+          counts,
+          items: paginated,
+          media: paginated,
+          pagination: {
+            page: pageNum,
+            limit: limitNum,
+            total: filteredMedia.length,
+            totalPages: Math.ceil(filteredMedia.length / limitNum) || 1,
+            hasMore: pageNum * limitNum < filteredMedia.length,
+          },
+        },
+      });
+    }
+
+    if (type === 'documents') {
+      const paginated = paginateArray(filteredDocuments, pageNum, limitNum);
+      return res.status(200).json({
+        success: true,
+        data: {
+          conversationId: conversation._id.toString(),
+          type: 'documents',
+          counts,
+          items: paginated,
+          documents: paginated,
+          pagination: {
+            page: pageNum,
+            limit: limitNum,
+            total: filteredDocuments.length,
+            totalPages: Math.ceil(filteredDocuments.length / limitNum) || 1,
+            hasMore: pageNum * limitNum < filteredDocuments.length,
+          },
+        },
+      });
+    }
+
+    if (type === 'links') {
+      const paginated = paginateArray(filteredLinks, pageNum, limitNum);
+      return res.status(200).json({
+        success: true,
+        data: {
+          conversationId: conversation._id.toString(),
+          type: 'links',
+          counts,
+          items: paginated,
+          links: paginated,
+          pagination: {
+            page: pageNum,
+            limit: limitNum,
+            total: filteredLinks.length,
+            totalPages: Math.ceil(filteredLinks.length / limitNum) || 1,
+            hasMore: pageNum * limitNum < filteredLinks.length,
+          },
+        },
+      });
+    }
+
+    // Default 'all': returns unified items sorted by date plus categories and conversation counts
+    const combinedAll = [...filteredMedia, ...filteredDocuments, ...filteredLinks].sort((a, b) => {
+      const timeA = new Date(a.createdAt).getTime();
+      const timeB = new Date(b.createdAt).getTime();
+      return sortOrder === 1 ? timeA - timeB : timeB - timeA;
+    });
+
+    const paginatedAll = paginateArray(combinedAll, pageNum, limitNum);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        conversationId: conversation._id.toString(),
+        type: 'all',
+        counts,
+        items: paginatedAll,
+        media: paginateArray(filteredMedia, pageNum, limitNum),
+        documents: paginateArray(filteredDocuments, pageNum, limitNum),
+        links: paginateArray(filteredLinks, pageNum, limitNum),
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total: combinedAll.length,
+          totalPages: Math.ceil(combinedAll.length / limitNum) || 1,
+          hasMore: pageNum * limitNum < combinedAll.length,
+        },
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Retrieve safe metadata preview for external link (with SSRF protection, caching, and timeout)
+ */
+export const getLinkPreview = async (req, res, next) => {
+  try {
+    const rawUrl = req.query.url;
+    if (!rawUrl || typeof rawUrl !== 'string') {
+      return res.status(400).json({ success: false, message: 'URL query parameter is required.' });
+    }
+
+    let targetUrl = rawUrl.trim();
+    if (targetUrl.startsWith('www.')) {
+      targetUrl = `https://${targetUrl}`;
+    }
+
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(targetUrl);
+    } catch {
+      return res.status(400).json({ success: false, message: 'Invalid URL format.' });
+    }
+
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      return res.status(400).json({ success: false, message: 'Only HTTP and HTTPS protocols are supported.' });
+    }
+
+    const hostname = parsedUrl.hostname.toLowerCase();
+
+    // SSRF Protections: Reject loopback, localhost, and private IPv4/IPv6 ranges
+    const isPrivateOrLoopback =
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '::1' ||
+      hostname.endsWith('.localhost') ||
+      hostname.endsWith('.local') ||
+      hostname === '0.0.0.0' ||
+      /^10\./.test(hostname) ||
+      /^192\.168\./.test(hostname) ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+      /^169\.254\./.test(hostname);
+
+    if (isPrivateOrLoopback) {
+      return res.status(403).json({ success: false, message: 'Requests to private or loopback addresses are blocked.' });
+    }
+
+    // Check cache
+    const cached = linkPreviewCache.get(targetUrl);
+    if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) {
+      return res.status(200).json({ success: true, data: cached.data });
+    }
+
+    const cleanHostname = hostname.replace(/^www\./, '');
+    const fallbackData = {
+      url: targetUrl,
+      hostname: cleanHostname,
+      title: cleanHostname,
+      description: '',
+      image: null,
+    };
+
+    // Safe fetch with 2.5s timeout and abort controller
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+    try {
+      const response = await fetch(targetUrl, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; SIMS-Bot/1.0; +https://sims.internal)',
+          'Accept': 'text/html,application/xhtml+xml',
+        },
+        redirect: 'follow',
+      });
+      clearTimeout(timeoutId);
+
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('text/html')) {
+        linkPreviewCache.set(targetUrl, { data: fallbackData, cachedAt: Date.now() });
+        return res.status(200).json({ success: true, data: fallbackData });
+      }
+
+      const htmlText = await response.text();
+      const snippet = htmlText.slice(0, 65536);
+
+      const titleMatch =
+        snippet.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i) ||
+        snippet.match(/<title[^>]*>([^<]+)<\/title>/i);
+      const descMatch =
+        snippet.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i) ||
+        snippet.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i);
+      const imageMatch = snippet.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
+
+      const sanitize = (str) =>
+        (str || '')
+          .replace(/<[^>]*>/g, '')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .trim()
+          .slice(0, 200);
+
+      const title = sanitize(titleMatch ? titleMatch[1] : cleanHostname) || cleanHostname;
+      const description = sanitize(descMatch ? descMatch[1] : '').slice(0, 200);
+      let image = imageMatch ? imageMatch[1].trim() : null;
+      if (image && !image.startsWith('http://') && !image.startsWith('https://')) {
+        try {
+          image = new URL(image, targetUrl).href;
+        } catch {
+          image = null;
+        }
+      }
+
+      const previewData = {
+        url: targetUrl,
+        hostname: cleanHostname,
+        title,
+        description,
+        image,
+      };
+
+      linkPreviewCache.set(targetUrl, { data: previewData, cachedAt: Date.now() });
+      return res.status(200).json({ success: true, data: previewData });
+    } catch {
+      clearTimeout(timeoutId);
+      linkPreviewCache.set(targetUrl, { data: fallbackData, cachedAt: Date.now() });
+      return res.status(200).json({ success: true, data: fallbackData });
+    }
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Detailed read receipt information for a message (Read by list, timestamps, delivered to)
+ */
+export const getMessageReadInfo = async (req, res, next) => {
+  try {
+    const messageId = req.params.id;
+    const userId = req.user.id;
+
+    if (!mongoose.Types.ObjectId.isValid(messageId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid message ID format.',
+      });
+    }
+
+    const message = await Message.findById(messageId)
+      .populate('sender', 'name email role profile')
+      .populate('readBy', 'name email role profile')
+      .lean();
+
+    if (!message) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message not found.',
+      });
+    }
+
+    const conversation = await Conversation.findById(message.conversation)
+      .populate('participants', 'name email role profile lastSeen')
+      .lean();
+
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Associated conversation not found.',
+      });
+    }
+
+    // Verify requesting user is a participant
+    const isParticipant = (conversation.participants || []).some(
+      (p) => (p._id || p).toString() === userId
+    );
+
+    if (!isParticipant) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You are not a member of this conversation.',
+      });
+    }
+
+    const senderIdStr = (message.sender?._id || message.sender || '').toString();
+    const readByIds = new Set(
+      (message.readBy || []).map((u) => (u._id || u).toString())
+    );
+
+    // Map user lastReadAt from conversation readReceipts
+    const receiptMap = new Map();
+    (conversation.readReceipts || []).forEach((r) => {
+      if (r.user) {
+        receiptMap.set(r.user.toString(), r.lastReadAt);
+      }
+    });
+
+    const readByList = [];
+    const deliveredToList = [];
+
+    (conversation.participants || []).forEach((participant) => {
+      const pIdStr = (participant._id || participant).toString();
+      // Exclude message sender from read receipt targets
+      if (pIdStr === senderIdStr) return;
+
+      const userObj = {
+        _id: participant._id,
+        name: participant.name,
+        email: participant.email,
+        role: participant.role,
+        profile: participant.profile,
+        lastSeen: participant.lastSeen,
+      };
+
+      const hasRead =
+        readByIds.has(pIdStr) ||
+        (receiptMap.has(pIdStr) &&
+          new Date(receiptMap.get(pIdStr)) >= new Date(message.createdAt));
+
+      if (hasRead) {
+        const readAt = receiptMap.get(pIdStr) || message.createdAt;
+        readByList.push({
+          user: userObj,
+          readAt,
+        });
+      } else {
+        deliveredToList.push({
+          user: userObj,
+        });
+      }
+    });
+
+    // Sort readBy by most recent read timestamp
+    readByList.sort((a, b) => new Date(b.readAt) - new Date(a.readAt));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        messageId: message._id,
+        content: message.content,
+        createdAt: message.createdAt,
+        attachments: message.attachments || [],
+        sender: message.sender,
+        conversationId: conversation._id,
+        conversationType: conversation.type,
+        conversationName: conversation.name,
+        totalParticipants: Math.max(0, conversation.participants.length - 1),
+        readBy: readByList,
+        deliveredTo: deliveredToList,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 

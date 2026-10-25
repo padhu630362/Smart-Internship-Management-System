@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 
 export const ATTACHMENT_TYPES = {
   IMAGE: 'image',
+  VIDEO: 'video',
   PDF: 'pdf',
   DOCUMENT: 'document',
   SPREADSHEET: 'spreadsheet',
@@ -165,6 +166,7 @@ const messageSchema = new mongoose.Schema(
 messageSchema.index({ conversation: 1, createdAt: -1 });
 messageSchema.index({ conversation: 1, deletedFor: 1 });
 messageSchema.index({ conversation: 1, isDeleted: 1, createdAt: -1 });
+messageSchema.index({ conversation: 1, 'attachments.fileType': 1, isDeleted: 1, createdAt: -1 });
 
 export const Message = mongoose.model('Message', messageSchema);
 export default Message;

@@ -310,12 +310,13 @@ export const emitConversationUpdated = (conversationId, conversation, participan
 /**
  * Dispatch read receipt update
  */
-export const emitReadReceipt = (conversationId, userId, readAt, participantIds = []) => {
+export const emitReadReceipt = (conversationId, userId, readAt, participantIds = [], userObj = null) => {
   if (io && conversationId) {
     const payload = {
       conversationId: conversationId.toString(),
       userId: userId.toString(),
       readAt,
+      user: userObj || null,
     };
     io.to(`conversation:${conversationId.toString()}`).emit('chat:read_update', payload);
 

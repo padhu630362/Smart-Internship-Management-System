@@ -233,6 +233,80 @@ export const chatService = {
     });
     return response.data;
   },
+
+  /**
+   * Retrieve conversation-specific shared content (Media, Documents, Links)
+   * @param {string} conversationId
+   * @param {Object} params - { type: 'all'|'media'|'documents'|'links', page, limit, sort, search }
+   */
+  async getSharedContent(conversationId, params = {}) {
+    const response = await apiClient.get(`/api/chat/conversations/${conversationId}/shared-content`, {
+      params,
+    });
+    return response.data;
+  },
+
+  /**
+   * Safe link preview metadata
+   * @param {string} url
+   * @param {AbortSignal} [signal]
+   */
+  async getLinkPreview(url, signal) {
+    const response = await apiClient.get('/api/chat/link-preview', {
+      params: { url },
+      signal,
+    });
+    return response.data;
+  },
+
+  /**
+   * Resolve an attachment URL with active session authorization token
+   */
+  getAttachmentUrl(url) {
+    return getAttachmentUrl(url);
+  },
+
+  /**
+   * Fetch detailed read receipts and seen-by status for a message
+   * @param {string} messageId
+   */
+  async getMessageReadInfo(messageId) {
+    const response = await apiClient.get(`/api/chat/messages/${messageId}/read-info`);
+    return response.data;
+  },
+};
+
+/**
+ * Resolves an attachment URL with active session authorization token
+ * so <img>, <video>, and <a> elements can load private attachments securely without 401 errors.
+ */
+export const getAttachmentUrl = (rawUrl) => {
+  if (!rawUrl || typeof rawUrl !== 'string') return '';
+  if (rawUrl.startsWith('data:') || rawUrl.startsWith('blob:')) return rawUrl;
+
+  let normalized = rawUrl;
+  if (normalized.startsWith('uploads/chat/')) {
+    const filename = normalized.split('/').pop();
+    normalized = `/api/chat/attachments/${filename}`;
+  } else if (!normalized.startsWith('/api/') && !normalized.startsWith('http')) {
+    normalized = `/api/chat/attachments/${normalized}`;
+  }
+
+  let token = null;
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      token = sessionStorage.getItem('sims_auth_token');
+    }
+  } catch {}
+
+  if (!token) return normalized;
+
+  const [baseUrl, existingQuery] = normalized.split('?');
+  const params = new URLSearchParams(existingQuery || '');
+  if (!params.has('token')) {
+    params.set('token', token);
+  }
+  return `${baseUrl}?${params.toString()}`;
 };
 
 export default chatService;

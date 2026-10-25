@@ -29,6 +29,9 @@ import {
   toggleMessageReaction,
   pinMessage,
   unpinMessage,
+  getConversationSharedContent,
+  getLinkPreview,
+  getMessageReadInfo,
 } from '../controllers/chatController.js';
 
 const router = Router();
@@ -54,6 +57,40 @@ router.get(
   searchConversationMessages
 );
 
+// Conversation-specific shared content (Media, Documents, Links)
+router.get(
+  '/conversations/:id/shared-content',
+  requireConversationMember,
+  getConversationSharedContent
+);
+router.get(
+  '/conversations/:id/media',
+  requireConversationMember,
+  (req, res, next) => {
+    req.query.type = 'media';
+    return getConversationSharedContent(req, res, next);
+  }
+);
+router.get(
+  '/conversations/:id/documents',
+  requireConversationMember,
+  (req, res, next) => {
+    req.query.type = 'documents';
+    return getConversationSharedContent(req, res, next);
+  }
+);
+router.get(
+  '/conversations/:id/links',
+  requireConversationMember,
+  (req, res, next) => {
+    req.query.type = 'links';
+    return getConversationSharedContent(req, res, next);
+  }
+);
+
+// Safe external link metadata preview (with SSRF protection & caching)
+router.get('/link-preview', getLinkPreview);
+
 // Messages in conversation (supports multipart attachments or JSON)
 router.get('/conversations/:id/messages', requireConversationMember, getMessages);
 router.post(
@@ -66,6 +103,7 @@ router.post(
 );
 
 // Message operations
+router.get('/messages/:id/read-info', getMessageReadInfo);
 router.patch('/messages/:messageId', validateEditMessage, editMessage);
 router.delete('/messages/:messageId', validateDeleteMessage, deleteMessage);
 router.post('/messages/:messageId/forward', forwardMessage);
