@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 import notificationService from '../services/notificationService';
@@ -660,39 +660,71 @@ export const SocketProvider = ({ children }) => {
     }
   }, []);
 
+  const socketContextValue = useMemo(
+    () => ({
+      socket,
+      isConnected,
+      notifications,
+      unreadCount,
+      isLoading,
+      onlineUsers,
+      totalChatUnread,
+      pushPermission,
+      toasts,
+      soundEnabled,
+      toggleSound,
+      dismissToast,
+      addToast,
+      activeChatConversationId,
+      setActiveChatConversationId,
+      requestPushPermission,
+      setTotalChatUnread,
+      refreshChatUnread,
+      isUserOnline,
+      joinConversation,
+      leaveConversation,
+      sendTyping,
+      refreshNotifications,
+      markAsRead,
+      markConversationNotificationsRead,
+      markAllAsRead,
+      deleteNotification,
+      clearAllNotifications,
+    }),
+    [
+      socket,
+      isConnected,
+      notifications,
+      unreadCount,
+      isLoading,
+      onlineUsers,
+      totalChatUnread,
+      pushPermission,
+      toasts,
+      soundEnabled,
+      toggleSound,
+      dismissToast,
+      addToast,
+      activeChatConversationId,
+      setActiveChatConversationId,
+      requestPushPermission,
+      setTotalChatUnread,
+      refreshChatUnread,
+      isUserOnline,
+      joinConversation,
+      leaveConversation,
+      sendTyping,
+      refreshNotifications,
+      markAsRead,
+      markConversationNotificationsRead,
+      markAllAsRead,
+      deleteNotification,
+      clearAllNotifications,
+    ]
+  );
+
   return (
-    <SocketContext.Provider
-      value={{
-        socket,
-        isConnected,
-        notifications,
-        unreadCount,
-        isLoading,
-        onlineUsers,
-        totalChatUnread,
-        pushPermission,
-        toasts,
-        soundEnabled,
-        toggleSound,
-        dismissToast,
-        addToast,
-        activeChatConversationId,
-        setActiveChatConversationId,
-        requestPushPermission,
-        setTotalChatUnread,
-        refreshChatUnread,
-        isUserOnline,
-        joinConversation,
-        leaveConversation,
-        sendTyping,
-        refreshNotifications,
-        markAsRead,
-        markConversationNotificationsRead,
-        markAllAsRead,
-        deleteNotification,
-        clearAllNotifications,
-      }}
-    >
+    <SocketContext.Provider value={socketContextValue}>
       {children}
     </SocketContext.Provider>
   );

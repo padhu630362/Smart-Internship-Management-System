@@ -20,7 +20,7 @@ const freePortIfOccupied = (port) => {
   if (process.env.NODE_ENV === 'test') return;
   try {
     if (process.platform === 'win32') {
-      const output = execSync('netstat -ano', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+      const output = execSync('netstat -ano -p tcp', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'], timeout: 2000 });
       const lines = output.split('\n');
       for (const line of lines) {
         if (line.includes(`:${port}`) && line.includes('LISTENING')) {

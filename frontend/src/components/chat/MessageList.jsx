@@ -27,6 +27,7 @@ export const MessageList = ({
   messages = [],
   loadingMessages = false,
   currentUserId,
+  currentUser = null,
   activeConversation,
   activeDetails,
   pinnedData,
@@ -166,6 +167,7 @@ export const MessageList = ({
                 isSender={item.isSender}
                 isConsecutive={item.isConsecutive}
                 currentUserId={currentUserId}
+                currentUser={currentUser}
                 activeConversation={activeConversation}
                 activeDetails={activeDetails}
                 pinnedMessageId={pinnedData?.messageId?.toString()}

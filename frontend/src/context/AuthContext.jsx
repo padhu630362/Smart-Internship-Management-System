@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import authService from '../services/authService';
 import { setAuthToken } from '../api/client';
 
@@ -138,7 +138,7 @@ export const AuthProvider = ({ children }) => {
     }
   }, [token]);
 
-  const login = async ({ email, password }) => {
+  const login = useCallback(async ({ email, password }) => {
     setIsLoading(true);
     setError(null);
     try {
@@ -167,9 +167,9 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const completeTwoFactor = async ({ email, code }) => {
+  const completeTwoFactor = useCallback(async ({ email, code }) => {
     setIsLoading(true);
     setError(null);
     try {
@@ -191,9 +191,9 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const register = async (userData) => {
+  const register = useCallback(async (userData) => {
     setIsLoading(true);
     setError(null);
     try {
@@ -215,9 +215,9 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const loginWithGoogle = async ({ credential, role }) => {
+  const loginWithGoogle = useCallback(async ({ credential, role }) => {
     setIsLoading(true);
     setError(null);
     try {
@@ -239,9 +239,9 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await authService.logout();
     } finally {
@@ -261,11 +261,11 @@ export const AuthProvider = ({ children }) => {
         // Ignore history replaceState error in non-browser test runners
       }
     }
-  };
+  }, []);
 
-  const clearError = () => setError(null);
+  const clearError = useCallback(() => setError(null), []);
 
-  const updateUserState = (updatedUser) => {
+  const updateUserState = useCallback((updatedUser) => {
     if (!updatedUser) return;
     setUser((prev) => {
       const nextUser = prev ? { ...prev, ...updatedUser } : updatedUser;
@@ -276,28 +276,44 @@ export const AuthProvider = ({ children }) => {
       }
       return nextUser;
     });
-  };
+  }, []);
+
+  const authContextValue = useMemo(
+    () => ({
+      user,
+      setUser,
+      token,
+      isAuthenticated: !!user,
+      isLoading,
+      error,
+      login,
+      completeTwoFactor,
+      loginWithGoogle,
+      register,
+      logout,
+      clearError,
+      reloadUser: loadUser,
+      updateUserState,
+      updateUser: updateUserState,
+    }),
+    [
+      user,
+      token,
+      isLoading,
+      error,
+      login,
+      completeTwoFactor,
+      loginWithGoogle,
+      register,
+      logout,
+      clearError,
+      loadUser,
+      updateUserState,
+    ]
+  );
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        setUser,
-        token,
-        isAuthenticated: !!user,
-        isLoading,
-        error,
-        login,
-        completeTwoFactor,
-        loginWithGoogle,
-        register,
-        logout,
-        clearError,
-        reloadUser: loadUser,
-        updateUserState,
-        updateUser: updateUserState,
-      }}
-    >
+    <AuthContext.Provider value={authContextValue}>
       {children}
     </AuthContext.Provider>
   );

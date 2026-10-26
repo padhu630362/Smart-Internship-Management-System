@@ -38,13 +38,26 @@ export const App = () => {
 
   useEffect(() => {
     const fetchHealth = async () => {
-      const data = await healthService.checkHealth();
-      if (data?.data) {
-        setHealthStatus(data.data);
+      try {
+        const data = await healthService.checkHealth();
+        if (data?.data) {
+          setHealthStatus((prev) => {
+            if (
+              prev &&
+              prev.status === data.data.status &&
+              prev.database === data.data.database
+            ) {
+              return prev; // Preserve identity to prevent AppLayout and subtree re-renders
+            }
+            return data.data;
+          });
+        }
+      } catch {
+        // Ignore background polling network errors
       }
     };
     fetchHealth();
-    const interval = setInterval(fetchHealth, 15000);
+    const interval = setInterval(fetchHealth, 30000);
     return () => clearInterval(interval);
   }, []);
 

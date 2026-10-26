@@ -249,9 +249,9 @@ export default function ConversationDetailsDrawer({
 
   return (
     <>
-      {/* Mobile Backdrop */}
+      {/* Backdrop for screens below xl */}
       <div
-        className="md:hidden fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-40 animate-in fade-in duration-200"
+        className="xl:hidden fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-40 animate-in fade-in duration-200"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -260,7 +260,7 @@ export default function ConversationDetailsDrawer({
       <aside
         role="complementary"
         aria-label="Conversation details and shared media"
-        className="fixed inset-y-0 right-0 w-full sm:w-96 md:static md:w-88 lg:w-96 h-full bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl md:shadow-none z-40 flex flex-col overflow-hidden animate-in slide-in-from-right duration-200 font-sans"
+        className="fixed inset-y-0 right-0 w-full sm:w-96 xl:static xl:w-96 h-full bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl xl:shadow-none z-40 flex flex-col overflow-hidden animate-in slide-in-from-right duration-200 font-sans"
       >
         {/* Drawer Header */}
         <div className="h-16 px-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0 bg-slate-50/70 dark:bg-slate-850/60">

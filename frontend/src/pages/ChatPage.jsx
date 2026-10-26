@@ -271,6 +271,7 @@ export const ChatPage = () => {
   const [unreadWhileScrolled, setUnreadWhileScrolled] = useState(0);
   const [pinningMessageId, setPinningMessageId] = useState(null);
   const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Modals state
   const [showNewChatModal, setShowNewChatModal] = useState(false);
@@ -1980,33 +1981,36 @@ export const ChatPage = () => {
       )}
 
       {/* LEFT SIDEBAR: Conversations List & Directory */}
-      <ConversationSidebar
-        conversations={conversations}
-        activeConversation={activeConversation}
-        onSelectConversation={selectConversation}
-        searchQuery={searchQuery}
-        onChangeSearch={setSearchQuery}
-        filterType={filterType}
-        onChangeFilter={setFilterType}
-        loadingConversations={loadingConversations}
-        filteredCompanyMembers={filteredCompanyMembers}
-        isUserOnline={isUserOnline}
-        onStartOrOpenChat={handleStartOrOpenChat}
-        onNewDirectChat={() => {
-          fetchContacts();
-          setShowNewChatModal(true);
-        }}
-        onNewGroupChat={() => {
-          fetchContacts();
-          setShowNewGroupModal(true);
-        }}
-        canCreateGroup={canCreateGroup}
-        formatMessageTime={formatMessageTime}
-        formatLastSeen={formatLastSeen}
-        currentUserId={currentUserId}
-        mobileShowChat={mobileShowChat}
-        isConnected={isConnected}
-      />
+      {!isFullscreen && (
+        <ConversationSidebar
+          conversations={conversations}
+          activeConversation={activeConversation}
+          onSelectConversation={selectConversation}
+          searchQuery={searchQuery}
+          onChangeSearch={setSearchQuery}
+          filterType={filterType}
+          onChangeFilter={setFilterType}
+          loadingConversations={loadingConversations}
+          filteredCompanyMembers={filteredCompanyMembers}
+          contacts={contacts}
+          isUserOnline={isUserOnline}
+          onStartOrOpenChat={handleStartOrOpenChat}
+          onNewDirectChat={() => {
+            fetchContacts();
+            setShowNewChatModal(true);
+          }}
+          onNewGroupChat={() => {
+            fetchContacts();
+            setShowNewGroupModal(true);
+          }}
+          canCreateGroup={canCreateGroup}
+          formatMessageTime={formatMessageTime}
+          formatLastSeen={formatLastSeen}
+          currentUserId={currentUserId}
+          mobileShowChat={mobileShowChat}
+          isConnected={isConnected}
+        />
+      )}
 
       {/* RIGHT MAIN PANEL: Active Conversation */}
       <div
@@ -2036,6 +2040,8 @@ export const ChatPage = () => {
               pushPermission={pushPermission}
               onBackMobile={() => setMobileShowChat(false)}
               onOpenGroupInfo={() => setShowGroupInfoModal(true)}
+              isFullscreen={isFullscreen}
+              onToggleFullscreen={() => setIsFullscreen((prev) => !prev)}
               formatLastSeen={formatLastSeen}
             />
 
@@ -2159,6 +2165,7 @@ export const ChatPage = () => {
               messages={displayedMessages}
               loadingMessages={loadingMessages}
               currentUserId={currentUserId}
+              currentUser={user}
               activeConversation={activeConversation}
               activeDetails={activeDetails}
               pinnedData={pinnedData}

@@ -72,11 +72,13 @@ export const DashboardPage = () => {
     }
   }, []);
 
+  const currentUserId = user?._id || user?.id;
+
   useEffect(() => {
-    if (!authLoading && isAuthenticated && user) {
+    if (!authLoading && isAuthenticated && currentUserId) {
       fetchAnalytics();
     }
-  }, [authLoading, isAuthenticated, user, fetchAnalytics]);
+  }, [authLoading, isAuthenticated, currentUserId, fetchAnalytics]);
 
   const roleTitleMap = {
     student: 'Student & Intern Workspace',

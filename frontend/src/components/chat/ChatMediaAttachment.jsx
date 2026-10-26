@@ -65,7 +65,7 @@ export const ChatMediaAttachment = ({
                 <ImageIcon className="w-4 h-4" />
               </div>
               <div className="min-w-0 text-left">
-                <p className="text-xs font-semibold truncate" title={attachment.fileName}>
+                <p className="text-xs sm:text-sm font-bold truncate leading-snug" title={attachment.fileName}>
                   {attachment.fileName || 'Image attachment'}
                 </p>
                 <p className="text-[10px] text-slate-400">
@@ -205,27 +205,27 @@ export const ChatMediaAttachment = ({
 
   return (
     <div
-      className={`flex items-center gap-3 p-2.5 rounded-xl border transition-colors my-1 ${
+      className={`flex items-center justify-between gap-3 p-3 sm:p-3.5 rounded-2xl border transition-all my-1.5 min-w-[260px] sm:min-w-[320px] max-w-md shadow-2xs ${
         isSender
-          ? 'bg-brand-700/60 border-brand-400/40 text-white'
-          : 'bg-slate-50 dark:bg-slate-750 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white'
+          ? 'bg-brand-800/90 border-brand-500/40 text-white'
+          : 'bg-white dark:bg-slate-800 border-slate-200/90 dark:border-slate-700 text-slate-900 dark:text-white'
       }`}
     >
-      <div className="p-2 rounded-lg bg-white/20 dark:bg-black/20 shrink-0">
+      <div className={`p-2.5 rounded-xl shrink-0 ${isSender ? 'bg-white/15 text-white' : isPdf ? 'bg-rose-50 text-rose-500 dark:bg-rose-950/50' : 'bg-blue-50 text-blue-500 dark:bg-blue-950/50'}`}>
         {isPdf ? (
-          <FileText className="w-5 h-5 text-rose-500" />
+          <FileText className="w-7 h-7 sm:w-8 sm:h-8 text-rose-500" />
         ) : isSheet ? (
-          <FileSpreadsheet className="w-5 h-5 text-emerald-500" />
+          <FileSpreadsheet className="w-7 h-7 sm:w-8 sm:h-8 text-emerald-500" />
         ) : (
-          <File className="w-5 h-5 text-blue-500" />
+          <File className="w-7 h-7 sm:w-8 sm:h-8 text-blue-500" />
         )}
       </div>
 
       <div className="flex-1 min-w-0 text-left">
-        <p className="text-xs font-semibold truncate" title={attachment.fileName}>
+        <p className="text-xs sm:text-sm font-bold truncate leading-snug" title={attachment.fileName}>
           {attachment.fileName}
         </p>
-        <p className={`text-[10px] ${isSender ? 'text-brand-100' : 'text-slate-400'}`}>
+        <p className={`text-[11px] font-medium mt-0.5 ${isSender ? 'text-brand-100/90' : 'text-slate-400 dark:text-slate-400'}`}>
           {formatFileSize(attachment.size)} • {attachment.fileType?.toUpperCase() || 'FILE'}
         </p>
       </div>
@@ -234,10 +234,14 @@ export const ChatMediaAttachment = ({
         <button
           type="button"
           onClick={() => onDownload(attachment.fileKey, attachment.fileName)}
-          className="p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 cursor-pointer"
+          className={`p-2 rounded-xl transition-colors shrink-0 cursor-pointer ${
+            isSender
+              ? 'text-white/80 hover:text-white hover:bg-white/15'
+              : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'
+          }`}
           title={`Download ${attachment.fileName}`}
         >
-          <Download className="w-4 h-4" />
+          <Download className="w-5 h-5" />
         </button>
       )}
     </div>

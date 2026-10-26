@@ -95,6 +95,7 @@ export const MessageBubble = ({
   isSender,
   isConsecutive = false,
   currentUserId,
+  currentUser = null,
   activeConversation,
   activeDetails,
   pinnedMessageId = null,
@@ -142,22 +143,44 @@ export const MessageBubble = ({
     ? ''
     : senderObj?.role || (activeConversation?.type === CONVERSATION_TYPES.DIRECT ? activeDetails.partner?.role || '' : '');
 
-  const isReadByOthers = (message.readBy || []).some(
-    (id) => (id._id || id).toString() !== currentUserId
-  );
+  // Resolve contacts who have seen/read this message (excluding author) - Requirement 2
+  let seenByContacts = (message.readBy || [])
+    .map((item) => {
+      if (typeof item === 'object' && item !== null) {
+        const id = (item._id || item.id)?.toString();
+        if (id && id === currentUserId?.toString()) return null;
+        return item;
+      }
+      const id = item?.toString();
+      if (!id || id === currentUserId?.toString()) return null;
+      return (
+        (activeConversation?.participants || []).find(
+          (p) => (p._id || p.id || p)?.toString() === id
+        ) || null
+      );
+    })
+    .filter(Boolean);
+
+  // In direct chat, if message is marked read or partner has read receipt after message creation
+  if (
+    isSender &&
+    seenByContacts.length === 0 &&
+    activeConversation?.type === CONVERSATION_TYPES.DIRECT
+  ) {
+    const partnerId = (activeDetails?.partner?._id || activeDetails?.partner || '').toString();
+    const partnerReceipt = (activeConversation?.readReceipts || []).find(
+      (r) => (r.user?._id || r.user || '').toString() === partnerId
+    );
+    const hasReadReceipt =
+      partnerReceipt?.lastReadAt &&
+      new Date(partnerReceipt.lastReadAt).getTime() >= new Date(message.createdAt).getTime();
+
+    if ((message.status === 'read' || hasReadReceipt) && activeDetails?.partner) {
+      seenByContacts = [activeDetails.partner];
+    }
+  }
 
   const isGroup = activeConversation?.type === CONVERSATION_TYPES.GROUP;
-  const otherParticipants = (activeConversation?.participants || []).filter(
-    (p) => (p._id || p).toString() !== currentUserId
-  );
-  const totalOthers = Math.max(1, otherParticipants.length);
-  const readOthers = (message.readBy || []).filter(
-    (id) => (id._id || id).toString() !== currentUserId
-  );
-  const readOthersCount = readOthers.length;
-  const isAllRead = otherParticipants.length > 0 && readOthersCount >= otherParticipants.length;
-  const isPartiallyRead = readOthersCount > 0 && !isAllRead;
-
   const groupedReactions = groupReactions(message.reactions, currentUserId);
 
   const hasMediaOnly =
@@ -179,7 +202,7 @@ export const MessageBubble = ({
         isConsecutive ? 'mt-1' : 'mt-3.5'
       } ${isSender ? 'justify-end' : 'justify-start'}`}
     >
-      {/* Received message avatar (only rendered on first message of a consecutive group) */}
+      {/* Received message avatar */}
       {!isSender && (
         <div className="shrink-0 w-8 flex justify-center mt-0.5">
           {!isConsecutive ? (
@@ -202,42 +225,21 @@ export const MessageBubble = ({
           isSender ? 'items-end ml-auto' : 'items-start mr-auto'
         }`}
       >
-        {/* Sender header & timestamp (omitted on consecutive messages from same sender) */}
-        {!isConsecutive && (
+        {/* Sender header (only rendered for received messages on first message of group) */}
+        {!isConsecutive && !isSender && (
           <div className="flex items-center gap-1.5 flex-wrap text-xs px-1 select-none">
-            {!isSender ? (
-              <>
-                <span className={`font-bold text-[12px] ${getSenderColorClass(senderRole)}`}>
-                  {senderName}
-                </span>
-                {senderRole && (
-                  <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-sm bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300/60 dark:border-slate-700/60 leading-none">
-                    {senderRole}
-                  </span>
-                )}
-                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium ml-1">
-                  {formatMessageTime(message.createdAt)}
-                </span>
-                {message.isEdited && (
-                  <span className="text-[10px] text-slate-400 italic">
-                    (edited)
-                  </span>
-                )}
-              </>
-            ) : (
-              <>
-                {message.isEdited && (
-                  <span className="text-[10px] text-slate-400 italic mr-1">
-                    (edited)
-                  </span>
-                )}
-                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium mr-1">
-                  {formatMessageTime(message.createdAt)}
-                </span>
-                <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-sm bg-brand-50 dark:bg-brand-950/80 text-brand-700 dark:text-brand-300 border border-brand-200/80 dark:border-brand-800/80 leading-none">
-                  You
-                </span>
-              </>
+            <span className={`font-bold text-[12px] ${getSenderColorClass(senderRole)}`}>
+              {senderName}
+            </span>
+            {senderRole && (
+              <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-sm bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300/60 dark:border-slate-700/60 leading-none">
+                {senderRole}
+              </span>
+            )}
+            {message.isEdited && (
+              <span className="text-[10px] text-slate-400 italic">
+                (edited)
+              </span>
             )}
           </div>
         )}
@@ -251,7 +253,7 @@ export const MessageBubble = ({
                 type="button"
                 onClick={() => onStartReply(message)}
                 className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                title="Reply to message"
+                title="Reply"
                 aria-label="Reply to message"
               >
                 <Reply className="w-3.5 h-3.5" />
@@ -277,13 +279,15 @@ export const MessageBubble = ({
             </div>
           )}
 
-          {/* Bubble Surface */}
+          {/* Bubble Surface matching reference screenshot card aesthetic */}
           <div
-            className={`shadow-xs transition-all relative text-xs sm:text-[13px] leading-relaxed wrap-break-word whitespace-pre-wrap select-text max-w-full ${
-              hasMediaOnly ? 'p-1 sm:p-1.5' : 'px-4 py-2.5'
+            className={`shadow-xs transition-all relative text-xs sm:text-[13px] leading-relaxed break-words [overflow-wrap:anywhere] select-text max-w-full ${
+              hasMediaOnly ? 'p-1 sm:p-1.5' : 'p-3.5 sm:p-4'
             } ${
               isSender
-                ? `bg-brand-600 text-white ${isConsecutive ? 'rounded-2xl' : 'rounded-2xl rounded-tr-xs'}`
+                ? `bg-brand-50/85 dark:bg-brand-950/60 border border-brand-200/90 dark:border-brand-800 text-slate-900 dark:text-slate-100 ${
+                    isConsecutive ? 'rounded-2xl' : 'rounded-2xl rounded-tr-xs'
+                  }`
                 : `bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100 ${
                     isConsecutive ? 'rounded-2xl' : 'rounded-2xl rounded-tl-xs'
                   } border border-slate-200/90 dark:border-slate-800`
@@ -293,7 +297,7 @@ export const MessageBubble = ({
             {isPinned && (
               <div
                 className={`flex items-center gap-1.5 text-[10px] font-semibold mb-1.5 ${
-                  isSender ? 'text-amber-200' : 'text-amber-600 dark:text-amber-400'
+                  isSender ? 'text-brand-800 dark:text-brand-300' : 'text-amber-600 dark:text-amber-400'
                 }`}
               >
                 <Pin className="w-3 h-3 fill-amber-500/40" />
@@ -317,8 +321,8 @@ export const MessageBubble = ({
                 }}
                 className={`mb-2 p-2.5 rounded-xl text-xs cursor-pointer border-l-4 transition-all hover:opacity-95 ${
                   isSender
-                    ? 'bg-brand-700/80 border-white/90 text-white hover:bg-brand-700'
-                    : 'bg-slate-100 dark:bg-slate-750 border-brand-500 text-slate-800 dark:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-700'
+                    ? 'bg-brand-100/70 dark:bg-brand-900/40 border-brand-600 text-slate-900 dark:text-white'
+                    : 'bg-slate-100 dark:bg-slate-750 border-brand-500 text-slate-800 dark:text-slate-200'
                 }`}
                 title="Click to jump to original message"
                 role="button"
@@ -329,22 +333,13 @@ export const MessageBubble = ({
                   <span>
                     {message.replyTo?.sender?.name || message.replySnapshot?.senderName || 'User'}
                   </span>
-                  {(message.replyTo?.sender?.role || message.replySnapshot?.senderRole) && (
-                    <span className="px-1 text-[9px] font-semibold rounded uppercase tracking-wider bg-black/10 dark:bg-white/10">
-                      {message.replyTo?.sender?.role || message.replySnapshot?.senderRole}
-                    </span>
-                  )}
                 </div>
                 <p className="line-clamp-1 italic text-[11px] opacity-85">
                   {message.replyTo?.isDeleted || message.replySnapshot?.isDeleted
                     ? '🚫 This message was deleted'
                     : message.replyTo?.content ||
                       message.replySnapshot?.contentPreview ||
-                      (message.replyTo?.attachments?.length > 0
-                        ? `📎 ${message.replyTo.attachments[0].fileName}`
-                        : message.replySnapshot?.attachmentSummary
-                        ? `📎 ${message.replySnapshot.attachmentSummary}`
-                        : 'Quoted message')}
+                      'Quoted message'}
                 </p>
               </div>
             )}
@@ -372,9 +367,12 @@ export const MessageBubble = ({
               </p>
             ) : (
               message.content && (
-                <p className={message.attachments && message.attachments.length > 0 ? 'px-2 pt-1.5 pb-0.5' : ''}>
-                  {message.content}
-                </p>
+                <div className={message.attachments && message.attachments.length > 0 ? 'px-1 pt-1.5 pb-0.5' : ''}>
+                  <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium block text-right mt-1.5 select-none">
+                    {formatMessageTime(message.createdAt)}
+                  </span>
+                </div>
               )
             )}
           </div>
@@ -386,7 +384,7 @@ export const MessageBubble = ({
                 type="button"
                 onClick={() => onStartReply(message)}
                 className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                title="Reply to message"
+                title="Reply"
                 aria-label="Reply to message"
               >
                 <Reply className="w-3.5 h-3.5" />
@@ -580,10 +578,52 @@ export const MessageBubble = ({
           )}
         </div>
 
-        {/* Reaction Badges */}
+        {/* ============================================================== */}
+        {/* CONTACTS PROFILE WHO HAVE SEEN MESSAGES (Requirement 2)         */}
+        {/* ============================================================== */}
+        {isSender && seenByContacts.length > 0 && !isDeleted && (
+          <div
+            onClick={() => onOpenMessageInfo?.(message)}
+            className="flex items-center gap-1.5 mt-0.5 cursor-pointer select-none group/seen pr-1 hover:opacity-90 transition-opacity"
+            title={`Seen by ${seenByContacts.map((u) => u.name || 'Contact').join(', ')} (Click to view full info)`}
+          >
+            <div className="flex items-center -space-x-1.5">
+              {seenByContacts.slice(0, 3).map((u, i) => (
+                <UserAvatar
+                  key={u._id || i}
+                  sender={u}
+                  name={u.name}
+                  size="xs"
+                  className="w-4.5 h-4.5 rounded-full ring-2 ring-white dark:ring-slate-900 shadow-2xs"
+                  showStatus={false}
+                />
+              ))}
+            </div>
+            {seenByContacts.length > 1 && (
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                {seenByContacts.length}
+              </span>
+            )}
+            {seenByContacts.length === 1 && (
+              <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                Seen
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Fallback if sent and not seen yet */}
+        {isSender && seenByContacts.length === 0 && !isDeleted && (
+          <div className="flex items-center gap-1 text-[10px] text-slate-400 select-none pr-1 mt-0.5">
+            <Check className="w-3.5 h-3.5 text-slate-400 stroke-[2]" />
+            <span>Sent</span>
+          </div>
+        )}
+
+        {/* Reaction Badges matching reference screenshot below seen stack */}
         {groupedReactions.length > 0 && (
           <div
-            className={`flex flex-wrap items-center gap-1 mt-1 ${
+            className={`flex flex-wrap items-center gap-1 mt-0.5 ${
               isSender ? 'justify-end' : 'justify-start'
             }`}
           >
@@ -596,72 +636,13 @@ export const MessageBubble = ({
                 className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border transition-all active:scale-95 cursor-pointer ${
                   reactedByMe
                     ? 'bg-brand-50 dark:bg-brand-950/80 border-brand-300 dark:border-brand-700 text-brand-700 dark:text-brand-300 shadow-2xs'
-                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
+                    : 'bg-white dark:bg-slate-850 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300'
                 }`}
               >
                 <span>{emoji}</span>
                 <span className="text-[11px] font-semibold">{count}</span>
               </button>
             ))}
-          </div>
-        )}
-
-        {/* Sender Delivery / Read Receipt */}
-        {isSender && (
-          <div className="flex items-center gap-1 text-[10px] select-none pr-1">
-            {isGroup ? (
-              <button
-                type="button"
-                onClick={() => onOpenMessageInfo?.(message)}
-                className="inline-flex items-center gap-1 py-0.5 px-1 rounded-md hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer group/receipt"
-                title="Click to see who read this message"
-              >
-                {isAllRead ? (
-                  <span className="inline-flex items-center gap-1 text-sky-500 dark:text-sky-400 font-semibold">
-                    <CheckCheck className="w-3.5 h-3.5 text-sky-500 dark:text-sky-400 stroke-[2.5]" />
-                    <span>Read by all ({totalOthers})</span>
-                    <Info className="w-3 h-3 text-sky-500 opacity-60 group-hover/receipt:opacity-100" />
-                  </span>
-                ) : isPartiallyRead ? (
-                  <span className="inline-flex items-center gap-1 text-sky-600 dark:text-sky-400 font-medium">
-                    <CheckCheck className="w-3.5 h-3.5 text-sky-500 dark:text-sky-400 stroke-[2]" />
-                    <span>
-                      Read by {readOthersCount} of {totalOthers}
-                    </span>
-                    <Info className="w-3 h-3 text-sky-500 opacity-60 group-hover/receipt:opacity-100" />
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-slate-400 dark:text-slate-500">
-                    <CheckCheck className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 stroke-[2]" />
-                    <span>Delivered</span>
-                    <Info className="w-3 h-3 text-slate-400 opacity-50 group-hover/receipt:opacity-100" />
-                  </span>
-                )}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => onOpenMessageInfo?.(message)}
-                className="inline-flex items-center gap-1 py-0.5 px-1 rounded-md hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
-                title={
-                  isReadByOthers
-                    ? 'Read by recipient (Click for message info)'
-                    : 'Delivered to recipient (Click for message info)'
-                }
-              >
-                {isReadByOthers ? (
-                  <span className="inline-flex items-center gap-1 text-sky-500 dark:text-sky-400 font-semibold">
-                    <CheckCheck className="w-3.5 h-3.5 text-sky-500 dark:text-sky-400 stroke-[2.5]" />
-                    <span className="text-sky-600 dark:text-sky-400">Read</span>
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-slate-400 dark:text-slate-500">
-                    <CheckCheck className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 stroke-[2]" />
-                    <span>Delivered</span>
-                  </span>
-                )}
-              </button>
-            )}
           </div>
         )}
       </div>

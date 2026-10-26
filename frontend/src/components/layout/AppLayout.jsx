@@ -43,27 +43,20 @@ export const AppLayout = ({ children, healthStatus, onOpenLogin }) => {
 
   const isChat = location.pathname === '/chat';
 
-  // If this is the Chat view, render a dedicated full-height workspace without outer page scroll or footer
+  // If this is the Chat view, render a dedicated full-height workspace without Core Platform sidebar, outer page scroll, or footer
   if (isChat) {
     return (
       <div className="h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-200">
-        {/* Workspace Sidebar */}
-        <Sidebar
-          isOpen={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-          healthStatus={healthStatus}
-        />
-
-        {/* Main Workspace Area with Sidebar Offset */}
-        <div className="flex-1 flex flex-col lg:pl-64 h-full min-h-0 overflow-hidden">
-          {/* Workspace Top Navbar */}
+        {/* Main Workspace Area with NO Sidebar Offset (Full Width) */}
+        <div className="flex-1 flex flex-col w-full h-full min-h-0 overflow-hidden">
+          {/* Workspace Top Navbar with Back to Main */}
           <TopNavbar
-            onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
             healthStatus={healthStatus}
             onOpenLogin={onOpenLogin}
+            isChat={true}
           />
 
-          {/* Full-bleed Chat Viewport: Pinned height, no outer overflow, no footer */}
+          {/* Full-bleed Chat Viewport: Pinned height, full width, no outer overflow, no footer */}
           <main className="flex-1 w-full min-h-0 overflow-hidden flex flex-col">
             {children}
           </main>
